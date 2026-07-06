@@ -1,0 +1,54 @@
+name: unigrid_app
+description: "University Department App with Announcements, Schedule, Materials, and Chat."
+publish_to: 'none'
+version: 1.0.0+3
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  google_sign_in: ^6.2.1
+  cloud_firestore: ^5.4.4
+  firebase_storage: ^12.3.2
+  supabase_flutter: ^2.5.4
+  provider: ^6.1.1
+  intl: ^0.19.0
+  file_picker: ^8.1.2
+  url_launcher: ^6.3.1
+  flutter_chat_ui: ^1.6.9
+  flutter_chat_types: ^3.6.1
+  uuid: ^4.3.3
+  shared_preferences: ^2.2.2
+  image: ^4.1.3
+  flutter_animate: ^4.5.0
+  google_fonts: ^6.3.3
+  http: ^1.2.2
+  connectivity_plus: ^6.0.3
+  googleapis_auth: ^1.6.0
+  package_info_plus: ^8.0.0
+  ota_update: ^6.0.0
+  firebase_messaging: ^15.1.3
+  flutter_local_notifications: ^17.1.1
+  permission_handler: ^11.3.0
+  onesignal_flutter: ^5.2.5
+  font_awesome_flutter: ^11.0.0
+  syncfusion_flutter_pdfviewer: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/service_account.json
+    - assets/images/
+
+

@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "113354293876",
+    "project_id": "dept-ipe",
+    "storage_bucket": "dept-ipe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:113354293876:android:f99fdb0676474d909f0721",
+        "android_client_info": {
+          "package_name": "com.example.unigrid_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "113354293876-2thlbrouov7329n4u5usbfm93c6kp2cu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.unigrid_app",
+            "certificate_hash": "38bba92717bab4983223c649d33707b5e54ccef9"
+          }
+        },
+        {
+          "client_id": "113354293876-p6ao6l5fjtshpp3uur03inaoeu8buih9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDY5KClRoBm9MTpKH3Bz3OmuuCxlvutEns"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "113354293876-p6ao6l5fjtshpp3uur03inaoeu8buih9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "113354293876-31mmolr4iph7lgnon5o5fl9l37u7g84k.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.unigridApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ (API 31+) full-backup rules.
+    Exclude sensitive credential files from cloud backup.
+    See: https://developer.android.com/guide/topics/data/autobackup
+-->
+<full-backup-content>
+    <!-- Exclude shared preferences that contain auth tokens -->
+    <exclude domain="sharedpref" path="FlutterSharedPreferences.xml" />
+    <!-- Exclude all cached files -->
+    <exclude domain="cache" path="." />
+    <exclude domain="external-cache" path="." />
+</full-backup-content>

@@ -1,0 +1,2498 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import '../models/models.dart';
+import '../services/auth_service.dart';
+import '../services/theme_service.dart';
+import '../utils/constants.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/floating_app_bar.dart';
+import '../widgets/unigrid_loader.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/dept_scope.dart';
+
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  // Upload and Update states
+  bool _isUploading = false;
+
+  // Tabs navigation state
+  String _activeTab = 'Edit profile';
+
+  // Notifications State Toggles
+  bool _notifRoutine = true;
+  bool _notifChat = true;
+  bool _notifAlerts = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationSettings();
+  }
+
+
+
+  Future<void> _loadNotificationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _notifRoutine = prefs.getBool('notif_routine') ?? true;
+        _notifChat = prefs.getBool('notif_chat') ?? true;
+        _notifAlerts = prefs.getBool('notif_alerts') ?? true;
+      });
+    }
+  }
+
+  Future<void> _saveNotificationSetting(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
+
+  // Text Form Controllers
+  late TextEditingController _nameController;
+  late TextEditingController _idController;
+  late TextEditingController _deptController;
+  late TextEditingController _batchController;
+  late TextEditingController _phoneController;
+  late TextEditingController _schoolController;
+  late TextEditingController _collegeController;
+  late TextEditingController _emailController;
+  late TextEditingController _currentPasswordController;
+  late TextEditingController _newPasswordController;
+
+  bool _isInitialized = false;
+  bool _isSaving = false;
+  String _saveError = '';
+
+  @override
+  void dispose() {
+    if (_isInitialized) {
+      _nameController.dispose();
+      _idController.dispose();
+      _deptController.dispose();
+      _batchController.dispose();
+      _phoneController.dispose();
+      _schoolController.dispose();
+      _collegeController.dispose();
+      _emailController.dispose();
+      _currentPasswordController.dispose();
+      _newPasswordController.dispose();
+    }
+    super.dispose();
+  }
+
+
+
+  // Base64 vs Network Image Loader
+  ImageProvider? _getProfileImage(String photoUrl) {
+    if (photoUrl.isEmpty) return null;
+    if (photoUrl.startsWith('data:image')) {
+      try {
+        final base64String = photoUrl.split(',').last;
+        return MemoryImage(base64Decode(base64String));
+      } catch (e) {
+        return null;
+      }
+    }
+    return NetworkImage(photoUrl);
+  }
+
+  // Profile image upload picker
+  Future<void> _pickAndUploadPhoto() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    try {
+      final result = await FilePicker.platform
+          .pickFiles(type: FileType.image, withData: true);
+      if (result == null) return;
+      final file = result.files.first;
+      Uint8List? fileBytes;
+      if (file.bytes != null && file.bytes!.isNotEmpty) {
+        fileBytes = file.bytes!;
+      } else if (file.path != null) {
+        fileBytes = await File(file.path!).readAsBytes();
+      }
+
+      if (fileBytes == null) return;
+
+      setState(() {
+        _isUploading = true;
+      });
+
+      await authService.uploadProfilePhoto(
+        fileBytes,
+        file.extension ?? 'jpg',
+      );
+
+      if (mounted) {
+        setState(() => _isUploading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('âœ… Profile photo updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Upload failed: ${e.toString().split(']').last}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  // Save changes popup trigger
+  void _showSavedPopup() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black38,
+      builder: (_) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A1912).withOpacity(0.95),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                  color: AppColors.primary.withOpacity(0.4), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.primary.withOpacity(0.15),
+                    blurRadius: 30,
+                    spreadRadius: 5),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.check_circle_rounded,
+                      color: AppColors.primary, size: 56),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Saved!',
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Your profile has been updated.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Provider.of<ThemeService>(context); // Listen to global theme updates
+    final user = Provider.of<AppUser?>(context);
+    if (user == null)
+      return const Scaffold(
+        body: UniGridLoader(
+          title: 'Retrieving Workspace Profile',
+          subtitle: 'Syncing settings with server...',
+        ),
+      );
+
+    // One-time load initialization
+    if (!_isInitialized) {
+      _nameController = TextEditingController(text: user.name);
+      _idController = TextEditingController(text: user.studentId);
+      _deptController = TextEditingController(text: user.department);
+      _batchController = TextEditingController(text: user.batch);
+      _phoneController = TextEditingController(text: user.phoneNumber);
+      _schoolController = TextEditingController(text: user.schoolName);
+      _collegeController = TextEditingController(text: user.collegeName);
+      _emailController = TextEditingController(text: user.email);
+      _currentPasswordController = TextEditingController();
+      _newPasswordController = TextEditingController();
+      _isInitialized = true;
+    }
+
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth <= 760;
+
+    // Resolve navigation active pane
+    final Widget activePane;
+    switch (_activeTab) {
+      case 'Edit profile':
+        activePane = _buildEditProfilePane(user);
+        break;
+      case 'Notification':
+        activePane = _buildNotificationPane();
+        break;
+      case 'Security':
+        activePane = _buildSecurityPane(user);
+        break;
+      case 'Appearance':
+        activePane = _buildAppearancePane(user);
+        break;
+      case 'Officers':
+        activePane = _buildOfficersPane();
+        break;
+      case 'About':
+        activePane = _buildAboutPane();
+        break;
+      case 'Help':
+        activePane = _buildHelpPane();
+        break;
+      case 'Terms & Conditions':
+        activePane = _buildTermsPane();
+        break;
+      case 'Privacy Policy':
+        activePane = _buildPrivacyPane();
+        break;
+      default:
+        activePane = _buildEditProfilePane(user);
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: null,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: AppGradients.mainBackground,
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FloatingAppBar(
+                title: 'My Settings',
+                actions: [
+                  IconButton(
+                    icon: Icon(Icons.logout_rounded, color: AppColors.textSecondary),
+                    tooltip: 'Logout',
+                    onPressed: () {
+                      Provider.of<AuthService>(context, listen: false).signOut();
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
+              Expanded(
+                child: isMobile
+                    ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Horizontal tab row for mobile
+                  Container(
+                    height: 50,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          _buildHorizontalTabItem(
+                              'Edit profile', Icons.edit_outlined),
+                          _buildHorizontalTabItem('Notification',
+                              Icons.notifications_none_outlined),
+                          _buildHorizontalTabItem(
+                              'Security', Icons.lock_outline_rounded),
+                          _buildHorizontalTabItem(
+                              'Appearance', Icons.settings_outlined),
+                          _buildHorizontalTabItem(
+                              'Officers', Icons.people_outline_rounded),
+                          _buildHorizontalTabItem(
+                              'About', Icons.info_outline_rounded),
+                          _buildHorizontalTabItem(
+                              'Help', Icons.help_outline_rounded),
+                          _buildHorizontalTabItem(
+                              'Terms & Conditions', Icons.gavel_outlined),
+                          _buildHorizontalTabItem(
+                              'Privacy Policy', Icons.privacy_tip_outlined),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Divider(color: AppColors.glassCardBorder, height: 1),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        top: 16,
+                        bottom: MediaQuery.of(context).padding.bottom + 96,
+                      ),
+                      child: GlassCard(
+                        padding: const EdgeInsets.all(16),
+                        child: activePane,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  left: 24,
+                  right: 24,
+                  top: 24,
+                  bottom: MediaQuery.of(context).padding.bottom + 96,
+                ),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Navigation Sidebar
+                      SizedBox(
+                        width: 200,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.chevron_left,
+                                    color: AppColors.textSecondary, size: 20),
+                                SizedBox(width: 4),
+                                Text(
+                                  'settings',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            _buildSidebarItem(
+                                'Edit profile', Icons.edit_outlined),
+                            _buildSidebarItem('Notification',
+                                Icons.notifications_none_outlined),
+                            _buildSidebarItem(
+                                'Security', Icons.lock_outline_rounded),
+                            _buildSidebarItem(
+                                'Appearance', Icons.settings_outlined),
+                            _buildSidebarItem(
+                                'Officers', Icons.people_outline_rounded),
+                            _buildSidebarItem(
+                                'About', Icons.info_outline_rounded),
+                            _buildSidebarItem(
+                                'Help', Icons.help_outline_rounded),
+                            _buildSidebarItem(
+                                'Terms & Conditions', Icons.gavel_outlined),
+                            _buildSidebarItem(
+                                'Privacy Policy', Icons.privacy_tip_outlined),
+                          ],
+                        ),
+                      ),
+                      // Thin vertical divider line
+                      Container(
+                        width: 1,
+                        height: 540,
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                        color: AppColors.glassCardBorder,
+                      ),
+                      // Main Content Area Pane
+                      Expanded(
+                        child: activePane,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Sidebar navigation item widget
+  Widget _buildSidebarItem(String title, IconData icon) {
+    final bool isActive = _activeTab == title;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _activeTab = title;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppColors.primary.withOpacity(0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: isActive
+              ? Border.all(color: AppColors.primary.withOpacity(0.3), width: 1)
+              : Border.all(color: Colors.transparent, width: 1),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isActive ? AppColors.primary : AppColors.textSecondary,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Mobile Swipeable Tab widget
+  Widget _buildHorizontalTabItem(String title, IconData icon) {
+    final bool isActive = _activeTab == title;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _activeTab = title;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppColors.primary.withOpacity(0.15)
+              : AppColors.textPrimary.withOpacity(0.02),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive
+                ? AppColors.primary.withOpacity(0.3)
+                : AppColors.textPrimary.withOpacity(0.06),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isActive ? AppColors.primary : AppColors.textSecondary,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------
+  // PANES IMPLEMENTATIONS
+  // -------------------------------------------------------------
+
+  // Pane 1: Edit Profile Form Content
+  Widget _buildEditProfilePane(AppUser user) {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isNarrow = screenWidth <= 520;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Title Header & Photo edit row (Centered Column on Mobile, Split Row on Tablet/Desktop)
+        if (isNarrow) ...[
+          Center(
+            child: Column(
+              children: [
+                Stack(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [AppColors.primary, AppColors.secondary],
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 44,
+                            backgroundColor: AppColors.backgroundTop,
+                            backgroundImage: _getProfileImage(user.photoUrl),
+                            child: user.photoUrl.isEmpty
+                                ? Text(
+                                    user.name.isNotEmpty
+                                        ? user.name[0].toUpperCase()
+                                        : 'U',
+                                    style: TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary),
+                                  )
+                                : null,
+                          ),
+                          if (_isUploading)
+                            const Positioned.fill(
+                              child: CircleAvatar(
+                                backgroundColor: Colors.black45,
+                                radius: 44,
+                                child: CircularProgressIndicator(
+                                    color: AppColors.textPrimary, strokeWidth: 2),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _isUploading ? null : _pickAndUploadPhoto,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color:
+                                _isUploading ? Colors.grey : AppColors.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: AppColors.backgroundTop, width: 1.5),
+                          ),
+                          child: Icon(
+                            _isUploading
+                                ? Icons.hourglass_top
+                                : Icons.camera_alt,
+                            color: AppColors.textPrimary,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Edit profile',
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold),
+                ),
+                if (user.isCR) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                    ),
+                    child: const Text(
+                      'â­ Root Admin',
+                      style: TextStyle(
+                          color: Colors.amber,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ] else ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'Edit profile',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold),
+              ),
+              Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [AppColors.primary, AppColors.secondary],
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 36,
+                          backgroundColor: AppColors.backgroundTop,
+                          backgroundImage: _getProfileImage(user.photoUrl),
+                          child: user.photoUrl.isEmpty
+                              ? Text(
+                                  user.name.isNotEmpty
+                                      ? user.name[0].toUpperCase()
+                                      : 'U',
+                                  style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary),
+                                )
+                              : null,
+                        ),
+                        if (_isUploading)
+                          const Positioned.fill(
+                            child: CircleAvatar(
+                              backgroundColor: Colors.black45,
+                              radius: 36,
+                              child: CircularProgressIndicator(
+                                  color: AppColors.textPrimary, strokeWidth: 2),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: _isUploading ? null : _pickAndUploadPhoto,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: _isUploading ? Colors.grey : AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: AppColors.backgroundTop, width: 1.5),
+                        ),
+                        child: Icon(
+                          _isUploading ? Icons.hourglass_top : Icons.camera_alt,
+                          color: AppColors.textPrimary,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 24),
+
+        // Text Form inputs layout
+        if (isNarrow) ...[
+          _buildFormInput(
+              label: 'First Name (Full Name)', controller: _nameController),
+          const SizedBox(height: 14),
+          _buildFormInput(label: 'Student ID', controller: _idController),
+          const SizedBox(height: 14),
+          _buildFormInput(
+              label: 'Email',
+              controller: _emailController,
+              readOnly: true,
+              showCheckmark: true),
+          const SizedBox(height: 14),
+          _buildDeptDropdown(user),
+          const SizedBox(height: 14),
+          _buildBatchDropdown(user),
+          const SizedBox(height: 14),
+          _buildFormInput(
+              label: 'Contact Number', controller: _phoneController),
+          const SizedBox(height: 14),
+          _buildFormInput(label: 'School Name', controller: _schoolController),
+          const SizedBox(height: 14),
+          _buildFormInput(
+              label: 'College Name', controller: _collegeController),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                  child: _buildFormInput(
+                      label: 'First Name (Full Name)',
+                      controller: _nameController)),
+              const SizedBox(width: 16),
+              Expanded(
+                  child: _buildFormInput(
+                      label: 'Student ID', controller: _idController)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildFormInput(
+              label: 'Email',
+              controller: _emailController,
+              readOnly: true,
+              showCheckmark: true),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _buildDeptDropdown(user)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildBatchDropdown(user)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                  child: _buildFormInput(
+                      label: 'Contact Number', controller: _phoneController)),
+              const SizedBox(width: 16),
+              Expanded(
+                  child: _buildFormInput(
+                      label: 'School Name', controller: _schoolController)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                  child: _buildFormInput(
+                      label: 'College Name', controller: _collegeController)),
+              const SizedBox(width: 16),
+              Expanded(child: Container()), // empty space for alignment
+            ],
+          ),
+        ],
+
+        // Error display panel
+        if (_saveError.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+            ),
+            child: Text(
+              'âŒ $_saveError',
+              style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 28),
+
+        // Cancel / Save buttons (Stacked vertically on Mobile, side-by-side Row on Desktop)
+        if (isNarrow) ...[
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _isSaving
+                  ? null
+                  : () async {
+                      setState(() {
+                        _isSaving = true;
+                        _saveError = '';
+                      });
+                      try {
+                        await Provider.of<AuthService>(context, listen: false)
+                            .updateUserProfile(
+                              name: _nameController.text.trim(),
+                              studentId: _idController.text.trim(),
+                              department: _deptController.text.trim(),
+                              batch: _batchController.text.trim(),
+                              phoneNumber: _phoneController.text.trim(),
+                              schoolName: _schoolController.text.trim(),
+                              collegeName: _collegeController.text.trim(),
+                            )
+                            .timeout(
+                              const Duration(seconds: 5),
+                              onTimeout: () => throw TimeoutException(
+                                  'Update timed out. Please check connection.'),
+                            );
+                        if (mounted) {
+                          setState(() {
+                            _isSaving = false;
+                          });
+                          _showSavedPopup();
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          setState(() {
+                            _isSaving = false;
+                            _saveError = e.toString();
+                          });
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: _isSaving
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          color: AppColors.textPrimary, strokeWidth: 1.5),
+                    )
+                  : Text(
+                      'Save Changes',
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: _isSaving
+                  ? null
+                  : () {
+                      setState(() {
+                        _nameController.text = user.name;
+                        _idController.text = user.studentId;
+                        _deptController.text = user.department;
+                        _batchController.text = user.batch;
+                        _phoneController.text = user.phoneNumber;
+                        _schoolController.text = user.schoolName;
+                        _collegeController.text = user.collegeName;
+                        _saveError = '';
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content:
+                                const Text('Form fields reset to default values.'),
+                            backgroundColor: AppColors.glassCardBorder),
+                      );
+                    },
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: AppColors.primary, width: 1),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ] else ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton(
+                onPressed: _isSaving
+                    ? null
+                    : () {
+                        setState(() {
+                          _nameController.text = user.name;
+                          _idController.text = user.studentId;
+                          _deptController.text = user.department;
+                          _batchController.text = user.batch;
+                          _phoneController.text = user.phoneNumber;
+                          _schoolController.text = user.schoolName;
+                          _collegeController.text = user.collegeName;
+                          _saveError = '';
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content:
+                                  const Text('Form fields reset to default values.'),
+                              backgroundColor: AppColors.glassCardBorder),
+                        );
+                      },
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: AppColors.primary, width: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _isSaving
+                    ? null
+                    : () async {
+                        setState(() {
+                          _isSaving = true;
+                          _saveError = '';
+                        });
+                        try {
+                          await Provider.of<AuthService>(context, listen: false)
+                              .updateUserProfile(
+                                name: _nameController.text.trim(),
+                                studentId: _idController.text.trim(),
+                                department: _deptController.text.trim(),
+                                batch: _batchController.text.trim(),
+                                phoneNumber: _phoneController.text.trim(),
+                                schoolName: _schoolController.text.trim(),
+                                collegeName: _collegeController.text.trim(),
+                              )
+                              .timeout(
+                                const Duration(seconds: 5),
+                                onTimeout: () => throw TimeoutException(
+                                    'Update timed out. Please check connection.'),
+                              );
+                          if (mounted) {
+                            setState(() {
+                              _isSaving = false;
+                            });
+                            _showSavedPopup();
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() {
+                              _isSaving = false;
+                              _saveError = e.toString();
+                            });
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: _isSaving
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            color: AppColors.textPrimary, strokeWidth: 1.5),
+                      )
+                    : Text(
+                        'Save',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold),
+                      ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Custom Outline Form Input Generator
+  Widget _buildFormInput({
+    required String label,
+    required TextEditingController controller,
+    bool readOnly = false,
+    bool showCheckmark = false,
+    bool isPassword = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+              color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          readOnly: readOnly,
+          obscureText: isPassword,
+          style: TextStyle(
+              color: readOnly ? AppColors.textSecondary : AppColors.textPrimary, fontSize: 14),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.textPrimary.withOpacity(0.03),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: AppColors.textPrimary.withOpacity(0.08)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+            ),
+            suffixIcon: showCheckmark
+                ? Icon(Icons.check_circle, color: AppColors.primary, size: 20)
+                : null,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeptDropdown(AppUser user) {
+    if (user.isApproved) {
+      return _buildFormInput(
+        label: 'Department',
+        controller: _deptController,
+        readOnly: true,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Department',
+          style: TextStyle(
+              color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: kDeptCodes.contains(_deptController.text)
+              ? _deptController.text
+              : null,
+          isExpanded: true,
+          dropdownColor: AppColors.backgroundTop,
+          style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.textPrimary.withOpacity(0.03),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: AppColors.textPrimary.withOpacity(0.08)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+            ),
+          ),
+          items: kDepartments
+              .map((d) => DropdownMenuItem<String>(
+                    value: d['code'],
+                    child: Text(
+                      '${d['code']} — ${d['name']}',
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) {
+              setState(() {
+                _deptController.text = v;
+              });
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBatchDropdown(AppUser user) {
+    if (user.isApproved) {
+      return _buildFormInput(
+        label: 'Batch',
+        controller: _batchController,
+        readOnly: true,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Batch',
+          style: TextStyle(
+              color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: kBatches.contains(_batchController.text)
+              ? _batchController.text
+              : null,
+          isExpanded: true,
+          dropdownColor: AppColors.backgroundTop,
+          style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.textPrimary.withOpacity(0.03),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: AppColors.textPrimary.withOpacity(0.08)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+            ),
+          ),
+          items: kBatches
+              .map((b) => DropdownMenuItem<String>(
+                    value: b,
+                    child: Text(
+                      'Batch $b',
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                    ),
+                  ))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) {
+              setState(() {
+                _batchController.text = v;
+              });
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  // Pane 2: Notification Switches Content
+  Widget _buildNotificationPane() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Notification Settings',
+          style: TextStyle(
+              color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Customize your app notification alerts.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 24),
+        _buildSwitchTile(
+            'Routine Reminders',
+            'Notify me 10 minutes before class starts.',
+            _notifRoutine, (newVal) async {
+          setState(() {
+            _notifRoutine = newVal;
+          });
+          await _saveNotificationSetting('notif_routine', newVal);
+        }),
+        const SizedBox(height: 12),
+        _buildSwitchTile(
+            'New Chat Messages',
+            'Receive real-time push notifications for chat.',
+            _notifChat, (newVal) async {
+          setState(() {
+            _notifChat = newVal;
+          });
+          await _saveNotificationSetting('notif_chat', newVal);
+        }),
+        const SizedBox(height: 12),
+        _buildSwitchTile(
+            'Announcements & CR Alerts',
+            'Receive alerts for class cancellations or updates.',
+            _notifAlerts, (newVal) async {
+          setState(() {
+            _notifAlerts = newVal;
+          });
+          await _saveNotificationSetting('notif_alerts', newVal);
+        }),
+      ],
+    );
+  }
+
+  // Custom Switch row
+  Widget _buildSwitchTile(String title, String subtitle, bool currentVal,
+      ValueChanged<bool> onChanged) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.textPrimary.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.textPrimary.withOpacity(0.04)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(subtitle,
+                    style:
+                        TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+              ],
+            ),
+          ),
+          Switch(
+            value: currentVal,
+            activeColor: AppColors.primary,
+            activeTrackColor: AppColors.primary.withOpacity(0.3),
+            inactiveThumbColor: AppColors.textSecondary.withOpacity(0.3),
+            inactiveTrackColor: AppColors.glassCardBorder,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Pane 3: Security & Credentials Content
+  Widget _buildSecurityPane(AppUser user) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Security Settings',
+          style: TextStyle(
+              color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Manage password resets and credentials.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.02),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.04)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.shield_outlined,
+                      color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Password & Login Security',
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'A secure reset link can be sent to your email (${user.email}) to safely change your account password.',
+                style: TextStyle(
+                    color: AppColors.textSecondary, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  if (user.email.isNotEmpty) {
+                    try {
+                      await Provider.of<AuthService>(context, listen: false)
+                          .sendPasswordResetEmail(user.email);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'âœ… Password reset email dispatched successfully!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text('Failed: $e'),
+                              backgroundColor: Colors.redAccent),
+                        );
+                      }
+                    }
+                  }
+                },
+                icon: Icon(Icons.mail_outline_rounded,
+                    size: 16, color: AppColors.textPrimary),
+                label: Text('Send Password Reset Email',
+                    style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Divider(color: AppColors.glassCardBorder, height: 1),
+              ),
+              Text('Change Password',
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13)),
+              const SizedBox(height: 12),
+              _buildFormInput(
+                  label: 'Current Password',
+                  controller: _currentPasswordController,
+                  isPassword: true),
+              const SizedBox(height: 12),
+              _buildFormInput(
+                  label: 'New Password',
+                  controller: _newPasswordController,
+                  isPassword: true),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _isSaving
+                    ? null
+                    : () async {
+                        if (_currentPasswordController.text.isEmpty ||
+                            _newPasswordController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Please fill both password fields.')));
+                          return;
+                        }
+                        setState(() => _isSaving = true);
+                        try {
+                          await Provider.of<AuthService>(context, listen: false)
+                              .updatePassword(
+                            _currentPasswordController.text,
+                            _newPasswordController.text,
+                          );
+                          _currentPasswordController.clear();
+                          _newPasswordController.clear();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        '✅ Password updated successfully!'),
+                                    backgroundColor: Colors.green));
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text('Failed: $e'),
+                                backgroundColor: Colors.redAccent));
+                          }
+                        } finally {
+                          if (mounted) setState(() => _isSaving = false);
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: _isSaving
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            color: AppColors.textPrimary, strokeWidth: 2))
+                    : Text('Update Password',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Pane 4: Appearance & Styling Themes Content
+  Widget _buildAppearancePane(AppUser user) {
+    final themeService = Provider.of<ThemeService>(context);
+    final activeTheme = themeService.currentTheme;
+    final bool isRootAdmin = Provider.of<AuthService>(context, listen: false)
+        .isRootAdmin(user.email);
+    final bool hasAdminAccess = user.isCR || isRootAdmin;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Appearance & Themes',
+          style: TextStyle(
+              color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Personalize the visual coloring style of the application.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 20),
+        if (!hasAdminAccess) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(16),
+              border:
+                  Border.all(color: Colors.amber.withOpacity(0.3), width: 1),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.lock_outline_rounded,
+                      color: Colors.amber, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Global Theme Locked',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Only Class Representatives (CRs) or Admins can customize the visual theme color globally for everyone.',
+                        style: TextStyle(
+                            color: AppColors.textSecondary, fontSize: 11, height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+        _buildThemeCard(
+            'Mist Emerald',
+            'Primary Green & Slate Mist (Default Active)',
+            const Color(0xFF10B981),
+            activeTheme == 'Mist Emerald',
+            hasAdminAccess),
+        const SizedBox(height: 12),
+        _buildThemeCard(
+            'Sky Sapphire',
+            'Vibrant Indigo & Deep Cosmic Blue',
+            const Color(0xFF3B82F6),
+            activeTheme == 'Sky Sapphire',
+            hasAdminAccess),
+        const SizedBox(height: 12),
+        _buildThemeCard(
+            'Pastel Bloom',
+            'Soft Lilac Pink & Deep Plum Dark',
+            const Color(0xFFEC4899),
+            activeTheme == 'Pastel Bloom',
+            hasAdminAccess),
+        const SizedBox(height: 12),
+        _buildThemeCard(
+            'Sayan Cyan',
+            'Deep Ocean Teal & Icy Cyan Glow',
+            const Color(0xFF06B6D4),
+            activeTheme == 'Sayan Cyan',
+            hasAdminAccess),
+        const SizedBox(height: 12),
+        _buildThemeCard(
+            'Ruby Rose',
+            'Elegant Crimson & Dark Cherry Red',
+            const Color(0xFFEF4444),
+            activeTheme == 'Ruby Rose',
+            hasAdminAccess),
+        const SizedBox(height: 12),
+        _buildThemeCard(
+            'Amethyst Orchid',
+            'Royal Velvet & Amethyst Charcoal',
+            const Color(0xFF8B5CF6),
+            activeTheme == 'Amethyst Orchid',
+            hasAdminAccess),
+        const SizedBox(height: 12),
+        _buildThemeCard(
+            'Sunset Coral',
+            'Vibrant Sunset Coral & Deep Ember',
+            const Color(0xFFF97316),
+            activeTheme == 'Sunset Coral',
+            hasAdminAccess),
+      ],
+    );
+  }
+
+  // Theme selector card template
+  Widget _buildThemeCard(String name, String desc, Color color, bool isActive,
+      bool hasAdminAccess) {
+    final themeService = Provider.of<ThemeService>(context, listen: false);
+    return GestureDetector(
+      onTap: () {
+        if (hasAdminAccess) {
+          themeService.setTheme(name, syncToFirestore: true);
+        } else {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.lock, color: Colors.amber, size: 20),
+                  SizedBox(width: 8),
+                  Text('Only CRs or Admins can customize global themes.',
+                      style: TextStyle(color: AppColors.textPrimary)),
+                ],
+              ),
+              backgroundColor: const Color(0xFF1E293B),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      },
+      child: Opacity(
+        opacity: isActive ? 1.0 : (hasAdminAccess ? 0.95 : 0.45),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.02),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isActive
+                  ? AppColors.primary.withOpacity(0.4)
+                  : AppColors.textPrimary.withOpacity(0.04),
+              width: isActive ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.glassCardBorder, width: 1.5),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14)),
+                    const SizedBox(height: 4),
+                    Text(desc,
+                        style: TextStyle(
+                            color: AppColors.textSecondary, fontSize: 11)),
+                  ],
+                ),
+              ),
+              if (isActive)
+                Icon(Icons.check_circle_rounded,
+                    color: AppColors.primary, size: 20)
+              else if (!hasAdminAccess)
+                Icon(Icons.lock_outline_rounded,
+                    color: AppColors.textSecondary.withOpacity(0.3), size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Pane 5: About Developer
+  Widget _buildAboutPane() {
+    const String portfolioUrl = 'https://mahmudulhasanmridul.netlify.app/';
+    const String linkedinUrl =
+        'https://www.linkedin.com/in/mahmudul-hasan-mridul1/';
+    const String githubUrl = 'https://github.com/mridulhasan13';
+    const String facebookUrl =
+        'https://www.facebook.com/mahmudulhasan.mridul01/';
+    const String xUrl = 'https://x.com/m_h_mridul';
+    const String instagramUrl = 'https://www.instagram.com/mustard_slevalion/';
+
+    Widget socialIconBtn(FaIconData icon, String url) {
+      return GestureDetector(
+        onTap: () =>
+            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.textPrimary.withOpacity(0.08),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Center(
+            child: FaIcon(
+              icon,
+              color: AppColors.textPrimary.withOpacity(0.65),
+              size: 19,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Header ─────────────────────────────────────────────────────
+        Text('About Developer',
+            style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text('The person behind UniGrid',
+            style:
+                TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 12)),
+        const SizedBox(height: 24),
+
+        // ── Centered Hero Card ──────────────────────────────────────────
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withOpacity(0.15),
+                AppColors.primary.withOpacity(0.05),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+                color: AppColors.primary.withOpacity(0.28), width: 1.5),
+          ),
+          child: FutureBuilder<Map<String, dynamic>?>(
+            future: FirebaseFirestore.instance
+                .collection('users')
+                .where('email', isEqualTo: 'hmridul27@gmail.com')
+                .limit(1)
+                .get()
+                .then((q) => q.docs.isNotEmpty ? q.docs.first.data() : null),
+            builder: (context, snap) {
+              final Map<String, dynamic>? devData = snap.data;
+              final String? photoUrl = devData?['photoUrl'];
+              final String? phoneNumber = devData?['phoneNumber'];
+
+              String whatsappUrl =
+                  'https://wa.me/8801521757204'; // Default fallback
+              if (phoneNumber != null && phoneNumber.isNotEmpty) {
+                String cleanPhone =
+                    phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
+                if (cleanPhone.startsWith('0') &&
+                    !cleanPhone.startsWith('880')) {
+                  cleanPhone = '880${cleanPhone.substring(1)}';
+                } else if (!cleanPhone.startsWith('880')) {
+                  cleanPhone = '880$cleanPhone';
+                }
+                whatsappUrl = 'https://wa.me/$cleanPhone';
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // ── Photo ──────────────────────────────────────────────────
+                  Container(
+                    width: 110,
+                    height: 110,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.secondary.withOpacity(0.6),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.45),
+                          blurRadius: 24,
+                          spreadRadius: 3,
+                        ),
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.15),
+                          blurRadius: 48,
+                          spreadRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(3), // ring gap
+                      child: ClipOval(
+                        child: photoUrl != null && photoUrl.isNotEmpty
+                            ? Image.network(
+                                photoUrl,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (ctx, child, progress) =>
+                                    progress == null
+                                        ? child
+                                        : Container(
+                                            color: AppColors.glassCardColor,
+                                            child: Center(
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                          ),
+                                errorBuilder: (ctx, e, s) => Image.asset(
+                                  'assets/images/mridul_profile.png',
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Image.asset(
+                                'assets/images/mridul_profile.png',
+                                fit: BoxFit.cover,
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Name ───────────────────────────────────────────────────
+                  Text(
+                    'Mahmudul Hasan Mridul',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border:
+                          Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.school_rounded,
+                            color: AppColors.primary, size: 16),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Bangladesh University of Textiles (BUTEX)',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: AppColors.textPrimary.withOpacity(0.9),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Social Buttons ──────────────────────────────────────────
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      socialIconBtn(FontAwesomeIcons.envelope,
+                          'mailto:hmridul27@gmail.com'),
+                      socialIconBtn(FontAwesomeIcons.globe, portfolioUrl),
+                      socialIconBtn(FontAwesomeIcons.linkedin, linkedinUrl),
+                      socialIconBtn(FontAwesomeIcons.github, githubUrl),
+                      socialIconBtn(FontAwesomeIcons.instagram, instagramUrl),
+                      socialIconBtn(FontAwesomeIcons.whatsapp, whatsappUrl),
+                      socialIconBtn(FontAwesomeIcons.facebook, facebookUrl),
+                      socialIconBtn(FontAwesomeIcons.xTwitter, xUrl),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── About Me ──────────────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.06)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.format_quote_rounded,
+                      color: AppColors.primary, size: 18),
+                  const SizedBox(width: 8),
+                  Text('About Me',
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Hey there! I’m Mridul, a visual storyteller, handwriting artist, and designer disguised as an engineering student. My journey is fueled by a love for aesthetics and structure, bridging the gap between the meticulous world of engineering and the fluid world of graphic design and calligraphy.\n\n'
+                'From running leadership initiatives in science and photography to digitalizing ideas into clean, striking graphics, I thrive on turning creative visions into reality.',
+                style: TextStyle(
+                    color: AppColors.textPrimary.withOpacity(0.7),
+                    fontSize: 12.5,
+                    height: 1.65),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // â”€â”€ App Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.06)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.apps_rounded, color: AppColors.primary, size: 18),
+                  const SizedBox(width: 8),
+                  Text('App Info',
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _aboutInfoRow(Icons.grid_view_rounded, 'App Name', 'UniGrid'),
+              _aboutInfoRow(Icons.person_outline_rounded, 'Built by',
+                  'Mahmudul Hasan Mridul - BUTEX - IPE - 51'),
+              _aboutInfoRow(Icons.terminal_rounded, 'Built with',
+                  'Flutter + Firebase + Supabase'),
+              _aboutInfoLinkRow(Icons.language_rounded, 'Website',
+                  'unigrid.netlify.app', 'https://unigrid.netlify.app'),
+              _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.0'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              'Copyright © 2026 - Mahmudul Hasan Mridul',
+              style: TextStyle(
+                  color: AppColors.textPrimary.withOpacity(0.35), fontSize: 11),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  // Pane: Officers & Founders
+  Widget _buildOfficersPane() {
+    final List<Map<String, dynamic>> officers = [
+      {
+        'name': 'Mahmudul Hasan Mridul',
+        'designation': 'Founder & Lead Developer',
+        'department': 'IPE',
+        'batch': '51',
+        'photo': 'assets/images/mridul_profile.png',
+        'socials': [
+          {
+            'icon': FontAwesomeIcons.globe,
+            'url': 'https://mahmudulhasanmridul.netlify.app/'
+          },
+          {
+            'icon': FontAwesomeIcons.linkedin,
+            'url': 'https://www.linkedin.com/in/mahmudul-hasan-mridul1/'
+          },
+          {
+            'icon': FontAwesomeIcons.facebook,
+            'url': 'https://www.facebook.com/mahmudulhasan.mridul01/'
+          },
+          {
+            'icon': FontAwesomeIcons.instagram,
+            'url': 'https://www.instagram.com/mustard_slevalion/'
+          },
+          {
+            'icon': FontAwesomeIcons.envelope,
+            'url': 'mailto:hmridul27@gmail.com'
+          },
+        ]
+      },
+      {
+        'name': 'Md. Sakibul Sahon',
+        'designation': 'COO',
+        'department': 'ESE',
+        'batch': '51',
+        'photo': 'assets/images/sahon_profile.jpg',
+        'socials': [
+          {
+            'icon': FontAwesomeIcons.facebook,
+            'url': 'https://www.facebook.com/share/192jKr7bWw/'
+          },
+          {
+            'icon': FontAwesomeIcons.instagram,
+            'url': 'https://www.instagram.com/___its_sahon___?utm_source=qr&igsh=ZmlvMDBzcTlldGkw'
+          },
+          {
+            'icon': FontAwesomeIcons.linkedin,
+            'url': 'https://www.linkedin.com/in/md-sakibul-sahon-b54315304?utm_source=share_via&utm_content=profile&utm_medium=member_android'
+          },
+          {
+            'icon': FontAwesomeIcons.envelope,
+            'url': 'mailto:alwaysongame134@gmail.com'
+          },
+        ]
+      }
+    ];
+
+    Widget socialIconBtn(dynamic icon, String url) {
+      return GestureDetector(
+        onTap: () =>
+            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: AppColors.textPrimary.withOpacity(0.08),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Center(
+            child: FaIcon(
+              icon,
+              color: AppColors.textPrimary.withOpacity(0.65),
+              size: 16,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Officers & Leadership',
+            style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text('The core team managing UniGrid',
+            style:
+                TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 12)),
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          alignment: WrapAlignment.center,
+          children: officers.map((officer) {
+            return Container(
+              width: 290,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withOpacity(0.12),
+                    AppColors.primary.withOpacity(0.03),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.primary.withOpacity(0.25),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Avatar Photo
+                  Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.secondary.withOpacity(0.6),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.35),
+                          blurRadius: 16,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(3),
+                      child: ClipOval(
+                        child: Image.asset(
+                          officer['photo'],
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, e, s) => Container(
+                            color: AppColors.glassCardColor,
+                            child: Icon(
+                              Icons.person_rounded,
+                              size: 44,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Name
+                  Text(
+                    officer['name'],
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Designation Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      officer['designation'],
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${officer['department']} — Batch ${officer['batch']}',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Social Links
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: (officer['socials'] as List<Map<String, dynamic>>).map((soc) {
+                      return socialIconBtn(soc['icon'], soc['url']);
+                    }).toList(),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _aboutInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.primary.withOpacity(0.7), size: 15),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 80,
+            child: Text(label,
+                style: TextStyle(
+                    color: AppColors.textPrimary.withOpacity(0.45),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Pane 6: Help & Updates Content
+
+  Widget _buildHelpPane() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Help & Support',
+          style: TextStyle(
+              color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'OTA versioning and technical developer assistance.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.02),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.04)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Developer Details',
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14)),
+              const SizedBox(height: 8),
+              Text(
+                  'This app is designed and maintained by the Google DeepMind agentic team for IPE BUTEX.',
+                  style: TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12, height: 1.4)),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => launchUrl(
+                    Uri.parse('https://mahmudulhasanmridul.netlify.app/')),
+                icon: Icon(Icons.open_in_new,
+                    size: 16, color: AppColors.textPrimary),
+                label: Text('Visit Developer Portfolio',
+                    style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+      ],
+    );
+  }
+
+  Widget _aboutInfoLinkRow(IconData icon, String label, String value, String url) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.primary.withOpacity(0.7), size: 15),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 80,
+            child: Text(label,
+                style: TextStyle(
+                    color: AppColors.textPrimary.withOpacity(0.45),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+              child: Text(
+                value,
+                style: TextStyle(
+                    color: AppColors.primary,
+                    decoration: TextDecoration.underline,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Terms & Conditions Pane
+  Widget _buildTermsPane() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Terms & Conditions',
+            style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text('Effective Date: January 1, 2026',
+            style:
+                TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 12)),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.06)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle('1. Acceptance of Terms'),
+              _buildSectionBody(
+                'By accessing or using UniGrid, you agree to comply with and be bound by these Terms and Conditions. If you do not agree, please do not use the app.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('2. User Accounts & Security'),
+              _buildSectionBody(
+                'You are responsible for maintaining the confidentiality of your login credentials. Any activity under your account is your sole responsibility. You agree to notify us immediately of any unauthorized use.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('3. Acceptable Use'),
+              _buildSectionBody(
+                'You agree to use UniGrid only for educational, organizational, and collaborative purposes within your department. Harassment, sharing inappropriate content, or attempting to disrupt the application services is strictly prohibited.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('4. Uploaded Materials & Rights'),
+              _buildSectionBody(
+                'Users (specifically CRs and Admins) uploading study materials, guides, or announcements retain ownership of their content but grant UniGrid the necessary rights to distribute and host it for academic access.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('5. Limitation of Liability'),
+              _buildSectionBody(
+                'UniGrid is provided "as is" without warranties of any kind. We are not liable for any service interruptions, loss of academic data, or incorrect information uploaded by users.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('6. Changes to Terms'),
+              _buildSectionBody(
+                'We reserves the right to modify these terms at any time. Continued use of the app after modifications constitutes acceptance of the new terms.',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Privacy Policy Pane
+  Widget _buildPrivacyPane() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Privacy Policy',
+            style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text('Effective Date: January 1, 2026',
+            style:
+                TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 12)),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.06)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle('1. Information We Collect'),
+              _buildSectionBody(
+                'When you sign up or configure your workspace, we collect your Full Name, University Email, Student ID, Contact Number, Department, Batch, and profile pictures. We also store academic files uploaded by you (materials, PDFs, announcements).',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('2. How We Use Information'),
+              _buildSectionBody(
+                'Your information is used solely to configure your UniGrid workspace, verify your registration (for CR and student scopes), enable classroom collaboration/chat, and deliver push notifications via OneSignal/FCM.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('3. Data Sharing & Security'),
+              _buildSectionBody(
+                'We do not sell, trade, or share your personal data with third parties. Your details are accessible only to authorized root administrators and CRs within your department for workspace moderation.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('4. Storage & Processing'),
+              _buildSectionBody(
+                'Your personal details and files are securely stored on Google Firebase Firestore/Authentication and Supabase Cloud Storage. We utilize encryption protocols to protect your transactions and stored items.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('5. Cookies & Local Storage'),
+              _buildSectionBody(
+                'We use local browser storage and app preferences (like SharedPreferences) to maintain your login session, notification preferences, and visual theme configurations.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('6. User Rights'),
+              _buildSectionBody(
+                'You can edit your profile details, update your password, or change notification preferences inside the settings at any time. For complete account deletion, you can contact your Master Admin.',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: AppColors.primary,
+          fontSize: 13.5,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionBody(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: AppColors.textPrimary.withOpacity(0.7),
+        fontSize: 12,
+        height: 1.6,
+      ),
+    );
+  }
+}
