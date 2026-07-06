@@ -13,6 +13,7 @@ import 'schedule_builder_screen.dart';
 import 'course_registry_screen.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/floating_app_bar.dart';
+import '../services/auth_service.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -656,7 +657,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget build(BuildContext context) {
     Provider.of<ThemeService>(context); // Listen to global theme updates
     final user = Provider.of<AppUser?>(context);
-    final isCR = user != null && user.isCR;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isRootAdmin = user != null && authService.isRootAdmin(user.email);
+    final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
 
     // Run auto-reset once per build session when user is available
     if (user != null && user.hasDeptScope) {
@@ -1390,7 +1393,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       AppUser? user, Map<String, dynamic>? customSlots) {
     final String dayOfWeekName = _getDayOfWeekName(_selectedDate);
     final String dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-    final isCR = user != null && user.isCR;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isRootAdmin = user != null && authService.isRootAdmin(user.email);
+    final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
 
     final schedulePath = user != null && user.hasDeptScope
         ? deptBatchCol(user.department, user.batch, 'schedule')

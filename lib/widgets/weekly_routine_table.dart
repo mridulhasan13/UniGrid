@@ -9,6 +9,7 @@ import '../utils/dept_scope.dart';
 import '../utils/schedule_constants.dart';
 import '../widgets/unigrid_loader.dart';
 import '../screens/schedule_builder_screen.dart';
+import '../services/auth_service.dart';
 
 class WeeklyRoutineTable extends StatelessWidget {
   final Map<String, dynamic>? customSlots;
@@ -694,7 +695,9 @@ class WeeklyRoutineTable extends StatelessWidget {
     }
 
     final user = Provider.of<AppUser?>(context);
-    final isCR = user != null && user.isCR;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isRootAdmin = user != null && authService.isRootAdmin(user.email);
+    final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
 
     return GestureDetector(
       onTap: isCR ? () => _showStatusUpdateDialog(context, cls, user) : null,
