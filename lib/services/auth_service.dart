@@ -69,9 +69,9 @@ class AuthService {
     // FAIL-SAFE: Hardcoded fallback for the primary root admin
     if (cleanEmail == 'mridul.owner@unigrid.app') return true;
 
-    // Database check for other potential root admins
+    // Database check for other potential root admins (supporting both 'email' and 'Email' keys)
     return _rootAdmins.any((a) {
-      final dbEmail = a['email']?.toString().trim().toLowerCase();
+      final dbEmail = (a['email'] ?? a['Email'])?.toString().trim().toLowerCase();
       return dbEmail == cleanEmail;
     });
   }

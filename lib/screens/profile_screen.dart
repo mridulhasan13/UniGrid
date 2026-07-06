@@ -2033,6 +2033,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'url': 'mailto:alwaysongame134@gmail.com'
           },
         ]
+      },
+      {
+        'name': 'Farhan Ishrak Shoron',
+        'designation': 'Marketing Officer',
+        'department': 'TMDM',
+        'batch': '51',
+        'photo': 'assets/images/shoron_profile.png',
+        'socials': [
+          {
+            'icon': FontAwesomeIcons.facebook,
+            'url': 'https://www.facebook.com/farhanishrakshoron404'
+          },
+          {
+            'icon': FontAwesomeIcons.linkedin,
+            'url': 'https://www.linkedin.com/in/md-farhan-ishrak-864035362/?skipRedirect=true'
+          },
+          {
+            'icon': FontAwesomeIcons.envelope,
+            'url': 'mailto:farhanishrak064@gmail.com'
+          },
+        ]
       }
     ];
 
