@@ -754,81 +754,91 @@ class WeeklyRoutineTable extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.backgroundTop,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Update Status: ${cls.subject}',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.schedule, color: Colors.blueAccent),
-              title:
-                  Text('Upcoming', style: TextStyle(color: AppColors.textPrimary)),
-              onTap: () {
-                _updateStatus(ctx, cls.id, 'upcoming');
-              },
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 24,
+              bottom: MediaQuery.of(ctx).padding.bottom + 48,
             ),
-            ListTile(
-              leading: const Icon(Icons.check_circle, color: Colors.green),
-              title: Text('Completed',
-                  style: TextStyle(color: AppColors.textPrimary)),
-              onTap: () {
-                _updateStatus(ctx, cls.id, 'completed');
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Update Status: ${cls.subject}',
+                    style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.schedule, color: Colors.blueAccent),
+                  title:
+                      Text('Upcoming', style: TextStyle(color: AppColors.textPrimary)),
+                  onTap: () {
+                    _updateStatus(ctx, cls.id, 'upcoming');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.check_circle, color: Colors.green),
+                  title: Text('Completed',
+                      style: TextStyle(color: AppColors.textPrimary)),
+                  onTap: () {
+                    _updateStatus(ctx, cls.id, 'completed');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cancel, color: Colors.redAccent),
+                  title: Text('Cancelled',
+                      style: TextStyle(color: AppColors.textPrimary)),
+                  onTap: () {
+                    _updateStatus(ctx, cls.id, 'cancelled');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.block, color: Colors.yellowAccent),
+                  title:
+                      Text('No Class', style: TextStyle(color: AppColors.textPrimary)),
+                  onTap: () {
+                    _updateStatus(ctx, cls.id, 'no class');
+                  },
+                ),
+                Divider(color: AppColors.glassCardBorder),
+                ListTile(
+                  leading: const Icon(Icons.edit, color: Colors.amberAccent),
+                  title: Text('Edit Class Details',
+                      style: TextStyle(color: AppColors.textPrimary)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                         builder: (context) => ScheduleBuilderScreen(
+                          classToEdit: cls,
+                          customSlots: customSlots,
+                          user: user,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading:
+                      const Icon(Icons.delete_forever, color: Colors.redAccent),
+                  title: const Text('Delete Class (Free Slot)',
+                      style: TextStyle(color: AppColors.textPrimary)),
+                  onTap: () {
+                    _deleteClass(context, cls.id);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.cancel, color: Colors.redAccent),
-              title: Text('Cancelled',
-                  style: TextStyle(color: AppColors.textPrimary)),
-              onTap: () {
-                _updateStatus(ctx, cls.id, 'cancelled');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.block, color: Colors.yellowAccent),
-              title:
-                  Text('No Class', style: TextStyle(color: AppColors.textPrimary)),
-              onTap: () {
-                _updateStatus(ctx, cls.id, 'no class');
-              },
-            ),
-            Divider(color: AppColors.glassCardBorder),
-            ListTile(
-              leading: const Icon(Icons.edit, color: Colors.amberAccent),
-              title: Text('Edit Class Details',
-                  style: TextStyle(color: AppColors.textPrimary)),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                     builder: (context) => ScheduleBuilderScreen(
-                      classToEdit: cls,
-                      customSlots: customSlots,
-                      user: user,
-                    ),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading:
-                  const Icon(Icons.delete_forever, color: Colors.redAccent),
-              title: const Text('Delete Class (Free Slot)',
-                  style: TextStyle(color: AppColors.textPrimary)),
-              onTap: () {
-                _deleteClass(context, cls.id);
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );
