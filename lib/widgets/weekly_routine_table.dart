@@ -421,21 +421,17 @@ class WeeklyRoutineTable extends StatelessWidget {
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(6.0),
-                child: isMobile
-                    ? InteractiveViewer(
-                        minScale: 0.3,
-                        maxScale: 2.5,
-                        constrained:
-                            false, // Allows panning horizontally & vertically to scroll
-                        boundaryMargin: const EdgeInsets.all(
-                            100), // Gives scroll limits buffer
-                        child: SizedBox(
-                          width: 920,
-                          height: 416,
-                          child: tableCard,
-                        ),
-                      )
-                    : tableCard,
+                child: InteractiveViewer(
+                  minScale: 0.3,
+                  maxScale: 2.5,
+                  constrained: !isMobile, // Allows panning horizontally & vertically to scroll when not constrained
+                  boundaryMargin: const EdgeInsets.all(100), // Gives scroll limits buffer
+                  child: SizedBox(
+                    width: isMobile ? 920 : null,
+                    height: isMobile ? 416 : null,
+                    child: tableCard,
+                  ),
+                ),
               ),
             ),
           ],
