@@ -18,6 +18,7 @@ class AuthService {
 
   final _userController = StreamController<AppUser?>.broadcast();
   StreamSubscription? _userSubscription;
+  StreamSubscription? _rootAdminsSubscription;
   List<Map<String, dynamic>> _rootAdmins = [];
 
   AuthService() {
@@ -28,6 +29,7 @@ class AuthService {
         FCMService.saveTokenForUser(firebaseUser.uid);
         OneSignalService.setExternalUserId(firebaseUser.uid);
         ThemeService.instance.initGlobalThemeListener();
+        _initRootAdminListener();
       } else {
         OneSignalService.removeExternalUserId();
         ThemeService.instance.initGlobalThemeListener();
@@ -42,7 +44,8 @@ class AuthService {
   }
 
   void _initRootAdminListener() {
-    _firestore.collection('root_admins').snapshots().listen(
+    _rootAdminsSubscription?.cancel();
+    _rootAdminsSubscription = _firestore.collection('root_admins').snapshots().listen(
       (snapshot) {
         _rootAdmins = snapshot.docs.map((doc) => doc.data()).toList();
         final current = _auth.currentUser;
@@ -132,13 +135,14 @@ class AuthService {
             );
           }
 
-          // Auto-promote root admins — always ensure isCR and isApproved are true
-          if (isRoot && (data['isCR'] != true || data['isApproved'] != true)) {
+          // Auto-promote root admins — always ensure isCR, isAdmin, and isApproved are true
+          if (isRoot && (data['isCR'] != true || data['isAdmin'] != true || data['isApproved'] != true)) {
             _firestore.collection('users').doc(uid).set(
-              {'isCR': true, 'isApproved': true, 'email': email},
+              {'isCR': true, 'isAdmin': true, 'isApproved': true, 'email': email},
               SetOptions(merge: true),
             );
             data['isCR'] = true;
+            data['isAdmin'] = true;
             data['isApproved'] = true;
           }
 
@@ -157,6 +161,7 @@ class AuthService {
             id: uid,
             email: email ?? '',
             isCR: isRoot,
+            isAdmin: isRoot,
             isApproved: isRoot,
             name: displayName ?? '',
             photoUrl: photoUrl ?? '',

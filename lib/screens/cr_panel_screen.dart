@@ -33,6 +33,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
   String _announcementType = 'Notice';
   PlatformFile? _announcementFile;
   bool _isPostingAnnouncement = false;
+  String _memberSearchQuery = '';
 
   Future<void> _seedDatabase() async {
     final user = Provider.of<AppUser?>(context, listen: false);
@@ -990,6 +991,239 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                 );
               },
             ),
+            const SizedBox(height: 16),
+            // Member Directory — visible to ALL CRs and Root Admins
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return GlassCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('Error loading members: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.red)),
+                  );
+                }
+
+                if (!snapshot.hasData) {
+                  return const SizedBox();
+                }
+
+                final allDocs = snapshot.data?.docs ?? [];
+                final isRoot = isRootAdmin;
+
+                final filteredMembers = allDocs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+
+                  if (!isRoot) {
+                    final dept = data['department'] ?? '';
+                    final b = data['batch'] ?? '';
+                    if (user == null || dept != user.department || b != user.batch) {
+                      return false;
+                    }
+                  }
+
+                  if (_memberSearchQuery.isNotEmpty) {
+                    final name = (data['name'] ?? '').toString().toLowerCase();
+                    final email = (data['email'] ?? '').toString().toLowerCase();
+                    final studentId = (data['studentId'] ?? '').toString().toLowerCase();
+                    final query = _memberSearchQuery.toLowerCase();
+                    return name.contains(query) || email.contains(query) || studentId.contains(query);
+                  }
+
+                  return true;
+                }).toList();
+
+                filteredMembers.sort((a, b) {
+                  final aName = ((a.data() as Map<String, dynamic>)['name'] ?? '').toString().toLowerCase();
+                  final bName = ((b.data() as Map<String, dynamic>)['name'] ?? '').toString().toLowerCase();
+                  return aName.compareTo(bName);
+                });
+
+                final totalMembersCount = allDocs.length;
+                final scopedMembersCount = filteredMembers.length;
+
+                return GlassCard(
+                  padding: EdgeInsets.zero,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      leading: const Icon(Icons.people, color: Colors.blueAccent),
+                      title: Text(
+                        isRoot ? 'Registered Members' : 'Class Members',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        isRoot
+                            ? 'Total App Members: $totalMembersCount (Showing $scopedMembersCount)'
+                            : 'Total members: $scopedMembersCount in ${user?.department} ${user?.batch}',
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      ),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: TextField(
+                            style: TextStyle(color: AppColors.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: 'Search members...',
+                              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+                              prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.glassCardBorder),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.glassCardBorder.withOpacity(0.5)),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            onChanged: (val) {
+                              setState(() {
+                                _memberSearchQuery = val;
+                              });
+                            },
+                          ),
+                        ),
+                        if (filteredMembers.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('No members found.',
+                                style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                        ...filteredMembers.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final name = (data['name'] ?? '').toString();
+                          final email = (data['email'] ?? '').toString();
+                          final dept = (data['department'] ?? '').toString();
+                          final batch = (data['batch'] ?? '').toString();
+                          final studentId = (data['studentId'] ?? '').toString();
+                          final phone = (data['phoneNumber'] ?? '').toString();
+                          final photoUrl = data['photoUrl'] as String?;
+                          final bool isCRUser = data['isCR'] == true;
+                          final bool isApproved = data['isApproved'] == true;
+                          final bool isThisUserRoot = authService.isRootAdmin(email);
+
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.textPrimary.withOpacity(0.02),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.glassCardBorder.withOpacity(0.1)),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              leading: CircleAvatar(
+                                backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                                    ? NetworkImage(photoUrl)
+                                    : null,
+                                backgroundColor: AppColors.primary.withOpacity(0.2),
+                                child: (photoUrl == null || photoUrl.isEmpty)
+                                    ? Text(
+                                        name.isNotEmpty
+                                            ? name[0].toUpperCase()
+                                            : (email.isNotEmpty
+                                                ? email[0].toUpperCase()
+                                                : 'U'),
+                                        style: TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontWeight: FontWeight.bold),
+                                      )
+                                    : null,
+                              ),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      name.isNotEmpty ? name : email,
+                                      style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (isThisUserRoot)
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text('Root',
+                                          style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    )
+                                  else if (isCRUser)
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blueAccent.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text('CR',
+                                          style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ),
+                                ],
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isRoot
+                                        ? '$email • $dept Batch $batch'
+                                        : '$email${studentId.isNotEmpty ? " • ID: $studentId" : ""}',
+                                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                                  ),
+                                  if (isRoot && studentId.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        'ID: $studentId${phone.isNotEmpty ? " • Phone: $phone" : ""}',
+                                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                                      ),
+                                    )
+                                  else if (!isRoot && phone.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        'Phone: $phone',
+                                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isApproved
+                                      ? Colors.greenAccent.withOpacity(0.15)
+                                      : Colors.amberAccent.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  isApproved ? 'Approved' : 'Pending',
+                                  style: TextStyle(
+                                    color: isApproved ? Colors.greenAccent : Colors.amberAccent,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
             if (isRootAdmin) ...[
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
