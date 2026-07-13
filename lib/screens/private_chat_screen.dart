@@ -18,6 +18,7 @@ import '../services/onesignal_service.dart';
 import '../services/fcm_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
+import '../services/theme_service.dart';
 
 class PrivateChatScreen extends StatefulWidget {
   final AppUser recipient;
@@ -173,6 +174,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   @override
   Widget build(BuildContext context) {
     final appUser = Provider.of<AppUser?>(context);
+    final themeService = Provider.of<ThemeService>(context);
+    final currentTheme = themeService.currentTheme;
     if (appUser == null)
       return const Scaffold(
         body: UniGridLoader(
@@ -371,16 +374,20 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   );
                 },
                 theme: DefaultChatTheme(
-                  primaryColor: AppColors.primary,
-                  secondaryColor: AppColors.textPrimary.withOpacity(0.1),
+                  primaryColor: currentTheme == 'Black & White'
+                      ? const Color(0xFF2E2E30)
+                      : AppColors.primary,
+                  secondaryColor: const Color(0xFF1E1E1E),
                   backgroundColor: Colors.transparent,
                   inputBackgroundColor:
                       AppColors.backgroundTop.withOpacity(0.9),
                   inputTextColor: AppColors.textPrimary,
                   receivedMessageBodyTextStyle:
                       const TextStyle(color: AppColors.textPrimary),
-                  sentMessageBodyTextStyle:
-                      const TextStyle(color: AppColors.textPrimary),
+                  sentMessageBodyTextStyle: TextStyle(
+                      color: currentTheme == 'Black & White'
+                          ? Colors.white
+                          : AppColors.onPrimary),
                   inputBorderRadius:
                       const BorderRadius.all(Radius.circular(20)),
                   inputMargin: const EdgeInsets.only(

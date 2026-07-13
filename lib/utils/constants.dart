@@ -17,6 +17,7 @@ class AppColors {
   // Text Colors
   static const Color textPrimary = Colors.white;
   static const Color textSecondary = Color(0xFF94A3B8); // Slate Gray
+  static Color get onPrimary => primary.computeLuminance() > 0.5 ? Colors.black : Colors.white;
 
   // Badges
   static const Color urgent = Color(0xFFEF4444); // Red

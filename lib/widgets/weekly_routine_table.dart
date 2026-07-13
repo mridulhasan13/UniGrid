@@ -10,6 +10,7 @@ import '../utils/schedule_constants.dart';
 import '../widgets/unigrid_loader.dart';
 import '../screens/schedule_builder_screen.dart';
 import '../services/auth_service.dart';
+import '../services/theme_service.dart';
 
 class WeeklyRoutineTable extends StatelessWidget {
   final Map<String, dynamic>? customSlots;
@@ -272,15 +273,14 @@ class WeeklyRoutineTable extends StatelessWidget {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    const Color(0xFF00E676).withOpacity(0.15),
-                                    const Color(0xFF003219).withOpacity(0.2)
+                                    AppColors.primary.withOpacity(0.15),
+                                    AppColors.secondary.withOpacity(0.04)
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
                                 border: Border.all(
-                                    color: const Color(0xFF00E676)
-                                        .withOpacity(0.25)),
+                                    color: AppColors.primary.withOpacity(0.2)),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Center(
@@ -365,10 +365,10 @@ class WeeklyRoutineTable extends StatelessWidget {
             child: Container(
               width: isMobile ? 920 : double.infinity,
               decoration: BoxDecoration(
-                color: const Color(0xFF0A1912).withOpacity(0.6),
+                color: AppColors.glassCardColor.withOpacity(0.75),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                    color: const Color(0xFF00E676).withOpacity(0.25), width: 1),
+                    color: AppColors.primary.withOpacity(0.25), width: 1),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.6),
@@ -409,8 +409,8 @@ class WeeklyRoutineTable extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF00E676).withOpacity(0.12),
-                      const Color(0xFF00E676).withOpacity(0),
+                      AppColors.primary.withOpacity(0.12),
+                      AppColors.primary.withOpacity(0),
                     ],
                   ),
                 ),
@@ -455,10 +455,11 @@ class WeeklyRoutineTable extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 1),
       decoration: BoxDecoration(
-        color: const Color(0xFF00E676).withOpacity(0.06),
+        color: AppColors.primary.withOpacity(0.06),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-            color: const Color(0xFF00E676).withOpacity(0.25), width: 1),
+            color: AppColors.primary.withOpacity(0.2),
+            width: 1),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
       alignment: Alignment.center,
@@ -479,9 +480,9 @@ class WeeklyRoutineTable extends StatelessWidget {
           Text(
             displayRange.replaceAll(' - ', '-'),
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 7.5,
-              color: Color(0xFF00FF87),
+              color: AppColors.secondary,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -509,20 +510,21 @@ class WeeklyRoutineTable extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 1),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFAB00).withOpacity(0.04),
+        color: AppColors.secondary.withOpacity(0.04),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-            color: const Color(0xFFFFAB00).withOpacity(0.3), width: 1),
+            color: AppColors.secondary.withOpacity(0.2),
+            width: 1),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
       alignment: Alignment.center,
       child: Text(
         name,
         textAlign: TextAlign.center,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 8.5,
           fontWeight: FontWeight.bold,
-          color: Color(0xFFFFAB00),
+          color: AppColors.secondary,
           letterSpacing: 0.3,
         ),
       ),
@@ -651,8 +653,7 @@ class WeeklyRoutineTable extends StatelessWidget {
         cls.span > 1;
 
     final String status = cls.status.toLowerCase();
-    final Color baseColor =
-        isLab ? const Color(0xFF00E5FF) : const Color(0xFF00E676);
+    final Color baseColor = isLab ? AppColors.secondary : AppColors.primary;
 
     final Color mainThemeColor;
     final List<Color> gradientColors;
@@ -684,9 +685,8 @@ class WeeklyRoutineTable extends StatelessWidget {
     } else {
       mainThemeColor = baseColor;
       gradientColors = [
-        baseColor.withOpacity(0.07),
-        (isLab ? const Color(0xFF002230) : const Color(0xFF002512))
-            .withOpacity(0.15),
+        baseColor.withOpacity(0.15),
+        Colors.black.withOpacity(0.35),
       ];
     }
 
@@ -893,10 +893,13 @@ class WeeklyRoutineTable extends StatelessWidget {
       final schedulePath = user != null && user.hasDeptScope
           ? deptBatchCol(user.department, user.batch, 'schedule')
           : 'schedule';
-      await FirebaseFirestore.instance
+      FirebaseFirestore.instance
           .collection(schedulePath)
           .doc(docId)
-          .delete();
+          .delete()
+          .catchError((e) {
+        debugPrint('Failed to delete class schedule: $e');
+      });
     }
   }
 }
@@ -937,7 +940,7 @@ class HeaderBar extends StatelessWidget {
                   letterSpacing: 0.5,
                   shadows: [
                     Shadow(
-                      color: Color(0xFF00E676),
+                      color: AppColors.primary.withOpacity(0.3),
                       blurRadius: 10,
                     ),
                   ],
@@ -946,7 +949,7 @@ class HeaderBar extends StatelessWidget {
                   TextSpan(text: '${university.toUpperCase()} :: '),
                   TextSpan(
                     text: levelTerm.toUpperCase(),
-                    style: const TextStyle(color: Color(0xFF00E676)),
+                    style: TextStyle(color: AppColors.primary),
                   ),
                 ],
               ),
@@ -960,17 +963,18 @@ class HeaderBar extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
             decoration: BoxDecoration(
-              color: const Color(0xFF00E676).withOpacity(0.12),
+              color: AppColors.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: const Color(0xFF00E676).withOpacity(0.25), width: 1),
+                  color: AppColors.primary.withOpacity(0.25),
+                  width: 1),
             ),
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 formattedDate,
-                style: const TextStyle(
-                  color: Color(0xFF00FF87),
+                style: TextStyle(
+                  color: AppColors.primary,
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.3,
@@ -994,8 +998,9 @@ class MiniRotatedBreak extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFAB00).withOpacity(0.03),
-        border: Border.all(color: const Color(0xFFFFAB00).withOpacity(0.15)),
+        color: AppColors.secondary.withOpacity(0.03),
+        border: Border.all(
+            color: AppColors.secondary.withOpacity(0.15)),
         borderRadius: BorderRadius.circular(4),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
@@ -1005,10 +1010,10 @@ class MiniRotatedBreak extends StatelessWidget {
           quarterTurns: 3,
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 6.5,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFFFFAB00),
+                color: AppColors.secondary,
                 letterSpacing: 1.2),
             textAlign: TextAlign.center,
           ),

@@ -395,4 +395,57 @@ class FCMService {
       senderUserId: senderUserId,
     );
   }
+
+  static Future<void> notifyCRNewRegistration({
+    required String studentName,
+    required String studentId,
+    required String department,
+    required String batch,
+  }) async {
+    try {
+      final crSnap = await _firestore
+          .collection('users')
+          .where('department', isEqualTo: department)
+          .where('batch', isEqualTo: batch)
+          .where('isCR', isEqualTo: true)
+          .get();
+
+      if (crSnap.docs.isEmpty) {
+        debugPrint('No CR found to notify for $department - $batch');
+        return;
+      }
+
+      final title = '🆕 New Registration Request';
+      final body = '$studentName (ID: $studentId) registered in $department Batch $batch. Tap to review/approve.';
+
+      if (kIsWeb) {
+        final crIds = crSnap.docs.map((doc) => doc.id).toList();
+        for (final crId in crIds) {
+          await OneSignalService.sendPrivateNotification(
+            recipientId: crId,
+            title: title,
+            body: body,
+          );
+        }
+      } else {
+        final tokens = crSnap.docs
+            .map((doc) => doc.data()['fcmToken'] as String?)
+            .whereType<String>()
+            .where((t) => t.isNotEmpty)
+            .toList();
+
+        if (tokens.isNotEmpty) {
+          await _sendFCMHttp(
+            tokens: tokens,
+            title: title,
+            body: body,
+            senderUserId: 'system',
+          );
+        }
+      }
+      debugPrint('✅ Notified ${crSnap.docs.length} CR(s) of new registration');
+    } catch (e) {
+      debugPrint('❌ notifyCRNewRegistration error: $e');
+    }
+  }
 }

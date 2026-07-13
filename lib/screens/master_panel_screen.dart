@@ -7,6 +7,7 @@ import '../utils/constants.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/unigrid_loader.dart';
 import '../utils/dept_scope.dart';
+import 'package:intl/intl.dart';
 
 class MasterPanelScreen extends StatefulWidget {
   const MasterPanelScreen({super.key});
@@ -276,18 +277,59 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                     return aName.compareTo(bName);
                   });
 
-                if (users.isEmpty) {
-                  return Center(
-                    child: Text('No users found.',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
-                  );
-                }
-
-                return ListView.builder(
-                  padding:
-                      const EdgeInsets.only(left: 24, right: 24, bottom: 100),
-                  itemCount: users.length,
-                  itemBuilder: (context, index) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _selectedDeptFilter == 'All' && _selectedBatchFilter == 'All'
+                                ? 'All Registered Members'
+                                : '${_selectedDeptFilter == 'All' ? 'All Depts' : _selectedDeptFilter} · ${_selectedBatchFilter == 'All' ? 'All Batches' : 'Batch $_selectedBatchFilter'}',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: AppColors.primary.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Text(
+                              '${users.length} Member${users.length == 1 ? "" : "s"}',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (users.isEmpty)
+                      Expanded(
+                        child: Center(
+                          child: Text('No users found.',
+                              style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.builder(
+                          padding:
+                              const EdgeInsets.only(left: 24, right: 24, bottom: 100),
+                          itemCount: users.length,
+                          itemBuilder: (context, index) {
                     final doc = users[index];
                     final data = doc.data() as Map<String, dynamic>;
                     final uid = doc.id;
@@ -356,6 +398,37 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                               fontSize: 12),
                                         ),
                                       ),
+                                    Builder(builder: (context) {
+                                      final dynamic rawJoined = data['createdAt'];
+                                      DateTime? joinedDate;
+                                      if (rawJoined != null) {
+                                        if (rawJoined is Timestamp) {
+                                          joinedDate = rawJoined.toDate();
+                                        } else if (rawJoined is String) {
+                                          joinedDate = DateTime.tryParse(rawJoined);
+                                        }
+                                      }
+                                      final String joinedStr = joinedDate != null
+                                          ? DateFormat('dd MMM yyyy, hh:mm a').format(joinedDate)
+                                          : 'N/A';
+                                      return Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.calendar_today_outlined,
+                                                size: 13,
+                                                color: AppColors.textSecondary),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Joined: $joinedStr',
+                                              style: TextStyle(
+                                                  color: AppColors.textSecondary,
+                                                  fontSize: 12),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
                                     if ((data['phoneNumber'] ?? '').toString().isNotEmpty ||
                                         (data['schoolName'] ?? '').toString().isNotEmpty ||
                                         (data['collegeName'] ?? '').toString().isNotEmpty)
@@ -555,9 +628,12 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         .fadeIn(
                             delay: Duration(milliseconds: 300 + (index * 50)))
                         .slideY(begin: 0.1, end: 0);
-                  },
-                );
-              },
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
             ),
           ),
         ],

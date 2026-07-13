@@ -85,6 +85,7 @@ class OneSignalService {
           'app_id': _appId,
           'filters': [
             {'field': 'tag', 'key': 'department', 'relation': '=', 'value': department},
+            {'operator': 'AND'},
             {'field': 'tag', 'key': 'batch', 'relation': '=', 'value': batch}
           ],
           'headings': {'en': title},

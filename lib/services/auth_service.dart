@@ -165,6 +165,7 @@ class AuthService {
             isApproved: isRoot,
             name: displayName ?? '',
             photoUrl: photoUrl ?? '',
+            createdAt: DateTime.now(),
           );
           _firestore.collection('users').doc(uid).set(newUser.toMap());
           _userController.add(newUser);
@@ -238,8 +239,20 @@ class AuthService {
           batch: batch,
           department: department,
           phoneNumber: phoneNumber,
+          createdAt: DateTime.now(),
         );
         await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
+        
+        // Notify the CR of the newly registered student's department and batch
+        FCMService.notifyCRNewRegistration(
+          studentName: name,
+          studentId: studentId,
+          department: department,
+          batch: batch,
+        ).catchError((e) {
+          debugPrint('❌ Failed to notify CR of new registration: $e');
+        });
+
         return newUser;
       }
       return null;

@@ -191,22 +191,11 @@ class _AnnouncementCard extends StatelessWidget {
   Color _getMainColor(String type) {
     switch (type) {
       case 'Urgent':
-        return const Color(0xFF7F1D1D); // Dark Crimson Red
+        return const Color(0xFFEF4444); // Bright warning red for accents
       case 'Material':
-        return const Color(0xFF0369A1); // Dark Sky Blue
+        return const Color(0xFF3B82F6); // Bright blue for material accents
       default:
-        return AppColors.primary; // Dynamically synchronize with active theme
-    }
-  }
-
-  Color _getPocketColor(String type) {
-    switch (type) {
-      case 'Urgent':
-        return const Color(0xFFFEE2E2); // Light Coral Red
-      case 'Material':
-        return const Color(0xFFE0F2FE); // Light Sky Blue
-      default:
-        return AppColors.secondary; // Dynamically synchronize with active theme
+        return AppColors.primary; // Accent color from current theme
     }
   }
 
@@ -244,17 +233,22 @@ class _AnnouncementCard extends StatelessWidget {
     );
     if (confirm == true) {
       final fileUrl = announcement.fileUrl;
-      if (fileUrl != null && fileUrl.isNotEmpty) {
-        try {
-          await SupabaseStorageService.deleteFileByUrl(fileUrl);
-        } catch (e) {
-          debugPrint('[AnnouncementDelete] Error cleaning up file: $e');
-        }
-      }
-      await FirebaseFirestore.instance
+      
+      // Delete Firestore document instantly (optimistic UI)
+      FirebaseFirestore.instance
           .collection(collectionPath)
           .doc(announcement.id)
-          .delete();
+          .delete()
+          .catchError((e) {
+        debugPrint('Failed to delete announcement doc: $e');
+      });
+
+      // Clean up Supabase file in background
+      if (fileUrl != null && fileUrl.isNotEmpty) {
+        SupabaseStorageService.deleteFileByUrl(fileUrl).catchError((e) {
+          debugPrint('[AnnouncementDelete] Error cleaning up file: $e');
+        });
+      }
     }
   }
 
@@ -264,8 +258,10 @@ class _AnnouncementCard extends StatelessWidget {
     final canDelete = user != null && (user.isCR || user.isAdmin);
 
     final mainColor = _getMainColor(announcement.type);
-    final pocketColor = _getPocketColor(announcement.type);
     final badgeIcon = _getBadgeIcon(announcement.type);
+
+    const isCardLight = false;
+    const isPocketLight = false;
 
     final screenWidth = MediaQuery.of(context).size.width;
     final cardWidth = screenWidth - 32;
@@ -296,7 +292,7 @@ class _AnnouncementCard extends StatelessWidget {
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                color: pocketColor,
+                color: const Color(0xFF2E2E30), // Soft dark charcoal pocket
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
                   color: mainColor.withOpacity(0.4),
@@ -336,10 +332,10 @@ class _AnnouncementCard extends StatelessWidget {
                       announcement.postedBy,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: mainColor,
+                        color: Colors.white70,
                       ),
                     ),
                   ),
@@ -352,7 +348,7 @@ class _AnnouncementCard extends StatelessWidget {
             clipper: HiglightsCard(cutoffWidth: cutoffWidth),
             child: Container(
               decoration: BoxDecoration(
-                color: mainColor,
+                color: const Color(0xFF1E1E1E), // Soft dark charcoal card
                 borderRadius: BorderRadius.circular(15.0),
               ),
               padding: const EdgeInsets.all(15),
@@ -368,8 +364,12 @@ class _AnnouncementCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.textPrimary,
+                              color: mainColor.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: mainColor.withOpacity(0.25),
+                                width: 1,
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -397,7 +397,7 @@ class _AnnouncementCard extends StatelessWidget {
                               onTap: () => _deleteAnnouncement(context),
                               child: Icon(
                                 Icons.delete_outline_rounded,
-                                color: AppColors.textSecondary,
+                                color: isCardLight ? Colors.black.withOpacity(0.6) : AppColors.textSecondary,
                                 size: 20,
                               ),
                             ),
@@ -410,7 +410,7 @@ class _AnnouncementCard extends StatelessWidget {
                   Text(
                     announcement.title,
                     style: TextStyle(
-                      color: AppColors.textPrimary,
+                      color: isCardLight ? Colors.black : AppColors.textPrimary,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -421,7 +421,7 @@ class _AnnouncementCard extends StatelessWidget {
                     Text(
                       announcement.details!,
                       style: TextStyle(
-                        color: AppColors.textSecondary,
+                        color: isCardLight ? Colors.black.withOpacity(0.6) : AppColors.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -432,24 +432,29 @@ class _AnnouncementCard extends StatelessWidget {
                     Text(
                       announcement.content,
                       style: TextStyle(
-                        color: AppColors.textPrimary.withOpacity(0.9),
+                        color: isCardLight ? Colors.black.withOpacity(0.85) : AppColors.textPrimary.withOpacity(0.9),
                         fontSize: 14,
                       ),
                     ),
                   ],
-                  Divider(color: AppColors.textSecondary.withOpacity(0.3), height: 20),
+                  Divider(
+                    color: isCardLight
+                        ? Colors.black.withOpacity(0.12)
+                        : AppColors.textSecondary.withOpacity(0.3),
+                    height: 20,
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: _buildBottomAction(context),
+                        child: _buildBottomAction(context, isCardLight),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         DateFormat('MMM dd, hh:mm a')
                             .format(announcement.timestamp),
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: isCardLight ? Colors.black.withOpacity(0.6) : AppColors.textSecondary,
                           fontSize: 11,
                         ),
                       ),
@@ -464,7 +469,7 @@ class _AnnouncementCard extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomAction(BuildContext context) {
+  Widget _buildBottomAction(BuildContext context, bool isCardLight) {
     if (announcement.fileUrl != null || announcement.fileName != null) {
       return GestureDetector(
         onTap: () {
@@ -491,7 +496,7 @@ class _AnnouncementCard extends StatelessWidget {
           children: [
             Icon(
               Icons.attach_file_rounded,
-              color: AppColors.textPrimary,
+              color: isCardLight ? Colors.black.withOpacity(0.7) : AppColors.textPrimary,
               size: 16,
             ),
             const SizedBox(width: 6),
@@ -501,7 +506,7 @@ class _AnnouncementCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: isCardLight ? Colors.black.withOpacity(0.8) : AppColors.textPrimary,
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                 ),
@@ -511,7 +516,7 @@ class _AnnouncementCard extends StatelessWidget {
               const SizedBox(width: 4),
               Icon(
                 Icons.open_in_new_rounded,
-                color: AppColors.textSecondary,
+                color: isCardLight ? Colors.black.withOpacity(0.5) : AppColors.textSecondary,
                 size: 12,
               ),
             ],
@@ -524,14 +529,14 @@ class _AnnouncementCard extends StatelessWidget {
         children: [
           Icon(
             Icons.info_outline_rounded,
-            color: AppColors.textSecondary,
+            color: isCardLight ? Colors.black.withOpacity(0.5) : AppColors.textSecondary,
             size: 16,
           ),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Text(
             'Tap to view details',
             style: TextStyle(
-              color: AppColors.textSecondary,
+              color: isCardLight ? Colors.black.withOpacity(0.6) : AppColors.textSecondary,
               fontSize: 13,
             ),
           ),

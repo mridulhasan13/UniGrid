@@ -81,7 +81,7 @@ class FloatingAppBar extends StatelessWidget {
                         Text(
                           subtitle!,
                           style: TextStyle(
-                            color: AppColors.secondary,
+                            color: AppColors.primary,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),

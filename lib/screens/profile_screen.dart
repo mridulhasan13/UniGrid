@@ -869,12 +869,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          color: AppColors.textPrimary, strokeWidth: 1.5),
+                          color: AppColors.onPrimary, strokeWidth: 1.5),
                     )
                   : Text(
                       'Save Changes',
                       style: TextStyle(
-                          color: AppColors.textPrimary,
+                          color: AppColors.onPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.bold),
                     ),
@@ -1011,12 +1011,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
-                            color: AppColors.textPrimary, strokeWidth: 1.5),
+                            color: AppColors.onPrimary, strokeWidth: 1.5),
                       )
                     : Text(
                         'Save',
                         style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: AppColors.onPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.bold),
                       ),
@@ -1355,10 +1355,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   }
                 },
                 icon: Icon(Icons.mail_outline_rounded,
-                    size: 16, color: AppColors.textPrimary),
+                    size: 16, color: AppColors.onPrimary),
                 label: Text('Send Password Reset Email',
                     style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: AppColors.onPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
@@ -1439,10 +1439,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
-                            color: AppColors.textPrimary, strokeWidth: 2))
+                            color: AppColors.onPrimary, strokeWidth: 2))
                     : Text('Update Password',
                         style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: AppColors.onPrimary,
                             fontSize: 12,
                             fontWeight: FontWeight.bold)),
               ),
@@ -1562,12 +1562,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const Color(0xFF8B5CF6),
             activeTheme == 'Amethyst Orchid',
             hasAdminAccess),
-        const SizedBox(height: 12),
         _buildThemeCard(
             'Sunset Coral',
             'Vibrant Sunset Coral & Deep Ember',
             const Color(0xFFF97316),
             activeTheme == 'Sunset Coral',
+            hasAdminAccess),
+        const SizedBox(height: 12),
+        _buildThemeCard(
+            'Black & White',
+            'Minimalist Pure Black & High-Contrast White',
+            const Color(0xFFFFFFFF),
+            activeTheme == 'Black & White',
             hasAdminAccess),
       ],
     );
@@ -2314,10 +2320,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: () => launchUrl(
                     Uri.parse('https://mahmudulhasanmridul.netlify.app/')),
                 icon: Icon(Icons.open_in_new,
-                    size: 16, color: AppColors.textPrimary),
+                    size: 16, color: AppColors.onPrimary),
                 label: Text('Visit Developer Portfolio',
                     style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: AppColors.onPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(

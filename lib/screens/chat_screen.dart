@@ -446,6 +446,13 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Widget _buildBubble(BuildContext context) {
+    final themeService = Provider.of<ThemeService>(context, listen: false);
+    final currentTheme = themeService.currentTheme;
+    final isBW = currentTheme == 'Black & White';
+    final textColor = isOwn
+        ? (isBW ? Colors.white : AppColors.onPrimary)
+        : AppColors.textPrimary;
+
     final radius = BorderRadius.only(
       topLeft: const Radius.circular(18),
       topRight: const Radius.circular(18),
@@ -462,23 +469,19 @@ class _MessageBubble extends StatelessWidget {
           constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.72),
           decoration: BoxDecoration(
-            gradient: isOwn
-                ? LinearGradient(
-                    colors: [
-                      AppColors.primary.withOpacity(0.85),
-                      const Color(0xFF059669).withOpacity(0.75),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            color: isOwn ? null : AppColors.textPrimary.withOpacity(0.09),
+            color: isOwn
+                ? (isBW
+                    ? const Color(0xFF2E2E30)
+                    : AppColors.primary.withOpacity(0.95))
+                : const Color(0xFF1E1E1E),
             borderRadius: radius,
             border: Border.all(
               color: isOwn
-                  ? AppColors.primary.withOpacity(0.5)
-                  : AppColors.textPrimary.withOpacity(0.1),
-              width: 1,
+                  ? (isBW
+                      ? const Color(0xFF3F3F46)
+                      : AppColors.primary.withOpacity(0.4))
+                  : Colors.white.withOpacity(0.08),
+              width: 0.8,
             ),
           ),
           child: Column(
@@ -524,13 +527,13 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 ),
               // Reply preview
-              if (message.replyTo != null) _buildReplyPreview(),
+              if (message.replyTo != null) _buildReplyPreview(textColor),
               // Content
               if (message.isUnsent)
                 Text(
                   '🚫  This message was unsent',
                   style: TextStyle(
-                    color: AppColors.textPrimary.withOpacity(0.45),
+                    color: textColor.withOpacity(0.45),
                     fontSize: 13,
                     fontStyle: FontStyle.italic,
                   ),
@@ -542,14 +545,14 @@ class _MessageBubble extends StatelessWidget {
                   Text(
                     message.text,
                     style: TextStyle(
-                        color: AppColors.textPrimary, fontSize: 14, height: 1.4),
+                        color: textColor, fontSize: 14, height: 1.4),
                   ),
                 ],
               ] else
                 Text(
                   message.text,
                   style: TextStyle(
-                      color: AppColors.textPrimary, fontSize: 14, height: 1.4),
+                      color: textColor, fontSize: 14, height: 1.4),
                 ),
               // Timestamp + edited tag
               const SizedBox(height: 5),
@@ -559,14 +562,14 @@ class _MessageBubble extends StatelessWidget {
                   Text(
                     DateFormat('h:mm a').format(message.createdAt),
                     style: TextStyle(
-                        color: AppColors.textPrimary.withOpacity(0.45), fontSize: 10),
+                        color: textColor.withOpacity(0.45), fontSize: 10),
                   ),
                   if (message.editedAt != null) ...[
                     const SizedBox(width: 5),
                     Text(
                       '· edited',
                       style: TextStyle(
-                          color: AppColors.textPrimary.withOpacity(0.35),
+                          color: textColor.withOpacity(0.35),
                           fontSize: 10,
                           fontStyle: FontStyle.italic),
                     ),
@@ -580,7 +583,7 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildReplyPreview() {
+  Widget _buildReplyPreview(Color textColor) {
     final replyData = message.replyTo!;
     final replyText = replyData['text'] as String? ?? '';
     final replyAuthor = replyData['authorName'] as String? ?? 'Unknown';
@@ -592,7 +595,7 @@ class _MessageBubble extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border(
           left: BorderSide(
-            color: isOwn ? AppColors.textPrimary.withOpacity(0.7) : AppColors.primary,
+            color: isOwn ? textColor.withOpacity(0.7) : AppColors.primary,
             width: 3,
           ),
         ),
@@ -604,7 +607,7 @@ class _MessageBubble extends StatelessWidget {
           Text(
             replyAuthor,
             style: TextStyle(
-              color: isOwn ? AppColors.textPrimary.withOpacity(0.9) : AppColors.primary,
+              color: isOwn ? textColor.withOpacity(0.9) : AppColors.primary,
               fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
@@ -613,7 +616,7 @@ class _MessageBubble extends StatelessWidget {
           Text(
             replyText.isEmpty ? '📷 Image' : replyText,
             style:
-                TextStyle(color: AppColors.textPrimary.withOpacity(0.55), fontSize: 12),
+                TextStyle(color: textColor.withOpacity(0.55), fontSize: 12),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1214,6 +1217,15 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                       if (isAllowed) ...[
+                        IconButton(
+                          icon: Icon(
+                            Icons.people_alt_rounded,
+                            color: AppColors.textSecondary,
+                            size: 24,
+                          ),
+                          onPressed: () => _showMembersDialog(context, user!),
+                          tooltip: 'View Department Members',
+                        ),
                         const SizedBox(width: 8),
                         IconButton(
                           icon: Icon(
@@ -1229,6 +1241,218 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ---- MEMBERS DIALOG ----
+  void _showMembersDialog(BuildContext context, AppUser currentUser) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: AppColors.backgroundTop,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: AppColors.glassCardBorder,
+              width: 1.5,
+            ),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 600,
+              maxHeight: 700,
+            ),
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .where('department', isEqualTo: currentUser.department)
+                  .where('batch', isEqualTo: currentUser.batch)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(
+                    height: 200,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return SizedBox(
+                    height: 200,
+                    child: Center(
+                      child: Text(
+                        'No members found',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                  );
+                }
+
+                final docs = snapshot.data!.docs;
+                final members = docs
+                    .map((d) => AppUser.fromMap(
+                        d.data() as Map<String, dynamic>, d.id))
+                    .toList();
+
+                // Sort: CRs first, then by Student ID
+                members.sort((a, b) {
+                  if (a.isCR && !b.isCR) return -1;
+                  if (!a.isCR && b.isCR) return 1;
+                  return a.studentId.compareTo(b.studentId);
+                });
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${currentUser.department} - Batch ${currentUser.batch}',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Total Members: ${members.length}',
+                                style: TextStyle(
+                                  color: AppColors.secondary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            color: AppColors.textSecondary,
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(color: Colors.white10, height: 1),
+                    // Members list
+                    Expanded(
+                      child: ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: members.length,
+                        itemBuilder: (context, index) {
+                          final member = members[index];
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                            leading: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: AppColors.primary.withOpacity(0.15),
+                                  backgroundImage: member.photoUrl.startsWith('data:image')
+                                      ? MemoryImage(base64Decode(member.photoUrl.split(',').last))
+                                      : (member.photoUrl.isNotEmpty
+                                          ? NetworkImage(member.photoUrl)
+                                          : null) as ImageProvider?,
+                                  child: member.photoUrl.isEmpty
+                                      ? Text(
+                                          member.name.isNotEmpty
+                                              ? member.name[0].toUpperCase()
+                                              : 'U',
+                                          style: TextStyle(
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                if (member.isCR)
+                                  Positioned(
+                                    right: -2,
+                                    bottom: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.amber,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.star,
+                                        size: 10,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            title: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    member.name,
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (member.isCR) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.amber.withOpacity(0.3), width: 0.5),
+                                    ),
+                                    child: const Text(
+                                      'CR',
+                                      style: TextStyle(
+                                        color: Colors.amber,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            subtitle: Text(
+                              member.studentId.isNotEmpty
+                                  ? 'ID: ${member.studentId}'
+                                  : 'No ID set',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: Text(
+                              member.email,
+                              style: TextStyle(
+                                color: AppColors.textSecondary.withOpacity(0.6),
+                                fontSize: 11,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                );
+              },
             ),
           ),
         );

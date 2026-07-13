@@ -132,6 +132,14 @@ class ThemeService extends ChangeNotifier {
         AppColors.glassCardColor = const Color(0xFF2D160E);
         AppColors.glassCardBorder = const Color(0xFF4E2618);
         break;
+      case 'Black & White':
+        AppColors.primary = const Color(0xFFFFFFFF);
+        AppColors.secondary = const Color(0xFF9CA3AF);
+        AppColors.backgroundTop = const Color(0xFF000000);
+        AppColors.backgroundBottom = const Color(0xFF000000);
+        AppColors.glassCardColor = const Color(0xFF18181B);
+        AppColors.glassCardBorder = const Color(0xFF27272A);
+        break;
       default:
         AppColors.primary = const Color(0xFF3B82F6);
         AppColors.secondary = const Color(0xFF93C5FD);

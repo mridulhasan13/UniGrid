@@ -14,6 +14,7 @@ class AppUser {
   final String photoUrl;
   final String schoolName;
   final String collegeName;
+  final DateTime? createdAt;
 
   AppUser({
     required this.id,
@@ -29,6 +30,7 @@ class AppUser {
     this.photoUrl = '',
     this.schoolName = '',
     this.collegeName = '',
+    this.createdAt,
   });
 
   /// Firestore sub-collection base path for this user's dept+batch.
@@ -39,6 +41,14 @@ class AppUser {
   bool get hasDeptScope => department.isNotEmpty && batch.isNotEmpty;
 
   factory AppUser.fromMap(Map<String, dynamic> data, String documentId) {
+    DateTime? ca;
+    if (data['createdAt'] != null) {
+      if (data['createdAt'] is Timestamp) {
+        ca = (data['createdAt'] as Timestamp).toDate();
+      } else if (data['createdAt'] is String) {
+        ca = DateTime.tryParse(data['createdAt'] as String);
+      }
+    }
     return AppUser(
       id: documentId,
       email: data['email'] ?? '',
@@ -53,6 +63,7 @@ class AppUser {
       photoUrl: data['photoUrl'] ?? '',
       schoolName: data['schoolName'] ?? '',
       collegeName: data['collegeName'] ?? '',
+      createdAt: ca,
     );
   }
 
@@ -70,6 +81,7 @@ class AppUser {
       'photoUrl': photoUrl,
       'schoolName': schoolName,
       'collegeName': collegeName,
+      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
     };
   }
 }
@@ -252,6 +264,7 @@ class StudyMaterial {
   final String subjectCode;
   final String teacherName;
   final String uploadedBy;
+  final DateTime? timestamp;
 
   StudyMaterial({
     required this.id,
@@ -264,9 +277,18 @@ class StudyMaterial {
     this.subjectCode = '',
     this.teacherName = '',
     this.uploadedBy = '',
+    this.timestamp,
   });
 
   factory StudyMaterial.fromMap(Map<String, dynamic> data, String id) {
+    DateTime? ts;
+    if (data['timestamp'] != null) {
+      if (data['timestamp'] is Timestamp) {
+        ts = (data['timestamp'] as Timestamp).toDate();
+      } else if (data['timestamp'] is String) {
+        ts = DateTime.tryParse(data['timestamp'] as String);
+      }
+    }
     return StudyMaterial(
       id: id,
       title: data['title'] ?? '',
@@ -278,6 +300,7 @@ class StudyMaterial {
       subjectCode: data['subjectCode'] ?? '',
       teacherName: data['teacherName'] ?? '',
       uploadedBy: data['uploadedBy'] ?? '',
+      timestamp: ts,
     );
   }
 }

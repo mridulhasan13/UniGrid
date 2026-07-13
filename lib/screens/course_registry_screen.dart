@@ -428,29 +428,31 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
           ? deptBatchCol(user.department, user.batch, 'courses')
           : 'courses';
       
-      try {
-        final docRef = FirebaseFirestore.instance.collection(coursesPath).doc(id);
-        final docSnapshot = await docRef.get();
+      // Clean up Supabase storage files in background
+      FirebaseFirestore.instance.collection(coursesPath).doc(id).get().then((docSnapshot) {
         if (docSnapshot.exists) {
           final data = docSnapshot.data();
           if (data != null) {
             final rawUrls = data['ctMarksUrls'] ?? data['ctMarksUrl'];
             if (rawUrls is String && rawUrls.isNotEmpty) {
-              await SupabaseStorageService.deleteFileByUrl(rawUrls);
+              SupabaseStorageService.deleteFileByUrl(rawUrls);
             } else if (rawUrls is List) {
               for (final url in rawUrls) {
                 if (url is String && url.isNotEmpty) {
-                  await SupabaseStorageService.deleteFileByUrl(url);
+                  SupabaseStorageService.deleteFileByUrl(url);
                 }
               }
             }
           }
         }
-      } catch (e) {
-        debugPrint('[CourseDelete] Non-fatal error cleaning up files: $e');
-      }
+      }).catchError((e) {
+        debugPrint('[CourseDelete] Error retrieving file URLs for deletion: $e');
+      });
 
-      await FirebaseFirestore.instance.collection(coursesPath).doc(id).delete();
+      // Delete Firestore document instantly (optimistic UI)
+      FirebaseFirestore.instance.collection(coursesPath).doc(id).delete().catchError((e) {
+        debugPrint('[CourseDelete] Failed to delete course doc: $e');
+      });
     }
   }
 
@@ -917,7 +919,8 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                               runSpacing: 8,
                                               children: List.generate(
                                                   course.ctMarksUrls.length,
-                                                  (pIdx) {
+                                                  (reverseIdx) {
+                                                final pIdx = course.ctMarksUrls.length - 1 - reverseIdx;
                                                 final urlString =
                                                     course.ctMarksUrls[pIdx];
                                                 final pName = course

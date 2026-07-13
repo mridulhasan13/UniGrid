@@ -189,6 +189,16 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                         doc.data() as Map<String, dynamic>, doc.id))
                     .toList();
 
+                // Sort automatically: newest first (timestamp descending), nulls last
+                materials.sort((a, b) {
+                  final aTime = a.timestamp;
+                  final bTime = b.timestamp;
+                  if (aTime == null && bTime == null) return 0;
+                  if (aTime == null) return 1;
+                  if (bTime == null) return -1;
+                  return bTime.compareTo(aTime);
+                });
+
                 if (materials.isEmpty) {
                   return const Center(
                       child: Text('No materials found in this category.'));
@@ -517,16 +527,26 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                                           if (confirm == true) {
                                             try {
                                               final fileUrl = material.fileUrl;
-                                              if (fileUrl != null && fileUrl.isNotEmpty) {
-                                                await SupabaseStorageService.deleteFileByUrl(fileUrl);
-                                              }
-                                              await FirebaseFirestore.instance
+
+                                              // Delete Firestore document instantly (optimistic UI)
+                                              FirebaseFirestore.instance
                                                   .collection(deptBatchCol(
                                                       user.department,
                                                       user.batch,
                                                       'materials'))
                                                   .doc(material.id)
-                                                  .delete();
+                                                  .delete()
+                                                  .catchError((e) {
+                                                debugPrint('Failed to delete material doc: $e');
+                                              });
+
+                                              // Clean up Supabase file in background
+                                              if (fileUrl != null && fileUrl.isNotEmpty) {
+                                                SupabaseStorageService.deleteFileByUrl(fileUrl).catchError((e) {
+                                                  debugPrint('[MaterialDelete] Error cleaning up file: $e');
+                                                });
+                                              }
+
                                               if (context.mounted) {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
