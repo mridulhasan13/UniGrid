@@ -33,30 +33,45 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     // Auto-reset is now triggered on build once we have user context
   }
 
+  DateTime _getStartOfWeek(DateTime date) {
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    return dateOnly.subtract(Duration(days: dateOnly.weekday - 1));
+  }
+
   // Auto-reset logic: If the last update was in a previous week, reset all statuses to 'upcoming'
   Future<void> _checkAndAutoResetStatuses(AppUser? user) async {
     if (user == null || !user.hasDeptScope) return;
     final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
+    final metaPath = deptBatchCol(user.department, user.batch, 'routine_metadata');
     try {
-      final query = await FirebaseFirestore.instance
-          .collection(schedulePath)
-          .limit(1)
-          .get();
-      if (query.docs.isEmpty) return;
+      final infoDocRef = FirebaseFirestore.instance.collection(metaPath).doc('info');
+      final infoDoc = await infoDocRef.get();
 
-      final sample =
-          ClassSchedule.fromMap(query.docs.first.data(), query.docs.first.id);
-      if (sample.lastUpdatedDate == null) return;
+      DateTime? lastReset;
+      if (infoDoc.exists) {
+        final data = infoDoc.data();
+        if (data != null && data['lastResetDate'] != null) {
+          lastReset = (data['lastResetDate'] as Timestamp).toDate();
+        }
+      }
 
-      final lastUpdate = sample.lastUpdatedDate!;
       final now = DateTime.now();
 
-      // Check if the last update was more than 7 days ago
-      // Or check if the week numbers differ
-      final difference = now.difference(lastUpdate).inDays;
+      // If lastReset is null, it means we haven't tracked resets yet.
+      // Initialize lastResetDate to the current time to avoid immediately resetting
+      // any schedule modifications made earlier in the current week.
+      if (lastReset == null) {
+        await infoDocRef.set({
+          'lastResetDate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        return;
+      }
 
-      if (difference >= 7 ||
-          (now.weekday < lastUpdate.weekday && difference >= 1)) {
+      final lastResetStartOfWeek = _getStartOfWeek(lastReset);
+      final currentStartOfWeek = _getStartOfWeek(now);
+
+      // Reset only if the current week starts after the last reset week
+      if (currentStartOfWeek.isAfter(lastResetStartOfWeek)) {
         // It's a new week! Reset all classes to 'upcoming'
         final batch = FirebaseFirestore.instance.batch();
         final allDocs =
@@ -67,6 +82,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             'lastUpdatedDate': FieldValue.serverTimestamp(),
           });
         }
+        
+        // Update the lastResetDate in routine_metadata/info
+        batch.set(infoDocRef, {
+          'lastResetDate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
         await batch.commit();
         debugPrint('Schedule automatically reset for the new week.');
       }
