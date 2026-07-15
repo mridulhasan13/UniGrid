@@ -330,7 +330,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             : (_isLogin ? _handleLogin : _handleRegister),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          foregroundColor: AppColors.textPrimary,
+                          foregroundColor: AppColors.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 18),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -343,7 +343,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
-                                    color: AppColors.textPrimary, strokeWidth: 2),
+                                    color: AppColors.onPrimary, strokeWidth: 2),
                               )
                             : Text(
                                 _isLogin ? 'Login' : 'Create Account',

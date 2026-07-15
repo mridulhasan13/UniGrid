@@ -733,17 +733,18 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
-                                  color: AppColors.textPrimary, strokeWidth: 2))
-                          : Icon(Icons.send, color: AppColors.textPrimary),
+                                  color: AppColors.onPrimary, strokeWidth: 2))
+                          : Icon(Icons.send, color: AppColors.onPrimary),
                       label: Text(
                           _isPostingAnnouncement
                               ? 'Posting...'
                               : 'Post Announcement',
                           style: TextStyle(
-                              color: AppColors.textPrimary,
+                              color: AppColors.onPrimary,
                               fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16)),

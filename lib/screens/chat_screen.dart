@@ -460,125 +460,119 @@ class _MessageBubble extends StatelessWidget {
       bottomRight: Radius.circular(isOwn ? 4 : 18),
     );
 
-    return ClipRRect(
-      borderRadius: radius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.72),
-          decoration: BoxDecoration(
-            color: isOwn
-                ? (isBW
-                    ? const Color(0xFF2E2E30)
-                    : AppColors.primary.withOpacity(0.95))
-                : const Color(0xFF1E1E1E),
-            borderRadius: radius,
-            border: Border.all(
-              color: isOwn
-                  ? (isBW
-                      ? const Color(0xFF3F3F46)
-                      : AppColors.primary.withOpacity(0.4))
-                  : Colors.white.withOpacity(0.08),
-              width: 0.8,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Sender name for received messages
-              if (!isOwn)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 5),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        message.authorName,
-                        style: TextStyle(
-                          color: message.isCR
-                              ? AppColors.secondary
-                              : AppColors.primary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (message.isCR) ...[
-                        const SizedBox(width: 5),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'CR',
-                            style: TextStyle(
-                                color: AppColors.secondary,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ]
-                    ],
-                  ),
-                ),
-              // Reply preview
-              if (message.replyTo != null) _buildReplyPreview(textColor),
-              // Content
-              if (message.isUnsent)
-                Text(
-                  '🚫  This message was unsent',
-                  style: TextStyle(
-                    color: textColor.withOpacity(0.45),
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                  ),
-                )
-              else if (message.type == 'image' && message.uri != null) ...[
-                _buildImageContent(),
-                if (message.text.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    message.text,
-                    style: TextStyle(
-                        color: textColor, fontSize: 14, height: 1.4),
-                  ),
-                ],
-              ] else
-                Text(
-                  message.text,
-                  style: TextStyle(
-                      color: textColor, fontSize: 14, height: 1.4),
-                ),
-              // Timestamp + edited tag
-              const SizedBox(height: 5),
-              Row(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.72),
+      decoration: BoxDecoration(
+        color: isOwn
+            ? (isBW
+                ? const Color(0xFF2E2E30)
+                : AppColors.primary.withOpacity(0.95))
+            : const Color(0xFF1E1E1E),
+        borderRadius: radius,
+        border: Border.all(
+          color: isOwn
+              ? (isBW
+                  ? const Color(0xFF3F3F46)
+                  : AppColors.primary.withOpacity(0.4))
+              : Colors.white.withOpacity(0.08),
+          width: 0.8,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Sender name for received messages
+          if (!isOwn)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    DateFormat('h:mm a').format(message.createdAt),
+                    message.authorName,
                     style: TextStyle(
-                        color: textColor.withOpacity(0.45), fontSize: 10),
+                      color: message.isCR
+                          ? AppColors.secondary
+                          : AppColors.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  if (message.editedAt != null) ...[
+                  if (message.isCR) ...[
                     const SizedBox(width: 5),
-                    Text(
-                      '· edited',
-                      style: TextStyle(
-                          color: textColor.withOpacity(0.35),
-                          fontSize: 10,
-                          fontStyle: FontStyle.italic),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'CR',
+                        style: TextStyle(
+                            color: AppColors.secondary,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ],
               ),
+            ),
+          // Reply preview
+          if (message.replyTo != null) _buildReplyPreview(textColor),
+          // Content
+          if (message.isUnsent)
+            Text(
+              '🚫  This message was unsent',
+              style: TextStyle(
+                color: textColor.withOpacity(0.45),
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          else if (message.type == 'image' && message.uri != null) ...[
+            _buildImageContent(),
+            if (message.text.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                message.text,
+                style: TextStyle(
+                    color: textColor, fontSize: 14, height: 1.4),
+              ),
+            ],
+          ] else
+            Text(
+              message.text,
+              style: TextStyle(
+                  color: textColor, fontSize: 14, height: 1.4),
+            ),
+          // Timestamp + edited tag
+          const SizedBox(height: 5),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                DateFormat('h:mm a').format(message.createdAt),
+                style: TextStyle(
+                    color: textColor.withOpacity(0.45), fontSize: 10),
+              ),
+              if (message.editedAt != null) ...[
+                const SizedBox(width: 5),
+                Text(
+                  '· edited',
+                  style: TextStyle(
+                      color: textColor.withOpacity(0.35),
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic),
+                ),
+              ],
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1733,7 +1727,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
-                                  foregroundColor: AppColors.textPrimary,
+                                  foregroundColor: AppColors.onPrimary,
                                   elevation: 0,
                                   padding:
                                       const EdgeInsets.symmetric(vertical: 14),
@@ -2041,12 +2035,10 @@ class _ChatScreenState extends State<ChatScreen> {
             left: 8,
             right: 8,
             top: 10,
-            bottom: MediaQuery.of(context).padding.bottom + 16,
+            bottom: MediaQuery.of(context).padding.bottom + 12 + 12,
           ),
-          decoration: BoxDecoration(
-            color: AppColors.backgroundTop.withOpacity(0.8),
-            border:
-                Border(top: BorderSide(color: AppColors.textPrimary.withOpacity(0.08))),
+          decoration: const BoxDecoration(
+            color: Colors.transparent,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

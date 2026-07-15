@@ -192,7 +192,7 @@ class _FileViewerScreenState extends State<FileViewerScreen> {
               onPressed: _downloadFile,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textPrimary,
+                foregroundColor: AppColors.onPrimary,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
@@ -387,7 +387,7 @@ class _FileViewerScreenState extends State<FileViewerScreen> {
                                                 label: const Text('Open in Browser / External App'),
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: AppColors.primary,
-                                                  foregroundColor: AppColors.textPrimary,
+                                                  foregroundColor: AppColors.onPrimary,
                                                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(10),

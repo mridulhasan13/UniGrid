@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../utils/constants.dart';
 
 class GlassCard extends StatelessWidget {
@@ -22,33 +23,38 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget cardContent = ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color:
-                AppColors.glassCardColor.withOpacity(0.8), // Dark slate glass
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(
-              color: AppColors.glassCardBorder,
-              width: 1.5,
-            ),
-            boxShadow: AppStyles.emeraldGlow,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.textPrimary.withOpacity(0.05),
-                Colors.transparent,
-              ],
-            ),
-          ),
-          child: child,
+    final bool useBlur = !kIsWeb;
+    
+    Widget cardContainer = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: AppColors.glassCardColor.withOpacity(useBlur ? 0.8 : 0.95), // slightly more opaque on web
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: AppColors.glassCardBorder,
+          width: 1.5,
+        ),
+        boxShadow: AppStyles.emeraldGlow,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.textPrimary.withOpacity(0.05),
+            Colors.transparent,
+          ],
         ),
       ),
+      child: child,
+    );
+
+    Widget cardContent = ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: useBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+              child: cardContainer,
+            )
+          : cardContainer,
     );
 
     if (onTap != null) {

@@ -564,12 +564,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(Icons.save_rounded,
-                                        color: AppColors.textPrimary, size: 16),
+                                        color: AppColors.onPrimary, size: 16),
                                     SizedBox(width: 6),
                                     Text(
                                       'Save Slots',
                                       style: TextStyle(
-                                          color: AppColors.textPrimary,
+                                          color: AppColors.onPrimary,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 13),
                                     ),
@@ -832,38 +832,46 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         ],
                       ),
                       Expanded(
-                        child: SingleChildScrollView(
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              left: 16.0,
-                              right: 16.0,
-                              top: 8.0,
-                              bottom: MediaQuery.of(context).padding.bottom + 96,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                        _buildDateCalendarCard(user, customSlots),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 440,
-                          child: WeeklyRoutineTable(
-                            customSlots: customSlots,
-                            university: university,
-                            levelTerm: levelTerm,
-                            selectedDate: _selectedDate,
-                            onDateTap: () {
-                              setState(() {
-                                _isCalendarExpanded = !_isCalendarExpanded;
-                              });
-                            },
-                          ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final double availableHeight = constraints.maxHeight;
+                            final double calendarHeight = _isCalendarExpanded ? 340 : 54;
+                            final double tableHeight = (availableHeight - calendarHeight - 8 - 80).clamp(380.0, 1000.0);
+
+                            return SingleChildScrollView(
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  left: 16.0,
+                                  right: 16.0,
+                                  top: 8.0,
+                                  bottom: MediaQuery.of(context).padding.bottom + 80,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildDateCalendarCard(user, customSlots),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      height: tableHeight,
+                                      child: WeeklyRoutineTable(
+                                        customSlots: customSlots,
+                                        university: university,
+                                        levelTerm: levelTerm,
+                                        selectedDate: _selectedDate,
+                                        onDateTap: () {
+                                          setState(() {
+                                            _isCalendarExpanded = !_isCalendarExpanded;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+                      ),
             ],
           ),
         ),
@@ -1079,10 +1087,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         },
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF0A1912).withOpacity(0.6),
+            color: AppColors.glassCardColor.withOpacity(0.6),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-                color: const Color(0xFF00E676).withOpacity(0.2), width: 1),
+                color: AppColors.primary.withOpacity(0.2), width: 1),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.4),
@@ -1133,10 +1141,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1912).withOpacity(0.6),
+        color: AppColors.glassCardColor.withOpacity(0.6),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: const Color(0xFF00E676).withOpacity(0.2), width: 1),
+            color: AppColors.primary.withOpacity(0.2), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.4),

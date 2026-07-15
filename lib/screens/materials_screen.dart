@@ -975,6 +975,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.onPrimary,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(
@@ -985,7 +986,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                               ? 'Upload ${selectedFiles.length} File(s)'
                               : 'Select & Upload',
                           style: TextStyle(
-                              color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                              color: AppColors.onPrimary, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],

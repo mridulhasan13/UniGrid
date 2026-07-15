@@ -1,6 +1,7 @@
 import '../utils/constants.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ota_update/ota_update.dart';
@@ -308,17 +309,15 @@ class _VersionAwareWrapperState extends State<VersionAwareWrapper> {
               },
               child: Material(
                 color: Colors.transparent,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                    child: Container(
+                child: Builder(
+                  builder: (context) {
+                    final bool useBlur = !kIsWeb;
+                    final Widget bannerContainer = Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E2C).withOpacity(0.92),
+                        color: AppColors.glassCardColor.withOpacity(useBlur ? 0.8 : 0.95),
                         borderRadius: BorderRadius.circular(16),
-                        border:
-                            Border.all(color: AppColors.textPrimary.withOpacity(0.08)),
+                        border: Border.all(color: AppColors.glassCardBorder),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.4),
@@ -335,12 +334,12 @@ class _VersionAwareWrapperState extends State<VersionAwareWrapper> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.blueAccent.withOpacity(0.2),
+                                  color: AppColors.primary.withOpacity(0.2),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.system_update_rounded,
-                                  color: Colors.blueAccent,
+                                  color: AppColors.primary,
                                   size: 24,
                                 ),
                               ),
@@ -374,8 +373,8 @@ class _VersionAwareWrapperState extends State<VersionAwareWrapper> {
                           if (_isDownloading) ...[
                             Text(
                               _downloadStatus,
-                              style: const TextStyle(
-                                  color: Colors.blueAccent,
+                              style: TextStyle(
+                                  color: AppColors.primary,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12),
                             ),
@@ -387,8 +386,8 @@ class _VersionAwareWrapperState extends State<VersionAwareWrapper> {
                                     ? _downloadProgress
                                     : null,
                                 backgroundColor: AppColors.glassCardBorder,
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                    Colors.blueAccent),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.primary),
                                 minHeight: 6,
                               ),
                             ),
@@ -412,7 +411,7 @@ class _VersionAwareWrapperState extends State<VersionAwareWrapper> {
                                 ElevatedButton(
                                   onPressed: _startOtaUpdate,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blueAccent,
+                                    backgroundColor: AppColors.primary,
                                     foregroundColor: AppColors.textPrimary,
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 16, vertical: 8),
@@ -445,8 +444,19 @@ class _VersionAwareWrapperState extends State<VersionAwareWrapper> {
                           ],
                         ],
                       ),
-                    ),
-                  ),
+                    );
+
+                    final Widget bannerContent = ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: useBlur
+                          ? BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                              child: bannerContainer,
+                            )
+                          : bannerContainer,
+                    );
+                    return bannerContent;
+                  },
                 ),
               ),
             ),

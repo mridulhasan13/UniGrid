@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
@@ -84,7 +85,7 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: GlassCard(
+      bottomNavigationBar: Container(
         margin: EdgeInsets.only(
           left: 16,
           right: 16,
@@ -92,39 +93,78 @@ class _MainScreenState extends State<MainScreen> {
               ? MediaQuery.of(context).padding.bottom + 8
               : 16,
         ),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        borderRadius: 24,
-        opacity: 0.3,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(navItems.length, (index) {
-            final item = navItems[index];
-            final isSelected = index == safeIndex;
-
-            IconData iconData = Icons.help;
-            if (item.icon is Icon) {
-              iconData = (item.icon as Icon).icon ?? Icons.help;
-            }
-
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
-                child: Icon(
-                  iconData,
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textSecondary,
-                  size: 26,
+        decoration: BoxDecoration(
+          color: AppColors.glassCardColor.withOpacity(0.92), // Deeper backdrop to hide scrolling content
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: AppColors.glassCardBorder,
+            width: 1.5,
+          ),
+          boxShadow: [
+            // Strong drop shadow to place the bar "above of all elements"
+            BoxShadow(
+              color: Colors.black.withOpacity(0.55),
+              blurRadius: 20,
+              spreadRadius: 2,
+              offset: const Offset(0, 6),
+            ),
+            // Theme-colored ambient glow
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.12),
+              blurRadius: 16,
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.textPrimary.withOpacity(0.06),
+                    Colors.transparent,
+                  ],
                 ),
               ),
-            );
-          }),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(navItems.length, (index) {
+                  final item = navItems[index];
+                  final isSelected = index == safeIndex;
+
+                  IconData iconData = Icons.help;
+                  if (item.icon is Icon) {
+                    iconData = (item.icon as Icon).icon ?? Icons.help;
+                  }
+
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      setState(() {
+                        _currentIndex = index;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
+                      child: Icon(
+                        iconData,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        size: 26,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
         ),
       ),
     );

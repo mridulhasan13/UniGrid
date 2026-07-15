@@ -592,7 +592,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                     height: 24,
                                     width: 24,
                                     child: CircularProgressIndicator(
-                                      color: AppColors.textPrimary,
+                                      color: AppColors.onPrimary,
                                       strokeWidth: 2.5,
                                     ),
                                   )
@@ -603,7 +603,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                         widget.classToEdit != null
                                             ? Icons.check_circle_outline_rounded
                                             : Icons.add_circle_outline_rounded,
-                                        color: AppColors.textPrimary,
+                                        color: AppColors.onPrimary,
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
@@ -613,7 +613,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                         style: TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.bold,
-                                            color: AppColors.textPrimary,
+                                            color: AppColors.onPrimary,
                                             letterSpacing: 0.5),
                                       ),
                                     ],

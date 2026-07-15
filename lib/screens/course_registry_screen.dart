@@ -372,6 +372,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
+                            foregroundColor: AppColors.onPrimary,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
                             padding: const EdgeInsets.symmetric(
@@ -380,7 +381,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                           child: Text(
                             courseToEdit != null ? 'Update' : 'Add Course',
                             style: TextStyle(
-                                color: AppColors.textPrimary,
+                                color: AppColors.onPrimary,
                                 fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -1053,11 +1054,12 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                   onPressed: () => _showAddEditCourseDialog(
                       activeLevelTerm: activeLevelTerm),
                   backgroundColor: AppColors.primary,
-                  icon: Icon(Icons.menu_book, color: AppColors.textPrimary),
+                  foregroundColor: AppColors.onPrimary,
+                  icon: Icon(Icons.menu_book, color: AppColors.onPrimary),
                   label: Text(
                     'Add Course',
                     style: TextStyle(
-                        color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                        color: AppColors.onPrimary, fontWeight: FontWeight.bold),
                   ),
                 )
               : null,

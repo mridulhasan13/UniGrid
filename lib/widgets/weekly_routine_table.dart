@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -358,44 +359,50 @@ class WeeklyRoutineTable extends StatelessWidget {
           ],
         );
 
+        final bool useBlur = !kIsWeb;
+
+        final Widget cardContainer = Container(
+          width: isMobile ? 920 : double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.glassCardColor.withOpacity(useBlur ? 0.75 : 0.95),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: AppColors.primary.withOpacity(0.25), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.6),
+                blurRadius: 40,
+                offset: const Offset(0, 15),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              HeaderBar(
+                university: university,
+                levelTerm: levelTerm,
+                onDateTap: onDateTap,
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 358,
+                width: isMobile ? 920 : double.infinity,
+                child: tableGridContent,
+              ),
+            ],
+          ),
+        );
+
         final Widget tableCard = ClipRRect(
           borderRadius: BorderRadius.circular(14),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              width: isMobile ? 920 : double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.glassCardColor.withOpacity(0.75),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                    color: AppColors.primary.withOpacity(0.25), width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.6),
-                    blurRadius: 40,
-                    offset: const Offset(0, 15),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  HeaderBar(
-                    university: university,
-                    levelTerm: levelTerm,
-                    onDateTap: onDateTap,
-                  ),
-                  const SizedBox(height: 6),
-                  SizedBox(
-                    height: 358,
-                    width: isMobile ? 920 : double.infinity,
-                    child: tableGridContent,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          child: useBlur
+              ? BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: cardContainer,
+                )
+              : cardContainer,
         );
 
         return Stack(
@@ -860,7 +867,7 @@ class WeeklyRoutineTable extends StatelessWidget {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0A1912), // Deep dark green/black
+        backgroundColor: AppColors.backgroundTop,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
             side: BorderSide(color: AppColors.glassCardBorder)),
