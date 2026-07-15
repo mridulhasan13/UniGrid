@@ -2117,14 +2117,14 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 valueColor:
-                                    AlwaysStoppedAnimation<Color>(AppColors.textPrimary),
+                                    AlwaysStoppedAnimation<Color>(AppColors.onPrimary),
                               ),
                             )
                           : Icon(
                               _editingMessage != null
                                   ? Icons.check_rounded
                                   : Icons.send_rounded,
-                              color: AppColors.textPrimary,
+                              color: AppColors.onPrimary,
                               size: 20,
                             ),
                     ),
