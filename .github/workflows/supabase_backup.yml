@@ -40,7 +40,7 @@ jobs:
         
         echo "Starting pg_dump..."
         # -F c creates a compressed custom format archive (recommended for pg_restore)
-        pg_dump "$DB_URL" -F c -b -v -f "$FILENAME"
+        /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" -F c -b -v -f "$FILENAME"
         
         echo "Backup completed successfully: $FILENAME"
         echo "BACKUP_FILENAME=$FILENAME" >> $GITHUB_ENV
