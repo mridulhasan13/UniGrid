@@ -1346,98 +1346,122 @@ class _ChatScreenState extends State<ChatScreen> {
                         itemCount: members.length,
                         itemBuilder: (context, index) {
                           final member = members[index];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                            leading: Stack(
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                            child: Row(
                               children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: AppColors.primary.withOpacity(0.15),
-                                  backgroundImage: member.photoUrl.startsWith('data:image')
-                                      ? MemoryImage(base64Decode(member.photoUrl.split(',').last))
-                                      : (member.photoUrl.isNotEmpty
-                                          ? NetworkImage(member.photoUrl)
-                                          : null) as ImageProvider?,
-                                  child: member.photoUrl.isEmpty
-                                      ? Text(
-                                          member.name.isNotEmpty
-                                              ? member.name[0].toUpperCase()
-                                              : 'U',
-                                          style: TextStyle(
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                if (member.isCR)
-                                  Positioned(
-                                    right: -2,
-                                    bottom: -2,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(2),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.amber,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.star,
-                                        size: 10,
-                                        color: Colors.black,
-                                      ),
+                                Stack(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 20,
+                                      backgroundColor: AppColors.primary.withOpacity(0.15),
+                                      backgroundImage: member.photoUrl.startsWith('data:image')
+                                          ? MemoryImage(base64Decode(member.photoUrl.split(',').last))
+                                          : (member.photoUrl.isNotEmpty
+                                              ? NetworkImage(member.photoUrl)
+                                              : null) as ImageProvider?,
+                                      child: member.photoUrl.isEmpty
+                                          ? Text(
+                                              member.name.isNotEmpty
+                                                  ? member.name[0].toUpperCase()
+                                                  : 'U',
+                                              style: TextStyle(
+                                                color: AppColors.primary,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : null,
                                     ),
+                                    if (member.isCR)
+                                      Positioned(
+                                        right: -2,
+                                        bottom: -2,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.amber,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.star,
+                                            size: 10,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 3,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              member.name,
+                                              style: TextStyle(
+                                                color: AppColors.textPrimary,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (member.isCR) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: Colors.amber.withOpacity(0.15),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: Colors.amber.withOpacity(0.3), width: 0.5),
+                                              ),
+                                              child: const Text(
+                                                'CR',
+                                                style: TextStyle(
+                                                  color: Colors.amber,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        member.studentId.isNotEmpty
+                                            ? 'ID: ${member.studentId}'
+                                            : 'No ID set',
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
-                              ],
-                            ),
-                            title: Row(
-                              children: [
+                                ),
+                                const SizedBox(width: 8),
                                 Flexible(
+                                  flex: 2,
                                   child: Text(
-                                    member.name,
+                                    member.email,
                                     style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
+                                      color: AppColors.textSecondary.withOpacity(0.6),
+                                      fontSize: 11,
                                     ),
                                     overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.end,
+                                    maxLines: 1,
                                   ),
                                 ),
-                                if (member.isCR) ...[
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.amber.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.amber.withOpacity(0.3), width: 0.5),
-                                    ),
-                                    child: const Text(
-                                      'CR',
-                                      style: TextStyle(
-                                        color: Colors.amber,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
                               ],
-                            ),
-                            subtitle: Text(
-                              member.studentId.isNotEmpty
-                                  ? 'ID: ${member.studentId}'
-                                  : 'No ID set',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                            trailing: Text(
-                              member.email,
-                              style: TextStyle(
-                                color: AppColors.textSecondary.withOpacity(0.6),
-                                fontSize: 11,
-                              ),
                             ),
                           );
                         },
