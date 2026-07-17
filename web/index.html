@@ -129,6 +129,22 @@
       animation: fade-in-up 0.5s ease-out 0.3s forwards;
     }
 
+    .retry-btn {
+      margin-top: 24px;
+      padding: 10px 28px;
+      background: #3B82F6;
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      display: none;
+      letter-spacing: 0.5px;
+    }
+
+    .retry-btn:active { opacity: 0.8; }
+
     @keyframes rotate {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -159,31 +175,67 @@
   <div class="loader-container" id="unigrid-splash">
     <div class="logo-box">
       <div class="halo"></div>
-      <div class="spinner"></div>
+      <div class="spinner" id="unigrid-spinner"></div>
       <img src="assets/assets/images/logo.png" class="logo-img" alt="UniGrid" onerror="this.onerror=null; this.src='assets/images/logo.png';">
     </div>
-    <div class="loading-text">Loading UniGrid...</div>
-    <div class="loading-subtext">Initializing workspace environment</div>
+    <div class="loading-text" id="unigrid-loading-text">Loading UniGrid...</div>
+    <div class="loading-subtext" id="unigrid-loading-subtext">Initializing workspace environment</div>
+    <button class="retry-btn" id="unigrid-retry-btn" onclick="window.location.reload()">Tap to Retry</button>
   </div>
 
   <script>
+    // --- Splash helpers ---
+    function _removeSplash() {
+      var splash = document.getElementById('unigrid-splash');
+      if (splash) {
+        splash.style.transition = 'opacity 0.5s ease';
+        splash.style.opacity = '0';
+        setTimeout(function() { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 500);
+      }
+    }
+
+    function _showRetry(msg) {
+      var subtext = document.getElementById('unigrid-loading-subtext');
+      var spinner = document.getElementById('unigrid-spinner');
+      var btn = document.getElementById('unigrid-retry-btn');
+      var loadingText = document.getElementById('unigrid-loading-text');
+      if (subtext) subtext.textContent = msg || 'Something went wrong.';
+      if (loadingText) loadingText.textContent = 'Could not load UniGrid';
+      if (spinner) spinner.style.display = 'none';
+      if (btn) btn.style.display = 'block';
+    }
+
+    // --- 20-second timeout fallback ---
+    var _loadTimeout = setTimeout(function() {
+      _showRetry('Taking too long. Check your connection and tap to retry.');
+    }, 20000);
+
+    // --- Global JS error handler (catches Flutter engine crashes) ---
+    window.addEventListener('error', function(e) {
+      console.error('UniGrid load error:', e.message);
+      clearTimeout(_loadTimeout);
+      _showRetry('Failed to load. Tap to retry.');
+    });
+
     window.addEventListener('load', function(ev) {
-      // Download main.dart.js
       _flutter.loader.loadEntrypoint({
+        // Service worker disabled — prevents stale-cache loading issues in
+        // returning browsers. Netlify Cache-Control headers handle caching.
         serviceWorker: {
-          serviceWorkerVersion: serviceWorkerVersion,
+          serviceWorkerVersion: null,
         },
         onEntrypointLoaded: function(engineInitializer) {
+          // Clear the timeout — Flutter JS loaded successfully
+          clearTimeout(_loadTimeout);
           engineInitializer.initializeEngine().then(function(appRunner) {
-            Promise.resolve(appRunner.runApp()).then(function() {
-              // Smoothly fade out the splash screen once Flutter renders
-              const splash = document.getElementById('unigrid-splash');
-              if (splash) {
-                splash.style.transition = 'opacity 0.5s ease';
-                splash.style.opacity = '0';
-                setTimeout(() => splash.remove(), 500);
-              }
-            });
+            // Remove splash as soon as engine is ready (before runApp).
+            // Splash removal here is more reliable than inside runApp().then()
+            // because runApp() may not return a thenable in all browsers.
+            _removeSplash();
+            appRunner.runApp();
+          }).catch(function(err) {
+            console.error('Flutter engine init failed:', err);
+            _showRetry('Engine failed to start. Tap to retry.');
           });
         }
       });
