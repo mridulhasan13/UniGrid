@@ -6,10 +6,11 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, compute;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image/image.dart' as img;
+import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import 'fcm_service.dart';
-import 'onesignal_service.dart';
 import 'theme_service.dart';
+import 'supabase_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
@@ -27,11 +28,9 @@ class AuthService {
     _auth.authStateChanges().listen((User? firebaseUser) {
       if (firebaseUser != null) {
         FCMService.saveTokenForUser(firebaseUser.uid);
-        OneSignalService.setExternalUserId(firebaseUser.uid);
         ThemeService.instance.initGlobalThemeListener();
         _initRootAdminListener();
       } else {
-        OneSignalService.removeExternalUserId();
         ThemeService.instance.initGlobalThemeListener();
       }
       _startFirestoreListener(
@@ -69,8 +68,9 @@ class AuthService {
     if (email == null) return false;
     final cleanEmail = email.trim().toLowerCase();
 
-    // FAIL-SAFE: Hardcoded fallback for the primary root admin
-    if (cleanEmail == 'mridul.owner@unigrid.app') return true;
+    // FAIL-SAFE: Hardcoded fallback for primary root admins
+    if (cleanEmail == 'mridul.owner@unigrid.app' ||
+        cleanEmail == 'mridulhasan13@gmail.com') return true;
 
     // Database check for other potential root admins (supporting both 'email' and 'Email' keys)
     return _rootAdmins.any((a) {
@@ -149,7 +149,6 @@ class AuthService {
           final appUser = AppUser.fromMap(data, doc.id);
           _userController.add(appUser);
           if (appUser.hasDeptScope) {
-            OneSignalService.setTags(appUser.department, appUser.batch);
             ThemeService.instance.initGlobalThemeListener(
               department: appUser.department,
               batch: appUser.batch,
@@ -189,7 +188,7 @@ class AuthService {
           email: email.trim().toLowerCase(), password: password.trim());
       User? firebaseUser = result.user;
       if (firebaseUser != null) {
-        await _saveSession(email.trim().toLowerCase(), password.trim(), false);
+        await _saveSession(email.trim().toLowerCase(), false);
         _startFirestoreListener(
           firebaseUser.uid,
           firebaseUser.email,
@@ -225,7 +224,7 @@ class AuthService {
       User? user = result.user;
 
       if (user != null) {
-        await _saveSession(cleanEmail, password, false);
+        await _saveSession(cleanEmail, false);
         final bool isRoot = isRootAdmin(cleanEmail);
         final newUser = AppUser(
           id: user.uid,
@@ -243,16 +242,15 @@ class AuthService {
         );
         await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
         
-        // Notify the CR of the newly registered student's department and batch
-        FCMService.notifyCRNewRegistration(
-          studentName: name,
-          studentId: studentId,
+        FCMService.sendToDeptAndBatch(
           department: department,
           batch: batch,
-        ).catchError((e) {
-          debugPrint('❌ Failed to notify CR of new registration: $e');
-        });
-
+          title: 'New Registration',
+          body: '$name ($studentId) has registered in your batch and needs approval.',
+          senderUserId: user.uid,
+          adminsOnly: true,
+        );
+        
         return newUser;
       }
       return null;
@@ -354,9 +352,15 @@ class AuthService {
   Future<String> uploadChatImage(Uint8List fileBytes, String extension) async {
     try {
       final compressedBytes = await compute(_compressImageForChat, fileBytes);
-      final base64Image = base64Encode(compressedBytes);
-      return 'data:image/jpeg;base64,$base64Image';
+      final fileName = '${const Uuid().v4()}.$extension';
+      final url = await SupabaseStorageService.uploadFile(
+        bytes: compressedBytes,
+        fileName: fileName,
+        folder: 'chat_images',
+      );
+      return url;
     } catch (e) {
+      debugPrint('[AuthService] uploadChatImage error: $e');
       rethrow;
     }
   }
@@ -365,12 +369,16 @@ class AuthService {
       Uint8List fileBytes, String extension) async {
     try {
       final compressedBytes = await compute(_compressImageForChat, fileBytes);
-      final base64Image = base64Encode(compressedBytes);
-      final dataUrl = 'data:image/jpeg;base64,$base64Image';
-
-      await updateUserProfile(photoUrl: dataUrl);
-      return dataUrl;
+      final fileName = '${const Uuid().v4()}.$extension';
+      final url = await SupabaseStorageService.uploadFile(
+        bytes: compressedBytes,
+        fileName: fileName,
+        folder: 'profile_photos',
+      );
+      await updateUserProfile(photoUrl: url);
+      return url;
     } catch (e) {
+      debugPrint('[AuthService] uploadProfilePhoto error: $e');
       rethrow;
     }
   }
@@ -396,7 +404,7 @@ class AuthService {
       }
       User? firebaseUser = result.user;
       if (firebaseUser != null) {
-        await _saveSession(firebaseUser.email ?? '', '', true);
+        await _saveSession(firebaseUser.email ?? '', true);
         _startFirestoreListener(
           firebaseUser.uid,
           firebaseUser.email,
@@ -416,12 +424,11 @@ class AuthService {
     return null;
   }
 
-  Future<void> _saveSession(String email, String password, bool isGoogle) async {
+  Future<void> _saveSession(String email, bool isGoogle) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('auth_session_timestamp', DateTime.now().millisecondsSinceEpoch);
       await prefs.setString('auth_session_email', email);
-      await prefs.setString('auth_session_password', password);
       await prefs.setBool('auth_session_is_google', isGoogle);
       debugPrint('[AuthService] Session saved for $email (Google: $isGoogle).');
     } catch (e) {
@@ -461,23 +468,13 @@ class AuthService {
           if (isGoogle) {
             debugPrint('[AuthService] Attempting silent Google login...');
             await _signInGoogleSilently();
-          } else {
-            final email = prefs.getString('auth_session_email');
-            final password = prefs.getString('auth_session_password');
-            if (email != null && password != null && email.isNotEmpty && password.isNotEmpty) {
-              debugPrint('[AuthService] Attempting auto-login for $email...');
-              await _auth.signInWithEmailAndPassword(
-                email: email,
-                password: password,
-              );
-            }
           }
         }
       } else {
         // No session stored yet. If already logged in, initialize the session now.
         final currentUser = _auth.currentUser;
         if (currentUser != null) {
-          await _saveSession(currentUser.email ?? '', '', false);
+          await _saveSession(currentUser.email ?? '', false);
         }
       }
     } catch (e) {

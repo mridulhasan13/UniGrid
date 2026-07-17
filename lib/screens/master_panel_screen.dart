@@ -8,6 +8,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/unigrid_loader.dart';
 import '../utils/dept_scope.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class MasterPanelScreen extends StatefulWidget {
   const MasterPanelScreen({super.key});
@@ -353,10 +354,10 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                 radius: 24,
                                 backgroundColor:
                                     AppColors.primary.withOpacity(0.2),
-                                backgroundImage: photoUrl.isNotEmpty
+                                backgroundImage: (photoUrl.isNotEmpty && (!kIsWeb || photoUrl.contains('supabase')))
                                     ? NetworkImage(photoUrl)
                                     : null,
-                                child: photoUrl.isEmpty
+                                child: (photoUrl.isEmpty || (kIsWeb && !photoUrl.contains('supabase')))
                                     ? Text(
                                         name.isNotEmpty
                                             ? name[0].toUpperCase()

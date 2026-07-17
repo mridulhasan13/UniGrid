@@ -7,7 +7,7 @@ class AppColors {
 
   // Background Colors
   static Color backgroundTop = const Color(0xFF030710); // Dark Blue / Black (Solid)
-  static Color backgroundBottom = const Color(0xFF030710); // Dark Blue / Black (Solid)
+  static Color backgroundBottom = const Color(0xFF0A0F1D); // Deep Space Navy Blue
 
   // Card & Surface Colors
   static Color glassCardColor =

@@ -8,6 +8,7 @@ import '../widgets/unigrid_loader.dart';
 import 'chat_screen.dart'; // Department Chat
 import 'private_chat_screen.dart'; // Private Chat
 import 'user_selection_screen.dart'; // New chat picker
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -195,10 +196,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             radius: 25,
             backgroundImage: user.photoUrl.startsWith('data:image')
                 ? MemoryImage(base64Decode(user.photoUrl.split(',').last))
-                : (user.photoUrl.isNotEmpty
+                : ((user.photoUrl.isNotEmpty && (!kIsWeb || user.photoUrl.contains('supabase')))
                     ? NetworkImage(user.photoUrl)
                     : null) as ImageProvider?,
-            child: user.photoUrl.isEmpty
+            child: (user.photoUrl.isEmpty || (kIsWeb && !user.photoUrl.contains('supabase') && !user.photoUrl.startsWith('data:image')))
                 ? Text(user.name.isNotEmpty ? user.name[0] : 'U')
                 : null,
           ),

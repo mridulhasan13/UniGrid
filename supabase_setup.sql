@@ -106,8 +106,8 @@ FOR INSERT
 WITH CHECK (
   bucket_id = 'unigrid-files'
   AND (
-    -- Allow uploads only into the three known folders
-    (storage.foldername(name))[1] IN ('announcements', 'materials', 'ct_marks')
+    -- Allow uploads only into the known folders
+    (storage.foldername(name))[1] IN ('announcements', 'materials', 'ct_marks', 'profile_photos', 'chat_images')
   )
 );
 
@@ -127,7 +127,7 @@ FOR DELETE
 USING (
   bucket_id = 'unigrid-files'
   AND (
-    (storage.foldername(name))[1] IN ('announcements', 'materials', 'ct_marks')
+    (storage.foldername(name))[1] IN ('announcements', 'materials', 'ct_marks', 'profile_photos', 'chat_images')
   )
 );
 

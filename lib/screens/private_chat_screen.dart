@@ -14,7 +14,6 @@ import '../widgets/unigrid_loader.dart';
 import '../utils/constants.dart';
 import 'file_viewer_screen.dart';
 import '../services/auth_service.dart';
-import '../services/onesignal_service.dart';
 import '../services/fcm_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
@@ -71,8 +70,14 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     final conversationRef =
         _firestore.collection('conversations').doc(_conversationId);
 
-    // Write message
+     // Write message
     await conversationRef.collection('messages').add(textMessage);
+    FCMService.sendPrivateNotification(
+      recipientId: widget.recipient.id,
+      title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
+      body: message.text,
+      senderUserId: user.id,
+    );
 
     // Update conversation metadata for Inbox sorting
     await conversationRef.set({
@@ -85,23 +90,6 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
         widget.recipient.id: false,
       }
     }, SetOptions(merge: true));
-
-    final senderName =
-        user.name.isNotEmpty ? user.name : user.email.split('@')[0];
-    if (kIsWeb) {
-      await OneSignalService.sendPrivateNotification(
-        recipientId: widget.recipient.id,
-        title: senderName,
-        body: message.text,
-      );
-    } else {
-      await FCMService.sendPrivateNotification(
-        recipientId: widget.recipient.id,
-        title: senderName,
-        body: message.text,
-        senderUserId: user.id,
-      );
-    }
   }
 
   void _handleAttachmentPressed() async {
@@ -148,6 +136,12 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
           };
 
           await conversationRef.collection('messages').add(imageMessage);
+          FCMService.sendPrivateNotification(
+            recipientId: widget.recipient.id,
+            title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
+            body: 'Sent an image',
+            senderUserId: user.id,
+          );
         }
       }
 
@@ -198,14 +192,13 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundImage: widget.recipient.photoUrl
-                      .startsWith('data:image')
+              backgroundImage: widget.recipient.photoUrl.startsWith('data:image')
                   ? MemoryImage(
                       base64Decode(widget.recipient.photoUrl.split(',').last))
-                  : (widget.recipient.photoUrl.isNotEmpty
+                  : ((widget.recipient.photoUrl.isNotEmpty && (!kIsWeb || widget.recipient.photoUrl.contains('supabase')))
                       ? NetworkImage(widget.recipient.photoUrl)
                       : null) as ImageProvider?,
-              child: widget.recipient.photoUrl.isEmpty
+              child: (widget.recipient.photoUrl.isEmpty || (kIsWeb && !widget.recipient.photoUrl.contains('supabase') && !widget.recipient.photoUrl.startsWith('data:image')))
                   ? Text(widget.recipient.name.isNotEmpty
                       ? widget.recipient.name[0]
                       : 'U')
@@ -410,10 +403,10 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   }
                   return CircleAvatar(
                     radius: 16,
-                    backgroundImage: user.imageUrl != null
+                    backgroundImage: (user.imageUrl != null && (!kIsWeb || user.imageUrl!.contains('supabase')))
                         ? NetworkImage(user.imageUrl!)
                         : null,
-                    child: user.imageUrl == null
+                    child: (user.imageUrl == null || (kIsWeb && !user.imageUrl!.contains('supabase')))
                         ? Text(user.firstName?[0] ?? 'U')
                         : null,
                   );

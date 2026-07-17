@@ -301,7 +301,7 @@ class _AnnouncementCard extends StatelessWidget {
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF2E2E30), // Soft dark charcoal pocket
+                color: AppColors.glassCardBorder.withOpacity(0.85), // Premium glass navy pocket
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
                   color: mainColor.withOpacity(0.4),
@@ -357,7 +357,7 @@ class _AnnouncementCard extends StatelessWidget {
             clipper: HiglightsCard(cutoffWidth: cutoffWidth),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E), // Soft dark charcoal card
+                color: AppColors.glassCardColor, // Premium glass navy card
                 borderRadius: BorderRadius.circular(15.0),
               ),
               padding: const EdgeInsets.all(15),

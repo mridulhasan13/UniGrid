@@ -1,10 +1,11 @@
 import '../utils/constants.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ota_update/ota_update.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class VersionAwareWrapper extends StatefulWidget {
   final Widget child;
@@ -96,6 +97,18 @@ class _VersionAwareWrapperState extends State<VersionAwareWrapper> {
   }
 
   Future<void> _startOtaUpdate() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      setState(() {
+        _downloadStatus = 'OTA update is only supported on Android.';
+      });
+      try {
+        await launchUrl(Uri.parse(_downloadUrl), mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint('Failed to launch download URL: $e');
+      }
+      return;
+    }
+
     setState(() {
       _isDownloading = true;
       _downloadStatus = 'Downloading update...';

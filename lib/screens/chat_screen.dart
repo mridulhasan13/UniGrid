@@ -19,6 +19,7 @@ import '../utils/constants.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
 import '../utils/dept_scope.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 // ============================================================
 // Data Model
@@ -239,6 +240,7 @@ class _SeenBySheet extends StatelessWidget {
 
   ImageProvider? _imgProvider(String photo) {
     if (photo.isEmpty) return null;
+    if (kIsWeb && !photo.contains('supabase')) return null;
     if (photo.startsWith('data:image')) {
       try {
         return MemoryImage(base64Decode(photo.split(',').last));
@@ -365,6 +367,7 @@ class _MessageBubble extends StatelessWidget {
 
   ImageProvider? _imgProvider(String photo) {
     if (photo.isEmpty) return null;
+    if (kIsWeb && !photo.contains('supabase')) return null;
     if (photo.startsWith('data:image')) {
       try {
         return MemoryImage(base64Decode(photo.split(',').last));
@@ -786,16 +789,14 @@ class _ChatScreenState extends State<ChatScreen> {
           }
 
           await _firestore.collection(_chatPath).add(msgData);
+          FCMService.notifyNewMessage(
+            senderName: senderName,
+            text: i == 0 && captionText.isNotEmpty ? captionText : 'Sent an image',
+            senderUserId: user.id,
+            department: user.department,
+            batch: user.batch,
+          );
         }
-
-        final notifyText = captionText.isNotEmpty ? captionText : '📷 Image';
-        await FCMService.notifyNewMessage(
-          senderName: senderName,
-          text: notifyText,
-          senderUserId: user.id,
-          department: user.department,
-          batch: user.batch,
-        );
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -841,15 +842,14 @@ class _ChatScreenState extends State<ChatScreen> {
       _replyingTo = null;
       _isSending = false;
     });
-    _firestore.collection(_chatPath).add(msgData).then((_) async {
-      await FCMService.notifyNewMessage(
-        senderName: senderName,
-        text: text,
-        senderUserId: user.id,
-        department: user.department,
-        batch: user.batch,
-      );
-    });
+    _firestore.collection(_chatPath).add(msgData);
+    FCMService.notifyNewMessage(
+      senderName: senderName,
+      text: text,
+      senderUserId: user.id,
+      department: user.department,
+      batch: user.batch,
+    );
   }
 
   // ---- MARK AS SEEN ----
@@ -1357,10 +1357,10 @@ class _ChatScreenState extends State<ChatScreen> {
                                       backgroundColor: AppColors.primary.withOpacity(0.15),
                                       backgroundImage: member.photoUrl.startsWith('data:image')
                                           ? MemoryImage(base64Decode(member.photoUrl.split(',').last))
-                                          : (member.photoUrl.isNotEmpty
+                                          : ((member.photoUrl.isNotEmpty && (!kIsWeb || member.photoUrl.contains('supabase')))
                                               ? NetworkImage(member.photoUrl)
                                               : null) as ImageProvider?,
-                                      child: member.photoUrl.isEmpty
+                                      child: (member.photoUrl.isEmpty || (kIsWeb && !member.photoUrl.contains('supabase') && !member.photoUrl.startsWith('data:image')))
                                           ? Text(
                                               member.name.isNotEmpty
                                                   ? member.name[0].toUpperCase()

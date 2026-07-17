@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/supabase_config.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
@@ -14,13 +15,14 @@ import 'screens/main_screen.dart';
 import 'screens/pending_approval_screen.dart';
 import 'utils/constants.dart';
 import 'services/fcm_service.dart';
-import 'services/onesignal_service.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'widgets/network_aware_wrapper.dart';
 import 'package:flutter/foundation.dart';
 
 import 'widgets/dept_setup_guard.dart';
+import 'widgets/version_aware_wrapper.dart';
+import 'widgets/unigrid_loader.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,9 +45,6 @@ void main() async {
     debugPrint('Failed to initialize FCM: $e');
   });
 
-  OneSignalService.initialize().catchError((e) {
-    debugPrint('Failed to initialize OneSignal: $e');
-  });
 
   // Load theme settings dynamically before app start
   await ThemeService.instance.init();
@@ -115,7 +114,9 @@ class MyApp extends StatelessWidget {
             ),
           ),
           home: const NetworkAwareWrapper(
-            child: AuthWrapper(),
+            child: VersionAwareWrapper(
+              child: AuthWrapper(),
+            ),
           ),
         );
       }),
@@ -129,9 +130,22 @@ class AuthWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AppUser?>(context);
+    final firebaseUser = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      // Not logged in
+      if (firebaseUser != null) {
+        // Logged in but waiting for Firestore profile to sync
+        return const Scaffold(
+          body: Center(
+            child: UniGridLoader(
+              title: 'Loading profile...',
+              subtitle: 'Syncing your workspace settings...',
+              showBackground: false,
+            ),
+          ),
+        );
+      }
+      // Truly not logged in
       return const LoginScreen();
     }
 

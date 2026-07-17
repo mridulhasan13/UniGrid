@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../utils/constants.dart';
 import '../widgets/unigrid_loader.dart';
 import 'private_chat_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class UserSelectionScreen extends StatefulWidget {
   const UserSelectionScreen({super.key});
@@ -108,14 +109,13 @@ class _UserSelectionScreenState extends State<UserSelectionScreen> {
                         return ListTile(
                           leading: CircleAvatar(
                             radius: 20,
-                            backgroundImage: user.photoUrl
-                                    .startsWith('data:image')
+                            backgroundImage: user.photoUrl.startsWith('data:image')
                                 ? MemoryImage(
                                     base64Decode(user.photoUrl.split(',').last))
-                                : (user.photoUrl.isNotEmpty
+                                : ((user.photoUrl.isNotEmpty && (!kIsWeb || user.photoUrl.contains('supabase')))
                                     ? NetworkImage(user.photoUrl)
                                     : null) as ImageProvider?,
-                            child: user.photoUrl.isEmpty
+                            child: (user.photoUrl.isEmpty || (kIsWeb && !user.photoUrl.contains('supabase') && !user.photoUrl.startsWith('data:image')))
                                 ? Text(
                                     user.name.isNotEmpty ? user.name[0] : 'U')
                                 : null,

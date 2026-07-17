@@ -1,34 +1,35 @@
-import 'dart:io';
 import 'dart:convert';
-import 'package:flutter/services.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:http/http.dart' as http;
-import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-import 'onesignal_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:googleapis_auth/auth_io.dart' as auth;
+import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 
-// ─── Top-level background handler (runs even when app is KILLED) ─────────────
+/// Top-level background message handler — must be a top-level function.
+/// Called by Firebase when a notification arrives while the app is terminated or in background.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Firebase AUTOMATICALLY displays the notification when the payload contains a 'notification' block
-  // (which our HTTP v1 push does).
-  // If we show a local notification here, the user gets double notifications!
-  debugPrint('Handling a background message: ${message.messageId}');
+  // Nothing to do here — Android shows the notification automatically from the FCM payload.
+  debugPrint('📬 Background FCM message received: ${message.messageId}');
 }
 
 class FCMService {
+  static bool _initialized = false;
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // ─── Initialize ───────────────────────────────────────────────────────────
+  // ─── Initialize FCM ───────────────────────────────────────────────────────
   static Future<void> initialize() async {
     if (kIsWeb) return;
+    if (_initialized) return;
+    _initialized = true;
 
     // Register token refresh listener immediately
     _messaging.onTokenRefresh.listen((newToken) async {
@@ -62,13 +63,13 @@ class FCMService {
       criticalAlert: true,
     );
 
-    // Save FCM Token immediately if user is already logged in (handles permission grant delay)
+    // Save FCM Token immediately if user is already logged in
     final currentUser = fb_auth.FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       await saveTokenForUser(currentUser.uid);
     }
 
-    // Subscribe to global topic for serverless automated broadcasts
+    // Subscribe to global topic
     try {
       await _messaging.subscribeToTopic('all_users');
       debugPrint('✅ Subscribed to global all_users topic');
@@ -76,8 +77,7 @@ class FCMService {
       debugPrint('⚠️ Topic subscription failed: $e');
     }
 
-    // Request battery optimization exclusion (keeps Firestore streams alive
-    // when phone is locked — same as WhatsApp/Telegram do)
+    // Request battery optimization exclusion
     await _requestBatteryOptimizationExclusion();
 
     // Setup local notifications channel
@@ -113,37 +113,39 @@ class FCMService {
       final status = await Permission.ignoreBatteryOptimizations.status;
       if (!status.isGranted) {
         await Permission.ignoreBatteryOptimizations.request();
-        debugPrint('✅ Battery optimization exclusion requested');
-      } else {
-        debugPrint('✅ Already excluded from battery optimization');
       }
     } catch (e) {
-      debugPrint('⚠️ Battery optimization request failed: $e');
+      debugPrint('⚠️ Battery optimization exclusion failed: $e');
     }
   }
 
   // ─── Show local notification from FCM remote message ─────────────────────
   static Future<void> _showNotificationFromRemote(RemoteMessage message) async {
-    final senderUserId = message.data['senderUserId'];
-    final currentUid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
+    final notification = message.notification;
+    if (notification == null) return;
 
-    if (senderUserId != null && senderUserId == currentUid) {
-      return;
-    }
+    // Block self-notifications
+    final currentUid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
+    final senderUserId = message.data['senderUserId'] ?? '';
+    if (senderUserId.isNotEmpty && senderUserId == currentUid) return;
 
     await _localNotifications.show(
-      message.hashCode,
-      message.notification?.title ??
-          message.data['title'] ??
-          'UniGrid Notification',
-      message.notification?.body ?? message.data['body'] ?? '',
-      const NotificationDetails(
+      notification.hashCode,
+      notification.title,
+      notification.body,
+      NotificationDetails(
         android: AndroidNotificationDetails(
           'unigrid_notifications',
           'UniGrid Notifications',
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
+          ticker: notification.body,
+          subText: 'UniGrid',
+          styleInformation: BigTextStyleInformation(
+            notification.body ?? '',
+            contentTitle: notification.title,
+          ),
         ),
       ),
     );
@@ -155,10 +157,9 @@ class FCMService {
     try {
       final token = await _messaging.getToken();
       if (token == null) {
-        debugPrint('⚠️ FCM token is null for user: $userId (perhaps permission not granted yet)');
+        debugPrint('⚠️ FCM token is null for user: $userId');
         return;
       }
-
       await _firestore.collection('users').doc(userId).set(
         {'fcmToken': token, 'fcmUpdatedAt': FieldValue.serverTimestamp()},
         SetOptions(merge: true),
@@ -169,53 +170,18 @@ class FCMService {
     }
   }
 
-  // ─── Send Private Notification to a Specific User ─────────────────────────
-  static Future<void> sendPrivateNotification({
-    required String recipientId,
-    required String title,
-    required String body,
-    required String senderUserId,
-  }) async {
-    if (kIsWeb) return;
-    try {
-      final recipientDoc =
-          await _firestore.collection('users').doc(recipientId).get();
-      if (!recipientDoc.exists) {
-        debugPrint('Recipient user document not found: $recipientId');
-        return;
-      }
-
-      final token = recipientDoc.data()?['fcmToken'] as String?;
-      if (token == null || token.isEmpty) {
-        debugPrint('No FCM token found for recipient: $recipientId');
-        return;
-      }
-
-      await _sendFCMHttp(
-        tokens: [token],
-        title: title,
-        body: body,
-        senderUserId: senderUserId,
-      );
-    } catch (e) {
-      debugPrint('❌ sendPrivateNotification error: $e');
-    }
-  }
-
-  // ─── Direct FCM Push via Googleapis ───────────────────────────────────────
+  // ─── Get OAuth2 Access Token from Service Account ─────────────────────────
   static Future<String> _getAccessToken() async {
-    final jsonString =
-        await rootBundle.loadString('assets/service_account.json');
-    final accountCredentials =
-        auth.ServiceAccountCredentials.fromJson(jsonString);
+    final jsonString = await rootBundle.loadString('assets/service_account.json');
+    final accountCredentials = auth.ServiceAccountCredentials.fromJson(jsonString);
     final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
-    final client =
-        await auth.clientViaServiceAccount(accountCredentials, scopes);
+    final client = await auth.clientViaServiceAccount(accountCredentials, scopes);
     final accessToken = client.credentials.accessToken.data;
     client.close();
     return accessToken;
   }
 
+  // ─── Send FCM HTTP v1 to a list of tokens ────────────────────────────────
   static Future<void> _sendFCMHttp({
     required List<String> tokens,
     required String title,
@@ -223,11 +189,9 @@ class FCMService {
     required String senderUserId,
   }) async {
     try {
-      final jsonString =
-          await rootBundle.loadString('assets/service_account.json');
+      final jsonString = await rootBundle.loadString('assets/service_account.json');
       final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
-      final projectId = jsonMap['project_id'];
-
+      final projectId = jsonMap['project_id'] as String;
       final accessToken = await _getAccessToken();
       final endpoint =
           'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
@@ -235,7 +199,7 @@ class FCMService {
       for (final token in tokens) {
         final response = await http.post(
           Uri.parse(endpoint),
-          headers: <String, String>{
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $accessToken',
           },
@@ -267,23 +231,70 @@ class FCMService {
           }),
         );
         if (response.statusCode == 200) {
-          debugPrint('✅ Sent direct FCM to $token');
+          debugPrint('✅ FCM sent to token');
+        } else if (response.statusCode == 404) {
+          // Token is stale (user reinstalled app or cleared data) — clean it up
+          debugPrint('🗑️ Stale FCM token detected, removing from Firestore...');
+          try {
+            final staleQuery = await _firestore
+                .collection('users')
+                .where('fcmToken', isEqualTo: token)
+                .limit(1)
+                .get();
+            for (final doc in staleQuery.docs) {
+              await doc.reference.update({
+                'fcmToken': FieldValue.delete(),
+                'fcmUpdatedAt': FieldValue.delete(),
+              });
+              debugPrint('🗑️ Removed stale token for user: ${doc.id}');
+            }
+          } catch (e) {
+            debugPrint('⚠️ Could not clean stale token: $e');
+          }
         } else {
-          debugPrint('❌ Failed direct FCM to $token: ${response.body}');
+          debugPrint('❌ FCM failed: ${response.statusCode} ${response.body}');
         }
       }
     } catch (e) {
-      debugPrint('❌ Error sending direct FCM: $e');
+      debugPrint('❌ Error sending FCM: $e');
     }
   }
 
-  // ─── Send to Specific Dept & Batch Users ──────────────────────────────────
+  // ─── Send to a Specific User (Private DM) ─────────────────────────────────
+  static Future<void> sendPrivateNotification({
+    required String recipientId,
+    required String title,
+    required String body,
+    required String senderUserId,
+  }) async {
+    if (kIsWeb) return;
+    try {
+      final recipientDoc =
+          await _firestore.collection('users').doc(recipientId).get();
+      if (!recipientDoc.exists) return;
+      final token = recipientDoc.data()?['fcmToken'] as String?;
+      if (token == null || token.isEmpty) {
+        debugPrint('No FCM token for recipient: $recipientId');
+        return;
+      }
+      await _sendFCMHttp(
+        tokens: [token],
+        title: title,
+        body: body,
+        senderUserId: senderUserId,
+      );
+    } catch (e) {
+      debugPrint('❌ sendPrivateNotification error: $e');
+    }
+  }
+
   static Future<void> sendToDeptAndBatch({
     required String department,
     required String batch,
     required String title,
     required String body,
     required String senderUserId,
+    bool adminsOnly = false,
   }) async {
     if (kIsWeb) return;
     try {
@@ -296,13 +307,21 @@ class FCMService {
 
       final tokens = usersSnap.docs
           .where((doc) => doc.id != senderUserId)
+          .where((doc) {
+            if (!adminsOnly) return true;
+            final data = doc.data();
+            final isCR = data['isCR'] == true;
+            final isAdmin = data['isAdmin'] == true;
+            return isCR || isAdmin;
+          })
           .map((doc) => doc.data()['fcmToken'] as String?)
           .whereType<String>()
           .where((t) => t.isNotEmpty && t != currentToken)
+          .toSet()
           .toList();
 
       if (tokens.isEmpty) {
-        debugPrint('No tokens to notify for dept $department, batch $batch');
+        debugPrint('No tokens to notify for $department - $batch');
         return;
       }
 
@@ -312,14 +331,13 @@ class FCMService {
         body: body,
         senderUserId: senderUserId,
       );
-      debugPrint(
-          '✅ Notification requests sent directly to FCM for ${tokens.length} users in $department - $batch');
+      debugPrint('✅ Notified ${tokens.length} users in $department - $batch');
     } catch (e) {
       debugPrint('❌ sendToDeptAndBatch error: $e');
     }
   }
 
-  // ─── Shortcut helpers ─────────────────────────────────────────────────────
+  // ─── Shortcut Helpers ─────────────────────────────────────────────────────
   static Future<void> notifyNewMessage({
     required String senderName,
     required String text,
@@ -327,20 +345,12 @@ class FCMService {
     required String department,
     required String batch,
   }) async {
-    if (kIsWeb) {
-      await OneSignalService.notifyNewMessage(
-        senderName: senderName,
-        text: text,
-        department: department,
-        batch: batch,
-      );
-      return;
-    }
+    if (kIsWeb) return;
     final preview = text.length > 80 ? '${text.substring(0, 80)}...' : text;
     await sendToDeptAndBatch(
       department: department,
       batch: batch,
-      title: '💬 $senderName',
+      title: senderName,
       body: preview,
       senderUserId: senderUserId,
     );
@@ -353,19 +363,11 @@ class FCMService {
     required String department,
     required String batch,
   }) async {
-    if (kIsWeb) {
-      await OneSignalService.notifyNewAnnouncement(
-        title: title,
-        type: type,
-        department: department,
-        batch: batch,
-      );
-      return;
-    }
+    if (kIsWeb) return;
     await sendToDeptAndBatch(
       department: department,
       batch: batch,
-      title: '📢 New ${type.isNotEmpty ? type : "Announcement"}',
+      title: 'New ${type.isNotEmpty ? type : "Announcement"}',
       body: title,
       senderUserId: senderUserId,
     );
@@ -378,74 +380,13 @@ class FCMService {
     required String department,
     required String batch,
   }) async {
-    if (kIsWeb) {
-      await OneSignalService.notifyNewMaterial(
-        title: title,
-        subject: subject,
-        department: department,
-        batch: batch,
-      );
-      return;
-    }
+    if (kIsWeb) return;
     await sendToDeptAndBatch(
       department: department,
       batch: batch,
-      title: '📚 New Material Uploaded',
+      title: 'New Material Uploaded',
       body: '$title${subject.isNotEmpty ? ' · $subject' : ''}',
       senderUserId: senderUserId,
     );
-  }
-
-  static Future<void> notifyCRNewRegistration({
-    required String studentName,
-    required String studentId,
-    required String department,
-    required String batch,
-  }) async {
-    try {
-      final crSnap = await _firestore
-          .collection('users')
-          .where('department', isEqualTo: department)
-          .where('batch', isEqualTo: batch)
-          .where('isCR', isEqualTo: true)
-          .get();
-
-      if (crSnap.docs.isEmpty) {
-        debugPrint('No CR found to notify for $department - $batch');
-        return;
-      }
-
-      final title = '🆕 New Registration Request';
-      final body = '$studentName (ID: $studentId) registered in $department Batch $batch. Tap to review/approve.';
-
-      if (kIsWeb) {
-        final crIds = crSnap.docs.map((doc) => doc.id).toList();
-        for (final crId in crIds) {
-          await OneSignalService.sendPrivateNotification(
-            recipientId: crId,
-            title: title,
-            body: body,
-          );
-        }
-      } else {
-        final tokens = crSnap.docs
-            .map((doc) => doc.data()['fcmToken'] as String?)
-            .whereType<String>()
-            .where((t) => t.isNotEmpty)
-            .toList();
-
-        if (tokens.isNotEmpty) {
-          await _sendFCMHttp(
-            tokens: tokens,
-            title: title,
-            body: body,
-            senderUserId: 'system',
-          );
-        }
-      }
-      debugPrint('✅ Notified ${crSnap.docs.length} CR(s) of new registration');
-    } catch (e) {
-      debugPrint('❌ notifyCRNewRegistration error: $e');
-    }
   }
 }

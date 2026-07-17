@@ -14,8 +14,8 @@ import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/unigrid_loader.dart';
-import '../services/fcm_service.dart';
 import 'schedule_builder_screen.dart';
+import '../services/fcm_service.dart';
 import 'course_registry_screen.dart';
 import '../widgets/custom_snack_bar.dart';
 
@@ -280,8 +280,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
         if (details.isNotEmpty) 'details': details,
       });
 
-      // Send push notification to all users
-      await FCMService.notifyNewAnnouncement(
+      FCMService.notifyNewAnnouncement(
         title: title,
         type: type,
         senderUserId: userId,
@@ -910,12 +909,12 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                 horizontal: 24, vertical: 4),
                             leading: CircleAvatar(
                               backgroundImage:
-                                  (photoUrl != null && photoUrl.isNotEmpty)
+                                  (photoUrl != null && photoUrl.isNotEmpty && (!kIsWeb || photoUrl.contains('supabase')))
                                       ? NetworkImage(photoUrl)
                                       : null,
                               backgroundColor:
                                   AppColors.primary.withOpacity(0.2),
-                              child: (photoUrl == null || photoUrl.isEmpty)
+                              child: (photoUrl == null || photoUrl.isEmpty || (kIsWeb && !photoUrl.contains('supabase')))
                                   ? Text(
                                       name.isNotEmpty
                                           ? name[0].toUpperCase()
@@ -923,7 +922,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                               ? email[0].toUpperCase()
                                               : 'U'),
                                       style: TextStyle(
-                                          color: AppColors.textPrimary,
+                                          color: AppColors.primary,
                                           fontWeight: FontWeight.bold),
                                     )
                                   : null,
@@ -1116,11 +1115,11 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                             child: ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                               leading: CircleAvatar(
-                                backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                                backgroundImage: (photoUrl != null && photoUrl.isNotEmpty && (!kIsWeb || photoUrl.contains('supabase')))
                                     ? NetworkImage(photoUrl)
                                     : null,
                                 backgroundColor: AppColors.primary.withOpacity(0.2),
-                                child: (photoUrl == null || photoUrl.isEmpty)
+                                child: (photoUrl == null || photoUrl.isEmpty || (kIsWeb && !photoUrl.contains('supabase')))
                                     ? Text(
                                         name.isNotEmpty
                                             ? name[0].toUpperCase()
@@ -1128,7 +1127,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                                 ? email[0].toUpperCase()
                                                 : 'U'),
                                         style: TextStyle(
-                                            color: AppColors.textPrimary,
+                                            color: AppColors.primary,
                                             fontWeight: FontWeight.bold),
                                       )
                                     : null,
@@ -1299,13 +1298,13 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                         horizontal: 24, vertical: 4),
                                     leading: CircleAvatar(
                                       backgroundImage: (photoUrl != null &&
-                                              photoUrl.isNotEmpty)
+                                              photoUrl.isNotEmpty && (!kIsWeb || photoUrl.contains('supabase')))
                                           ? NetworkImage(photoUrl)
                                           : null,
                                       backgroundColor:
                                           Colors.amber.withOpacity(0.2),
                                       child: (photoUrl == null ||
-                                              photoUrl.isEmpty)
+                                              photoUrl.isEmpty || (kIsWeb && !photoUrl.contains('supabase')))
                                           ? Text(
                                               name.isNotEmpty
                                                   ? name[0].toUpperCase()

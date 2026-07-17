@@ -903,7 +903,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     // Calculate dates and normalize to midnight
     final rawSunday = _getSundayOfWeek(_selectedDate);
     final targetSunday = DateTime(rawSunday.year, rawSunday.month, rawSunday.day);
-    final targetSaturday = DateTime(targetSunday.year, targetSunday.month, targetSunday.day, 23, 59, 59);
+    final targetSaturday = targetSunday.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
 
     final prevSunday = targetSunday.subtract(const Duration(days: 7));
     final prevSaturday = prevSunday.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));

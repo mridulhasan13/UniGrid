@@ -7,8 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/models.dart';
 import '../services/supabase_storage_service.dart';
-import '../services/fcm_service.dart';
 import '../services/theme_service.dart';
+import '../services/fcm_service.dart';
 import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
@@ -1042,8 +1042,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // Send push notification to all users
-      await FCMService.notifyNewMaterial(
+      FCMService.notifyNewMaterial(
         title: title,
         subject: subject,
         senderUserId: userId,

@@ -173,3 +173,65 @@ exports.onNewPrivateMessage = functions.firestore
         console.error("Error sending private message notification:", error);
       }
     });
+
+// ─────────────────────────────────────────────
+// TRIGGER 5: New User Registration (Awaiting Approval)
+// ─────────────────────────────────────────────
+exports.onNewUserRegistration = functions.firestore
+    .document("users/{userId}")
+    .onCreate(async (snap, context) => {
+      const data = snap.data();
+      
+      // Only notify if user registration needs approval (isApproved is false and they are not auto-approved as CR)
+      if (data.isApproved === true || data.isCR === true) return null;
+
+      const studentName = data.name || "Someone";
+      const studentId = data.studentId || "";
+      const department = data.department || "";
+      const batch = data.batch || "";
+
+      try {
+        const crSnap = await admin.firestore().collection("users")
+            .where("department", "==", department)
+            .where("batch", "==", batch)
+            .where("isCR", "==", true)
+            .get();
+
+        const tokens = [];
+        crSnap.forEach((doc) => {
+          const crData = doc.data();
+          if (crData.fcmToken) {
+            tokens.push(crData.fcmToken);
+          }
+        });
+
+        if (tokens.length === 0) {
+          console.log(`No CRs found to notify for ${department} Batch ${batch}`);
+          return null;
+        }
+
+        const title = "🆕 New Registration Request";
+        const body = `${studentName} (ID: ${studentId}) registered in ${department} Batch ${batch}. Tap to review/approve.`;
+
+        const response = await admin.messaging().sendEachForMulticast({
+          tokens: tokens,
+          notification: {
+            title: title,
+            body: body,
+          },
+          data: {
+            senderUserId: "system",
+          },
+          android: {
+            notification: {
+              channelId: "unigrid_notifications",
+              priority: "high",
+            },
+          },
+        });
+
+        console.log(`Successfully notified ${tokens.length} CR(s) of new registration request`);
+      } catch (error) {
+        console.error("Error notifying CR of new registration:", error);
+      }
+    });

@@ -19,6 +19,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/dept_scope.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -101,6 +102,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Base64 vs Network Image Loader
   ImageProvider? _getProfileImage(String photoUrl) {
     if (photoUrl.isEmpty) return null;
+    if (kIsWeb && !photoUrl.contains('supabase')) return null;
     if (photoUrl.startsWith('data:image')) {
       try {
         final base64String = photoUrl.split(',').last;
@@ -375,7 +377,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       // Navigation Sidebar
                       SizedBox(
-                        width: 200,
+                        width: 220,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -469,12 +471,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               size: 20,
             ),
             const SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
-                fontSize: 14,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -2469,7 +2475,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 16),
               _buildSectionTitle('2. How We Use Information'),
               _buildSectionBody(
-                'Your information is used solely to configure your UniGrid workspace, verify your registration (for CR and student scopes), enable classroom collaboration/chat, and deliver push notifications via OneSignal/FCM.',
+                'Your information is used solely to configure your UniGrid workspace, verify your registration (for CR and student scopes), enable classroom collaboration/chat, and deliver push notifications via FCM.',
               ),
               const SizedBox(height: 16),
               _buildSectionTitle('3. Data Sharing & Security'),
