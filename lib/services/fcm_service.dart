@@ -9,13 +9,15 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/material.dart' show Icons;
+import '../widgets/in_app_notification.dart';
 
 /// Top-level background message handler — must be a top-level function.
 /// Called by Firebase when a notification arrives while the app is terminated or in background.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Nothing to do here — Android shows the notification automatically from the FCM payload.
-  debugPrint('📬 Background FCM message received: ${message.messageId}');
+  debugPrint('Background FCM message received: ${message.messageId}');
 }
 
 class FCMService {
@@ -40,9 +42,9 @@ class FCMService {
             {'fcmToken': newToken, 'fcmUpdatedAt': FieldValue.serverTimestamp()},
             SetOptions(merge: true),
           );
-          debugPrint('🔄 FCM token refreshed and saved for user: ${currentUser.uid}');
+          debugPrint('FCM token refreshed and saved for user: ${currentUser.uid}');
         } catch (e) {
-          debugPrint('❌ FCM token refresh save error: $e');
+          debugPrint('FCM token refresh save error: $e');
         }
       }
     });
@@ -72,9 +74,9 @@ class FCMService {
     // Subscribe to global topic
     try {
       await _messaging.subscribeToTopic('all_users');
-      debugPrint('✅ Subscribed to global all_users topic');
+      debugPrint('Subscribed to global all_users topic');
     } catch (e) {
-      debugPrint('⚠️ Topic subscription failed: $e');
+      debugPrint('Topic subscription failed: $e');
     }
 
     // Request battery optimization exclusion
@@ -115,7 +117,7 @@ class FCMService {
         await Permission.ignoreBatteryOptimizations.request();
       }
     } catch (e) {
-      debugPrint('⚠️ Battery optimization exclusion failed: $e');
+      debugPrint('Battery optimization exclusion failed: $e');
     }
   }
 
@@ -149,6 +151,46 @@ class FCMService {
         ),
       ),
     );
+
+    // Show floating in-app glassmorphic notification banner
+    InAppNotification.showGlobal(
+      title: notification.title ?? 'Notification',
+      message: notification.body ?? '',
+      icon: Icons.notifications_active_rounded,
+    );
+  }
+
+  // ─── Show Direct Device System Notification (Phone Tray) ───────────────────
+  static Future<void> showLocalSystemNotification({
+    required String title,
+    required String body,
+    int? id,
+  }) async {
+    if (kIsWeb) return;
+    try {
+      await _localNotifications.show(
+        id ?? title.hashCode,
+        title,
+        body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'unigrid_notifications',
+            'UniGrid Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            ticker: body,
+            subText: 'Class Reminder',
+            styleInformation: BigTextStyleInformation(
+              body,
+              contentTitle: title,
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error showing local system notification: $e');
+    }
   }
 
   // ─── Save FCM Token to Firestore ──────────────────────────────────────────
@@ -157,16 +199,16 @@ class FCMService {
     try {
       final token = await _messaging.getToken();
       if (token == null) {
-        debugPrint('⚠️ FCM token is null for user: $userId');
+        debugPrint('FCM token is null for user: $userId');
         return;
       }
       await _firestore.collection('users').doc(userId).set(
         {'fcmToken': token, 'fcmUpdatedAt': FieldValue.serverTimestamp()},
         SetOptions(merge: true),
       );
-      debugPrint('✅ FCM token saved for user: $userId');
+      debugPrint('FCM token saved for user: $userId');
     } catch (e) {
-      debugPrint('❌ FCM token save error: $e');
+      debugPrint('FCM token save error: $e');
     }
   }
 
@@ -231,10 +273,10 @@ class FCMService {
           }),
         );
         if (response.statusCode == 200) {
-          debugPrint('✅ FCM sent to token');
+          debugPrint('FCM sent to token');
         } else if (response.statusCode == 404) {
           // Token is stale (user reinstalled app or cleared data) — clean it up
-          debugPrint('🗑️ Stale FCM token detected, removing from Firestore...');
+          debugPrint('Stale FCM token detected, removing from Firestore...');
           try {
             final staleQuery = await _firestore
                 .collection('users')
@@ -246,17 +288,17 @@ class FCMService {
                 'fcmToken': FieldValue.delete(),
                 'fcmUpdatedAt': FieldValue.delete(),
               });
-              debugPrint('🗑️ Removed stale token for user: ${doc.id}');
+              debugPrint('Removed stale token for user: ${doc.id}');
             }
           } catch (e) {
-            debugPrint('⚠️ Could not clean stale token: $e');
+            debugPrint('Could not clean stale token: $e');
           }
         } else {
-          debugPrint('❌ FCM failed: ${response.statusCode} ${response.body}');
+          debugPrint('FCM failed: ${response.statusCode} ${response.body}');
         }
       }
     } catch (e) {
-      debugPrint('❌ Error sending FCM: $e');
+      debugPrint('Error sending FCM: $e');
     }
   }
 
@@ -284,7 +326,7 @@ class FCMService {
         senderUserId: senderUserId,
       );
     } catch (e) {
-      debugPrint('❌ sendPrivateNotification error: $e');
+      debugPrint('sendPrivateNotification error: $e');
     }
   }
 
@@ -331,9 +373,9 @@ class FCMService {
         body: body,
         senderUserId: senderUserId,
       );
-      debugPrint('✅ Notified ${tokens.length} users in $department - $batch');
+      debugPrint('Notified ${tokens.length} users in $department - $batch');
     } catch (e) {
-      debugPrint('❌ sendToDeptAndBatch error: $e');
+      debugPrint('sendToDeptAndBatch error: $e');
     }
   }
 

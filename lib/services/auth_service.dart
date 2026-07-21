@@ -23,6 +23,11 @@ class AuthService {
   List<Map<String, dynamic>> _rootAdmins = [];
 
   AuthService() {
+    // Explicitly lock Firebase Auth to LOCAL persistence on web so sessions
+    // survive tab closes and browser restarts (indexedDB-backed, not just session-storage).
+    if (kIsWeb) {
+      _auth.setPersistence(Persistence.LOCAL);
+    }
     _initRootAdminListener();
     _initSession();
     _auth.authStateChanges().listen((User? firebaseUser) {
@@ -188,7 +193,7 @@ class AuthService {
           email: email.trim().toLowerCase(), password: password.trim());
       User? firebaseUser = result.user;
       if (firebaseUser != null) {
-        await _saveSession(email.trim().toLowerCase(), false);
+        await _saveSession(email.trim().toLowerCase(), false, password: password.trim());
         _startFirestoreListener(
           firebaseUser.uid,
           firebaseUser.email,
@@ -224,7 +229,7 @@ class AuthService {
       User? user = result.user;
 
       if (user != null) {
-        await _saveSession(cleanEmail, false);
+        await _saveSession(cleanEmail, false, password: password);
         final bool isRoot = isRootAdmin(cleanEmail);
         final newUser = AppUser(
           id: user.uid,
@@ -424,12 +429,16 @@ class AuthService {
     return null;
   }
 
-  Future<void> _saveSession(String email, bool isGoogle) async {
+  Future<void> _saveSession(String email, bool isGoogle, {String? password}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('auth_session_timestamp', DateTime.now().millisecondsSinceEpoch);
       await prefs.setString('auth_session_email', email);
       await prefs.setBool('auth_session_is_google', isGoogle);
+      // Store password for silent email/password re-auth within the 3-day window
+      if (password != null && password.isNotEmpty) {
+        await prefs.setString('auth_session_password', password);
+      }
       debugPrint('[AuthService] Session saved for $email (Google: $isGoogle).');
     } catch (e) {
       debugPrint('[AuthService] Error saving session: $e');
@@ -451,6 +460,20 @@ class AuthService {
 
   Future<void> _initSession() async {
     try {
+      // On web, Firebase Auth restores its session asynchronously from indexedDB.
+      // _auth.currentUser is null immediately at startup even if the user IS logged in.
+      // Wait up to 4 seconds for Firebase to finish its own restoration before we act.
+      if (kIsWeb && _auth.currentUser == null) {
+        try {
+          await _auth
+              .authStateChanges()
+              .firstWhere((user) => user != null)
+              .timeout(const Duration(seconds: 4));
+        } catch (_) {
+          // Timed out or no user restored — continue with our own session logic below.
+        }
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final timestamp = prefs.getInt('auth_session_timestamp');
       if (timestamp != null) {
@@ -462,23 +485,53 @@ class AuthService {
           return;
         }
 
-        // If Firebase Auth does not have a user, try auto-login
+        // If Firebase Auth still has no user after our wait, attempt silent re-auth.
         if (_auth.currentUser == null) {
           final isGoogle = prefs.getBool('auth_session_is_google') ?? false;
-          if (isGoogle) {
-            debugPrint('[AuthService] Attempting silent Google login...');
+          if (isGoogle && !kIsWeb) {
+            // Mobile only: GoogleSignIn.signInSilently() is not available on web.
+            // Web Google users are covered by Firebase LOCAL persistence above.
+            debugPrint('[AuthService] Attempting silent Google login (mobile)...');
             await _signInGoogleSilently();
+          } else if (!isGoogle) {
+            // Email/password silent re-auth — works on both mobile and web.
+            final email = prefs.getString('auth_session_email') ?? '';
+            final password = prefs.getString('auth_session_password') ?? '';
+            if (email.isNotEmpty && password.isNotEmpty) {
+              debugPrint('[AuthService] Attempting silent email/password re-auth for $email...');
+              await _signInEmailSilently(email, password);
+            }
           }
+        } else {
+          // Firebase still has the user — refresh the session timestamp so
+          // active users never hit the 3-day wall unexpectedly.
+          await prefs.setInt('auth_session_timestamp', DateTime.now().millisecondsSinceEpoch);
+          debugPrint('[AuthService] Session refreshed for active user.');
         }
       } else {
-        // No session stored yet. If already logged in, initialize the session now.
+        // No session stored yet. If already logged in (e.g. Firebase restored it
+        // on web), initialize the session now so the 3-day clock starts.
         final currentUser = _auth.currentUser;
         if (currentUser != null) {
-          await _saveSession(currentUser.email ?? '', false);
+          final isGoogleUser = currentUser.providerData
+              .any((p) => p.providerId == 'google.com');
+          await _saveSession(currentUser.email ?? '', isGoogleUser);
         }
       }
     } catch (e) {
       debugPrint('[AuthService] Error initializing session: $e');
+    }
+  }
+
+  Future<void> _signInEmailSilently(String email, String password) async {
+    try {
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      debugPrint('[AuthService] Silent email/password re-auth succeeded.');
+    } catch (e) {
+      debugPrint('[AuthService] Silent email/password re-auth failed: $e');
+      // Do not call signOut() here — the stored session and timestamp are still
+      // valid. Firebase may be temporarily unavailable (no network). The user
+      // will be prompted to log in manually only after the 3-day window expires.
     }
   }
 

@@ -9,6 +9,7 @@ import '../widgets/unigrid_loader.dart';
 import '../utils/dept_scope.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../widgets/in_app_notification.dart';
 
 class MasterPanelScreen extends StatefulWidget {
   const MasterPanelScreen({super.key});
@@ -28,14 +29,22 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
     try {
       await _firestore.collection('users').doc(uid).update({field: value});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User updated successfully')),
+        InAppNotification.show(
+          context,
+          title: 'User Updated',
+          message: 'User updated successfully',
+          accentColor: Colors.green,
+          icon: Icons.check_circle_rounded,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update user: $e')),
+        InAppNotification.show(
+          context,
+          title: 'Update Failed',
+          message: 'Failed to update user: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
         );
       }
     }
@@ -69,14 +78,22 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
       try {
         await _firestore.collection('users').doc(uid).delete();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User deleted permanently.')),
+          InAppNotification.show(
+            context,
+            title: 'User Deleted',
+            message: 'User deleted permanently.',
+            accentColor: Colors.redAccent,
+            icon: Icons.delete_forever_rounded,
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete user: $e')),
+          InAppNotification.show(
+            context,
+            title: 'Deletion Failed',
+            message: 'Failed to delete user: $e',
+            accentColor: Colors.redAccent,
+            icon: Icons.error_outline_rounded,
           );
         }
       }

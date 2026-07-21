@@ -143,6 +143,8 @@ class ClassSchedule {
   final DateTime? lastUpdatedDate; // To handle auto-resetting status every week
   final DateTime? scheduledDate; // To support week-specific classes
 
+  bool get isCancelled => status == 'cancelled';
+
   ClassSchedule({
     required this.id,
     required this.dayOfWeek,

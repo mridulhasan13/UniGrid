@@ -18,6 +18,7 @@ import 'schedule_builder_screen.dart';
 import '../services/fcm_service.dart';
 import 'course_registry_screen.dart';
 import '../widgets/custom_snack_bar.dart';
+import '../widgets/in_app_notification.dart';
 
 class CRPanelScreen extends StatefulWidget {
   const CRPanelScreen({super.key});
@@ -39,9 +40,12 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
     final user = Provider.of<AppUser?>(context, listen: false);
     if (user == null || !user.hasDeptScope) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Cannot seed: department or batch is missing.')),
+        InAppNotification.show(
+          context,
+          title: 'Seed Error',
+          message: 'Cannot seed: department or batch is missing.',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
         );
       }
       return;
@@ -110,14 +114,22 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
       await batch.commit();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Database seeded with sample data!')),
+        InAppNotification.show(
+          context,
+          title: 'Database Seeded',
+          message: 'Database seeded with sample data!',
+          accentColor: Colors.green,
+          icon: Icons.check_circle_rounded,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error seeding: $e')),
+        InAppNotification.show(
+          context,
+          title: 'Seed Error',
+          message: 'Error seeding: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
         );
       }
     }
@@ -127,9 +139,12 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
     final user = Provider.of<AppUser?>(context, listen: false);
     if (user == null || !user.hasDeptScope) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Cannot reset: department or batch is missing.')),
+        InAppNotification.show(
+          context,
+          title: 'Reset Error',
+          message: 'Cannot reset: department or batch is missing.',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
         );
       }
       return;
@@ -199,15 +214,22 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
         await batch.commit();
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('All announcements and chat messages cleared!')),
+          InAppNotification.show(
+            context,
+            title: 'Database Cleared',
+            message: 'All announcements and chat messages cleared!',
+            accentColor: Colors.green,
+            icon: Icons.cleaning_services_rounded,
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error resetting data: $e')),
+          InAppNotification.show(
+            context,
+            title: 'Reset Error',
+            message: 'Error resetting data: $e',
+            accentColor: Colors.redAccent,
+            icon: Icons.error_outline_rounded,
           );
         }
       }
@@ -289,10 +311,12 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text('Announcement posted! Uploading file in background...')),
+        InAppNotification.show(
+          context,
+          title: 'Announcement Posted',
+          message: 'Announcement posted! Uploading file in background...',
+          accentColor: Colors.green,
+          icon: Icons.campaign_rounded,
         );
       }
 
@@ -318,22 +342,33 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
           });
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('File attached successfully!')),
+            InAppNotification.show(
+              context,
+              title: 'File Attached',
+              message: 'File attached successfully!',
+              accentColor: Colors.green,
+              icon: Icons.attach_file_rounded,
             );
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Update failed: $e')),
+        InAppNotification.show(
+          context,
+          title: 'Post Error',
+          message: 'Update failed: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
         );
       }
-      // If Stage 1 failed, we should let them know
       if (docRef == null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to post announcement.')),
+        InAppNotification.show(
+          context,
+          title: 'Post Failed',
+          message: 'Failed to post announcement.',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
         );
       }
     }
@@ -376,8 +411,13 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                   });
                   if (mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('Nomination sent for approval!')));
+                    InAppNotification.show(
+                      context,
+                      title: 'Nomination Sent',
+                      message: 'Nomination sent for approval!',
+                      accentColor: Colors.green,
+                      icon: Icons.send_rounded,
+                    );
                   }
                 },
                 child: const Text('Submit'),
@@ -427,15 +467,22 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                               .update({'isCR': true});
                           emailCtrl.clear();
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Admin added directly!')));
+                          InAppNotification.show(
+                            context,
+                            title: 'Admin Added',
+                            message: 'Admin added directly!',
+                            accentColor: Colors.green,
+                            icon: Icons.person_add_rounded,
+                          );
                         } else {
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('User not found in database.')));
+                          InAppNotification.show(
+                            context,
+                            title: 'User Not Found',
+                            message: 'User not found in database.',
+                            accentColor: Colors.redAccent,
+                            icon: Icons.search_off_rounded,
+                          );
                         }
                       },
                     )
@@ -499,10 +546,13 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                           .update({'status': 'approved'});
                                     } else {
                                       if (context.mounted)
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(const SnackBar(
-                                                content:
-                                                    Text('User not found.')));
+                                        InAppNotification.show(
+                                          context,
+                                          title: 'User Not Found',
+                                          message: 'User not found in database.',
+                                          accentColor: Colors.redAccent,
+                                          icon: Icons.search_off_rounded,
+                                        );
                                     }
                                   },
                                 ),
@@ -951,11 +1001,13 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                         .doc(docId)
                                         .update({'isApproved': true});
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(SnackBar(
-                                              content: Text(
-                                                  '✅ ${name.isNotEmpty ? name : email} approved!'),
-                                              backgroundColor: Colors.green));
+                                      InAppNotification.show(
+                                        context,
+                                        title: 'User Approved',
+                                        message: '${name.isNotEmpty ? name : email} has been approved.',
+                                        accentColor: Colors.green,
+                                        icon: Icons.check_circle_rounded,
+                                      );
                                     }
                                   },
                                 ),
@@ -972,12 +1024,13 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                       'isRejected': true
                                     });
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(SnackBar(
-                                              content: Text(
-                                                  '❌ ${name.isNotEmpty ? name : email} rejected.'),
-                                              backgroundColor:
-                                                  Colors.redAccent));
+                                      InAppNotification.show(
+                                        context,
+                                        title: 'User Rejected',
+                                        message: '${name.isNotEmpty ? name : email} was rejected.',
+                                        accentColor: Colors.redAccent,
+                                        icon: Icons.remove_circle_rounded,
+                                      );
                                     }
                                   },
                                 ),
@@ -1348,23 +1401,24 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                               await FirebaseFirestore.instance
                                                   .collection('admin_requests')
                                                   .doc(reqId)
-                                                  .update(
-                                                      {'status': 'approved'});
+                                                  .update({'status': 'approved'});
                                               if (context.mounted)
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(const SnackBar(
-                                                        content: Text(
-                                                            'Admin approved!'),
-                                                        backgroundColor:
-                                                            Colors.green));
+                                                InAppNotification.show(
+                                                  context,
+                                                  title: 'Admin Approved',
+                                                  message: 'Admin approved!',
+                                                  accentColor: Colors.green,
+                                                  icon: Icons.check_circle_rounded,
+                                                );
                                             } else {
                                               if (context.mounted)
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(const SnackBar(
-                                                        content: Text(
-                                                            'User not found in database.'),
-                                                        backgroundColor:
-                                                            Colors.red));
+                                                InAppNotification.show(
+                                                  context,
+                                                  title: 'User Not Found',
+                                                  message: 'User not found in database.',
+                                                  accentColor: Colors.redAccent,
+                                                  icon: Icons.search_off_rounded,
+                                                );
                                             }
                                           },
                                         ),
@@ -1377,12 +1431,13 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                                 .doc(reqId)
                                                 .update({'status': 'rejected'});
                                             if (context.mounted)
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(const SnackBar(
-                                                      content: Text(
-                                                          'Admin request rejected.'),
-                                                      backgroundColor:
-                                                          Colors.red));
+                                              InAppNotification.show(
+                                                context,
+                                                title: 'Admin Rejected',
+                                                message: 'Admin request rejected.',
+                                                accentColor: Colors.redAccent,
+                                                icon: Icons.remove_circle_rounded,
+                                              );
                                           },
                                         ),
                                       ],

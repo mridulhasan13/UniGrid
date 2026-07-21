@@ -20,6 +20,7 @@ import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
 import '../utils/dept_scope.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../widgets/in_app_notification.dart';
 
 // ============================================================
 // Data Model
@@ -530,7 +531,7 @@ class _MessageBubble extends StatelessWidget {
           // Content
           if (message.isUnsent)
             Text(
-              '🚫  This message was unsent',
+              'This message was unsent',
               style: TextStyle(
                 color: textColor.withOpacity(0.45),
                 fontSize: 13,
@@ -611,7 +612,7 @@ class _MessageBubble extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            replyText.isEmpty ? '📷 Image' : replyText,
+            replyText.isEmpty ? 'Image' : replyText,
             style:
                 TextStyle(color: textColor.withOpacity(0.55), fontSize: 12),
             maxLines: 2,
@@ -780,9 +781,9 @@ class _ChatScreenState extends State<ChatScreen> {
             msgData['replyTo'] = {
               'id': _replyingTo!.id,
               'text': _replyingTo!.isUnsent
-                  ? '🚫 This message was unsent'
+                  ? 'This message was unsent'
                   : (_replyingTo!.type == 'image'
-                      ? '📷 Image'
+                      ? 'Image'
                       : _replyingTo!.text),
               'authorName': _replyingTo!.authorName,
             };
@@ -800,7 +801,7 @@ class _ChatScreenState extends State<ChatScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('❌ Failed to upload image: $e')),
+            SnackBar(content: Text('Failed to upload image: $e')),
           );
         }
       } finally {
@@ -832,8 +833,8 @@ class _ChatScreenState extends State<ChatScreen> {
       msgData['replyTo'] = {
         'id': _replyingTo!.id,
         'text': _replyingTo!.isUnsent
-            ? '🚫 This message was unsent'
-            : (_replyingTo!.type == 'image' ? '📷 Image' : _replyingTo!.text),
+            ? 'This message was unsent'
+            : (_replyingTo!.type == 'image' ? 'Image' : _replyingTo!.text),
         'authorName': _replyingTo!.authorName,
       };
     }
@@ -865,14 +866,12 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showSeenBy(_ChatMsg msg) {
     final viewerIds = msg.seenBy.where((id) => id != msg.authorId).toList();
     if (viewerIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Not seen by anyone yet.'),
-          backgroundColor: AppColors.backgroundTop,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
+      InAppNotification.show(
+        context,
+        title: 'Read Status',
+        message: 'Not seen by anyone yet.',
+        accentColor: AppColors.primary,
+        icon: Icons.done_all_rounded,
       );
       return;
     }
@@ -1537,7 +1536,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(
-                      content: Text('❌ Upload failed: $e'),
+                      content: Text('Upload failed: $e'),
                       backgroundColor: Colors.redAccent,
                     ),
                   );
@@ -1736,7 +1735,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                               .showSnackBar(
                                             SnackBar(
                                               content: const Text(
-                                                  '✅ Department details updated successfully!'),
+                                                  'Department details updated successfully!'),
                                               backgroundColor:
                                                   AppColors.primary,
                                               behavior:
@@ -1820,7 +1819,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Icon(Icons.chat_bubble_outline_rounded,
                     color: AppColors.textPrimary.withOpacity(0.2), size: 48),
                 const SizedBox(height: 12),
-                Text('No messages yet. Say hi! 👋',
+                Text('No messages yet. Say hi!',
                     style: TextStyle(
                         color: AppColors.textPrimary.withOpacity(0.3), fontSize: 15)),
               ],
@@ -1975,9 +1974,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     const SizedBox(height: 2),
                     Text(
                       _replyingTo!.isUnsent
-                          ? '🚫 Unsent message'
+                          ? 'Unsent message'
                           : (_replyingTo!.type == 'image'
-                              ? '📷 Image'
+                              ? 'Image'
                               : _replyingTo!.text),
                       style:
                           TextStyle(color: AppColors.textSecondary, fontSize: 12),

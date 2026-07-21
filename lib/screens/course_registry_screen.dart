@@ -12,6 +12,7 @@ import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/unigrid_loader.dart';
 import 'file_viewer_screen.dart';
+import '../widgets/in_app_notification.dart';
 
 class CourseRegistryScreen extends StatefulWidget {
   const CourseRegistryScreen({super.key});
@@ -299,12 +300,15 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                             }
                           } catch (e) {
                             setDialogState(() => isUploading = false);
-                            if (ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(
-                                    content: Text('Error uploading file: $e')),
-                              );
-                            }
+                             if (ctx.mounted) {
+                               InAppNotification.show(
+                                 ctx,
+                                 title: 'Upload Error',
+                                 message: 'Error uploading file: $e',
+                                 accentColor: Colors.redAccent,
+                                 icon: Icons.error_outline_rounded,
+                               );
+                             }
                           }
                         },
                         style: ElevatedButton.styleFrom(

@@ -124,13 +124,13 @@ class SupabaseStorageService {
           .from(SupabaseConfig.bucket)
           .getPublicUrl(storagePath);
 
-      debugPrint('[SupabaseUpload] ✅ Public URL: $publicUrl');
+      debugPrint('[SupabaseUpload] Public URL: $publicUrl');
       return publicUrl;
     } on StorageException catch (e) {
-      debugPrint('[SupabaseUpload] ❌ StorageException: ${e.message} | statusCode: ${e.statusCode}');
+      debugPrint('[SupabaseUpload] StorageException: ${e.message} | statusCode: ${e.statusCode}');
       rethrow;
     } catch (e) {
-      debugPrint('[SupabaseUpload] ❌ Unexpected error: $e');
+      debugPrint('[SupabaseUpload] Unexpected error: $e');
       rethrow;
     }
   }
@@ -147,17 +147,17 @@ class SupabaseStorageService {
       // Find "unigrid-files" in the path and take everything after it
       final bucketIndex = segments.indexOf(SupabaseConfig.bucket);
       if (bucketIndex == -1) {
-        debugPrint('[SupabaseUpload] ⚠️ Could not extract path from URL: $publicUrl');
+        debugPrint('[SupabaseUpload] Could not extract path from URL: $publicUrl');
         return;
       }
       final storagePath = segments.sublist(bucketIndex + 1).join('/');
 
       debugPrint('[SupabaseUpload] Deleting: $storagePath');
       await _storage.from(SupabaseConfig.bucket).remove([storagePath]);
-      debugPrint('[SupabaseUpload] ✅ Deleted: $storagePath');
+      debugPrint('[SupabaseUpload] Deleted: $storagePath');
     } catch (e) {
       // Non-fatal: log and continue. The Firestore doc deletion is more important.
-      debugPrint('[SupabaseUpload] ⚠️ Delete failed (non-fatal): $e');
+      debugPrint('[SupabaseUpload] Delete failed (non-fatal): $e');
     }
   }
 

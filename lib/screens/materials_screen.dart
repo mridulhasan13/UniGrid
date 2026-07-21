@@ -16,6 +16,7 @@ import '../widgets/unigrid_loader.dart';
 import '../widgets/floating_app_bar.dart';
 import '../services/auth_service.dart';
 import 'file_viewer_screen.dart';
+import '../widgets/in_app_notification.dart';
 
 class MaterialsScreen extends StatefulWidget {
   const MaterialsScreen({super.key});
@@ -413,10 +414,12 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                               child: ListTile(
                                 onTap: () {
                                   if (material.fileUrl == null || material.fileUrl!.isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('File is still uploading to the cloud. Please wait a moment...'),
-                                      ),
+                                    InAppNotification.show(
+                                      context,
+                                      title: 'File Uploading',
+                                      message: 'File is still uploading to the cloud. Please wait a moment...',
+                                      accentColor: Colors.amber,
+                                      icon: Icons.hourglass_top_rounded,
                                     );
                                     return;
                                   }
@@ -548,22 +551,22 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                                               }
 
                                               if (context.mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                      content: Text(
-                                                          'Material deleted successfully!'),
-                                                      backgroundColor:
-                                                          Colors.redAccent),
+                                                InAppNotification.show(
+                                                  context,
+                                                  title: 'Material Deleted',
+                                                  message: 'Material deleted successfully!',
+                                                  accentColor: Colors.redAccent,
+                                                  icon: Icons.delete_forever_rounded,
                                                 );
                                               }
                                             } catch (e) {
                                               if (context.mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                      content: Text(
-                                                          'Failed to delete material: $e')),
+                                                InAppNotification.show(
+                                                  context,
+                                                  title: 'Delete Failed',
+                                                  message: 'Failed to delete material: $e',
+                                                  accentColor: Colors.redAccent,
+                                                  icon: Icons.error_outline_rounded,
                                                 );
                                               }
                                             }
@@ -593,10 +596,12 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     final authService = Provider.of<AuthService>(context, listen: false);
     final isAdminEmail = authService.isRootAdmin(user.email);
     if (!user.isCR && !user.isAdmin && !isAdminEmail) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(
-                'Access Denied: Only CRs or Admins can upload materials.')),
+      InAppNotification.show(
+        context,
+        title: 'Access Denied',
+        message: 'Only CRs or Admins can upload materials.',
+        accentColor: Colors.redAccent,
+        icon: Icons.lock_rounded,
       );
       return;
     }
@@ -843,9 +848,12 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                         }
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Error selecting files: $e')),
+                          InAppNotification.show(
+                            context,
+                            title: 'File Selection Error',
+                            message: 'Error selecting files: $e',
+                            accentColor: Colors.redAccent,
+                            icon: Icons.error_outline_rounded,
                           );
                         }
                       }
@@ -886,21 +894,27 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                         onPressed: isUploading
                             ? null
                             : () async {
-                                if (titleCtrl.text.isEmpty ||
-                                    subjectCtrl.text.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Please fill Title and Subject Name')));
-                                  return;
-                                }
-                                if (selectedFiles.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Please attach at least one file')));
-                                  return;
-                                }
+                                 if (titleCtrl.text.isEmpty ||
+                                     subjectCtrl.text.isEmpty) {
+                                   InAppNotification.show(
+                                     context,
+                                     title: 'Missing Fields',
+                                     message: 'Please fill Title and Subject Name.',
+                                     accentColor: Colors.amber,
+                                     icon: Icons.warning_amber_rounded,
+                                   );
+                                   return;
+                                 }
+                                 if (selectedFiles.isEmpty) {
+                                   InAppNotification.show(
+                                     context,
+                                     title: 'Missing File',
+                                     message: 'Please attach at least one file.',
+                                     accentColor: Colors.amber,
+                                     icon: Icons.attach_file_rounded,
+                                   );
+                                   return;
+                                 }
 
                                 try {
                                   dialogSetState
@@ -923,10 +937,13 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
 
                                   if (mounted) {
                                     Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                            content: Text(
-                                                'Uploading ${selectedFiles.length} material(s) in background...')));
+                                    InAppNotification.show(
+                                      context,
+                                      title: 'Material Uploading',
+                                      message: 'Uploading ${selectedFiles.length} material(s) in background...',
+                                      accentColor: AppColors.primary,
+                                      icon: Icons.cloud_upload_rounded,
+                                    );
                                   }
 
                                   for (final pickedFile in selectedFiles) {
@@ -966,10 +983,13 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                                   dialogSetState
                                       ?.call(() => isUploading = false);
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                            content: Text(
-                                                'Error starting upload: $e')));
+                                    InAppNotification.show(
+                                      context,
+                                      title: 'Upload Error',
+                                      message: 'Error starting upload: $e',
+                                      accentColor: Colors.redAccent,
+                                      icon: Icons.error_outline_rounded,
+                                    );
                                   }
                                 }
                               },
@@ -1015,10 +1035,12 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     final isAdminEmail = authService.isRootAdmin(user.email);
     if (!user.isCR && !user.isAdmin && !isAdminEmail) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Access Denied: Only CRs or Admins can upload materials.')),
+        InAppNotification.show(
+          context,
+          title: 'Access Denied',
+          message: 'Only CRs or Admins can upload materials.',
+          accentColor: Colors.redAccent,
+          icon: Icons.lock_rounded,
         );
       }
       return;
@@ -1051,8 +1073,13 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Material entry created! Uploading file...')));
+        InAppNotification.show(
+          context,
+          title: 'Material Created',
+          message: 'Material entry created. Uploading file...',
+          accentColor: Colors.amber,
+          icon: Icons.pending_actions_rounded,
+        );
       }
 
       // Stage 2: Background File Upload (Supabase via HTTP)
@@ -1068,13 +1095,23 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Material file uploaded successfully!')));
+        InAppNotification.show(
+          context,
+          title: 'Upload Complete',
+          message: 'Material file uploaded successfully!',
+          accentColor: Colors.green,
+          icon: Icons.check_circle_rounded,
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error uploading material: $e')));
+        InAppNotification.show(
+          context,
+          title: 'Upload Error',
+          message: 'Error uploading material: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
       }
     }
   }

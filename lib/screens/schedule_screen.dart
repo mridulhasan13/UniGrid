@@ -14,6 +14,7 @@ import 'course_registry_screen.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/floating_app_bar.dart';
 import '../services/auth_service.dart';
+import '../widgets/in_app_notification.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -921,7 +922,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         content: Text(
           'Do you want to copy all scheduled classes from the previous week ($prevWeekStr) '
           'to the selected week ($currentWeekStr)?\n\n'
-          '⚠️ Warning: This will overwrite/replace any classes already scheduled for the selected week.',
+          'Warning: This will overwrite/replace any classes already scheduled for the selected week.',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5),
         ),
         actions: [
@@ -1617,19 +1618,27 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               Icon(Icons.access_time_rounded,
                                   color: AppColors.textSecondary, size: 12),
                               const SizedBox(width: 4),
-                              Text(
-                                '${cls.time} (Slot ${cls.startSlot})',
-                                style: TextStyle(
-                                    color: AppColors.textSecondary, fontSize: 11),
+                              Flexible(
+                                child: Text(
+                                  '${cls.time} (Slot ${cls.startSlot})',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary, fontSize: 11),
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Icon(Icons.room_rounded,
                                   color: AppColors.textSecondary, size: 12),
                               const SizedBox(width: 4),
-                              Text(
-                                cls.room,
-                                style: TextStyle(
-                                    color: AppColors.textSecondary, fontSize: 11),
+                              Flexible(
+                                child: Text(
+                                  cls.room,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary, fontSize: 11),
+                                ),
                               ),
                             ],
                           ),
@@ -1642,10 +1651,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   Icon(Icons.person_outline_rounded,
                                       color: AppColors.textSecondary, size: 12),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    cls.teacher,
-                                    style: TextStyle(
-                                        color: AppColors.textSecondary, fontSize: 11),
+                                  Flexible(
+                                    child: Text(
+                                      cls.teacher,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          color: AppColors.textSecondary, fontSize: 11),
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
                                 ],
@@ -1653,10 +1666,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   Icon(Icons.group_outlined,
                                       color: AppColors.textSecondary, size: 12),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    cls.group,
-                                    style: TextStyle(
-                                        color: AppColors.textSecondary, fontSize: 11),
+                                  Flexible(
+                                    child: Text(
+                                      cls.group,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          color: AppColors.textSecondary, fontSize: 11),
+                                    ),
                                   ),
                                 ],
                               ],
@@ -1738,19 +1755,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     classId: FieldValue.delete(),
                   }, SetOptions(merge: true));
                   if (ctx.mounted) Navigator.pop(ctx);
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Reset to weekly default status.'),
-                      backgroundColor: Colors.green,
-                    ),
+                  InAppNotification.show(
+                    context,
+                    title: 'Schedule Reset',
+                    message: 'Reset to weekly default status.',
+                    accentColor: Colors.green,
+                    icon: Icons.refresh_rounded,
                   );
                 } catch (e) {
                   if (ctx.mounted) Navigator.pop(ctx);
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(
-                      content: Text('❌ Reset failed: $e'),
-                      backgroundColor: Colors.redAccent,
-                    ),
+                  InAppNotification.show(
+                    context,
+                    title: 'Reset Failed',
+                    message: 'Reset failed: $e',
+                    accentColor: Colors.redAccent,
+                    icon: Icons.error_outline_rounded,
                   );
                 }
               },
@@ -1784,20 +1803,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             }
           }, SetOptions(merge: true));
           if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content:
-                  Text('✅ Successfully fixed class to "$label" for $dateStr.'),
-              backgroundColor: AppColors.primary,
-            ),
+          InAppNotification.show(
+            context,
+            title: 'Schedule Updated',
+            message: 'Successfully set class to "$label" for $dateStr.',
+            accentColor: AppColors.primary,
+            icon: Icons.edit_calendar_rounded,
           );
         } catch (e) {
           if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text('❌ Override failed: $e'),
-              backgroundColor: Colors.redAccent,
-            ),
+          InAppNotification.show(
+            context,
+            title: 'Override Failed',
+            message: 'Override failed: $e',
+            accentColor: Colors.redAccent,
+            icon: Icons.error_outline_rounded,
           );
         }
       },

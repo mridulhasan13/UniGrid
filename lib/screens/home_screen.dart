@@ -13,6 +13,7 @@ import '../services/supabase_storage_service.dart';
 import '../widgets/unigrid_loader.dart';
 import '../widgets/floating_app_bar.dart';
 import 'file_viewer_screen.dart';
+import '../widgets/in_app_notification.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -483,10 +484,12 @@ class _AnnouncementCard extends StatelessWidget {
       return GestureDetector(
         onTap: () {
           if (announcement.fileUrl == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text(
-                      'File is still uploading to the cloud. Please wait a moment...')),
+            InAppNotification.show(
+              context,
+              title: 'File Uploading',
+              message: 'File is still uploading to the cloud. Please wait a moment...',
+              accentColor: Colors.amber,
+              icon: Icons.hourglass_top_rounded,
             );
             return;
           }
@@ -542,11 +545,15 @@ class _AnnouncementCard extends StatelessWidget {
             size: 16,
           ),
           const SizedBox(width: 6),
-          Text(
-            'Tap to view details',
-            style: TextStyle(
-              color: isCardLight ? Colors.black.withOpacity(0.6) : AppColors.textSecondary,
-              fontSize: 13,
+          Flexible(
+            child: Text(
+              'Tap to view details',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isCardLight ? Colors.black.withOpacity(0.6) : AppColors.textSecondary,
+                fontSize: 13,
+              ),
             ),
           ),
         ],

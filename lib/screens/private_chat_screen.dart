@@ -148,7 +148,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       await conversationRef.set({
         'participants': [user.id, widget.recipient.id],
         'lastMessage':
-            '📷 ${result.files.length > 1 ? "${result.files.length} Images" : "Image"}',
+            '${result.files.length > 1 ? "${result.files.length} Images" : "Image"}',
         'lastMessageTime': timestamp,
         'preciseTime': preciseTime,
         'readStatus': {
@@ -205,9 +205,13 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   : null,
             ),
             const SizedBox(width: 12),
-            Text(widget.recipient.name.isNotEmpty
-                ? widget.recipient.name
-                : 'Student'),
+            Flexible(
+              child: Text(
+                widget.recipient.name.isNotEmpty ? widget.recipient.name : 'Student',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
           ],
         ),
         backgroundColor: Colors.transparent,

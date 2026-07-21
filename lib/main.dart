@@ -24,6 +24,8 @@ import 'widgets/dept_setup_guard.dart';
 import 'widgets/version_aware_wrapper.dart';
 import 'widgets/unigrid_loader.dart';
 
+import 'widgets/in_app_notification.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize Firebase
@@ -73,6 +75,7 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer<ThemeService>(builder: (context, themeService, _) {
         return MaterialApp(
+          navigatorKey: globalNavigatorKey,
           title: 'UniGrid',
           debugShowCheckedModeBanner: false,
           theme: ThemeData.dark().copyWith(

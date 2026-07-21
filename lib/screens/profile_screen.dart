@@ -20,6 +20,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/dept_scope.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../widgets/in_app_notification.dart';
+import '../services/routine_reminder_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -62,6 +64,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveNotificationSetting(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(key, value);
+
+    final user = Provider.of<AppUser?>(context, listen: false);
+    if (user != null) {
+      String firestoreField = 'notifAlerts';
+      if (key == 'notif_routine') firestoreField = 'notifRoutine';
+      if (key == 'notif_chat') firestoreField = 'notifChat';
+      if (key == 'notif_alerts') firestoreField = 'notifAlerts';
+
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.id)
+          .update({firestoreField: value}).catchError((e) {
+        debugPrint('Failed to sync notification pref to Firestore: $e');
+      });
+
+      if (key == 'notif_routine') {
+        RoutineReminderService.syncRoutineReminders(user);
+      }
+    }
+
+    if (mounted) {
+      String titleText = 'Routine Reminders';
+      if (key == 'notif_chat') titleText = 'Chat Notifications';
+      if (key == 'notif_alerts') titleText = 'Announcements & Alerts';
+
+      InAppNotification.show(
+        context,
+        title: titleText,
+        message: value ? 'Alerts enabled' : 'Alerts disabled',
+        accentColor: value ? AppColors.primary : Colors.amber,
+        icon: value ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+      );
+    }
   }
 
   // Text Form Controllers
@@ -142,11 +177,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) {
         setState(() => _isUploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('âœ… Profile photo updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
+        InAppNotification.show(
+          context,
+          title: 'Photo Updated',
+          message: 'Profile photo updated successfully!',
+          accentColor: Colors.green,
+          icon: Icons.check_circle_rounded,
         );
       }
     } catch (e) {
@@ -154,11 +190,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _isUploading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Upload failed: ${e.toString().split(']').last}'),
-            backgroundColor: Colors.redAccent,
-          ),
+        InAppNotification.show(
+          context,
+          title: 'Upload Failed',
+          message: e.toString().split(']').last.trim(),
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
         );
       }
     }
@@ -636,7 +673,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       border: Border.all(color: Colors.amber.withOpacity(0.4)),
                     ),
                     child: const Text(
-                      'â­ Root Admin',
+                      'Root Admin',
                       style: TextStyle(
                           color: Colors.amber,
                           fontWeight: FontWeight.bold,
@@ -652,13 +689,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                'Edit profile',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold),
+              Flexible(
+                child: Text(
+                  'Edit profile',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold),
+                ),
               ),
+              const SizedBox(width: 12),
               Stack(
                 children: [
                   Container(
@@ -813,7 +855,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
             ),
             child: Text(
-              'âŒ $_saveError',
+              _saveError,
               style: const TextStyle(color: Colors.redAccent, fontSize: 13),
             ),
           ),
@@ -1341,12 +1383,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       await Provider.of<AuthService>(context, listen: false)
                           .sendPasswordResetEmail(user.email);
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'âœ… Password reset email dispatched successfully!'),
-                            backgroundColor: Colors.green,
-                          ),
+                        InAppNotification.show(
+                          context,
+                          title: 'Password Reset',
+                          message: 'Password reset email dispatched successfully!',
+                          accentColor: Colors.green,
+                          icon: Icons.mark_email_read_rounded,
                         );
                       }
                     } catch (e) {
@@ -1417,11 +1459,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _currentPasswordController.clear();
                           _newPasswordController.clear();
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        '✅ Password updated successfully!'),
-                                    backgroundColor: Colors.green));
+                            InAppNotification.show(
+                              context,
+                              title: 'Password Updated',
+                              message: 'Password updated successfully!',
+                              accentColor: Colors.green,
+                              icon: Icons.lock_reset_rounded,
+                            );
                           }
                         } catch (e) {
                           if (mounted) {
@@ -1937,7 +1981,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 16),
 
-        // â”€â”€ App Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── App Info ──────────────────────────────────────────────────────────
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1973,7 +2017,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 20),
 
-        // â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Footer ────────────────────────────────────────────────────────────
         Center(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 16),

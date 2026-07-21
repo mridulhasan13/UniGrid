@@ -6,6 +6,7 @@ import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../utils/schedule_constants.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/in_app_notification.dart';
 
 class ScheduleBuilderScreen extends StatefulWidget {
   final ClassSchedule? classToEdit;
@@ -167,20 +168,25 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.classToEdit != null
-                ? 'Class details updated!'
-                : 'Class added to schedule!'),
-            backgroundColor: Colors.green,
-          ),
+        InAppNotification.show(
+          context,
+          title: widget.classToEdit != null ? 'Class Updated' : 'Class Scheduled',
+          message: widget.classToEdit != null
+              ? 'Class details updated successfully!'
+              : 'Class added to weekly schedule!',
+          accentColor: Colors.green,
+          icon: Icons.check_circle_rounded,
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        InAppNotification.show(
+          context,
+          title: 'Schedule Error',
+          message: 'Error: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
         );
       }
     } finally {
@@ -477,7 +483,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                   'Select Course from Registry',
                                   Icons.assignment_turned_in_rounded,
                                   helperText: _selectedCourseId != 'custom'
-                                      ? '⚡ Details auto-filled from registry'
+                                      ? 'Details auto-filled from registry'
                                       : 'Choose a registered course to auto-fill details',
                                   helperStyle: TextStyle(
                                     color: _selectedCourseId != 'custom'

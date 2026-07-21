@@ -24,34 +24,50 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool useBlur = !kIsWeb;
-    
-    Widget cardContainer = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: AppColors.glassCardColor.withOpacity(useBlur ? 0.8 : 0.95), // slightly more opaque on web
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(
-          color: AppColors.glassCardBorder,
-          width: 1.5,
+
+    // Solid opaque base — gradient cannot override a separate Stack layer
+    Widget cardContainer = Stack(
+      children: [
+        // Layer 1: fully solid dark base (no transparency so bg never bleeds through)
+        Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: AppColors.glassCardColor, // fully opaque
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: Border.all(
+              color: AppColors.glassCardBorder,
+              width: 1.5,
+            ),
+            boxShadow: AppStyles.emeraldGlow,
+          ),
+          child: child,
         ),
-        boxShadow: AppStyles.emeraldGlow,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.textPrimary.withOpacity(0.05),
-            Colors.transparent,
-          ],
+        // Layer 2: subtle shimmer gradient overlay on top (purely decorative, does not affect opacity)
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(borderRadius),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.textPrimary.withOpacity(0.04),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
-      child: child,
+      ],
     );
 
     Widget cardContent = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: useBlur
           ? BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+              filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
               child: cardContainer,
             )
           : cardContainer,
@@ -84,6 +100,7 @@ class GlassCard extends StatelessWidget {
     required Widget child,
   }) {
     return showDialog<T>(
+      barrierColor: Colors.black.withOpacity(0.75),
       context: context,
       builder: (context) => Center(
         child: SingleChildScrollView(

@@ -14,6 +14,7 @@ import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../utils/constants.dart';
 import '../widgets/glass_card.dart';
+import '../services/routine_reminder_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -31,6 +32,10 @@ class _MainScreenState extends State<MainScreen> {
     final user = Provider.of<AppUser?>(context);
     final authService = Provider.of<AuthService>(context, listen: false);
     final isRootAdmin = user != null && authService.isRootAdmin(user.email);
+
+    if (user != null) {
+      RoutineReminderService.syncRoutineReminders(user);
+    }
 
     final List<Widget> screens = [
       const HomeScreen(),

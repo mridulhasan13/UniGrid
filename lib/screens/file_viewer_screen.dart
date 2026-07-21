@@ -6,6 +6,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../utils/constants.dart';
 import '../widgets/unigrid_loader.dart';
 import 'web_ui_helper.dart' if (dart.library.html) 'web_ui_helper_web.dart';
+import '../widgets/in_app_notification.dart';
 
 class FileViewerScreen extends StatefulWidget {
   final String fileName;
@@ -101,11 +102,12 @@ class _FileViewerScreenState extends State<FileViewerScreen> {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } catch (e2) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Could not open file: $e2'),
-                backgroundColor: const Color(0xFF1E293B),
-              ),
+            InAppNotification.show(
+              context,
+              title: 'Error Opening File',
+              message: 'Could not open file: $e2',
+              accentColor: Colors.redAccent,
+              icon: Icons.error_outline_rounded,
             );
           }
         }
@@ -130,11 +132,12 @@ class _FileViewerScreenState extends State<FileViewerScreen> {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } catch (e2) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Could not print/open file: $e2'),
-                backgroundColor: const Color(0xFF1E293B),
-              ),
+            InAppNotification.show(
+              context,
+              title: 'Error Printing File',
+              message: 'Could not print/open file: $e2',
+              accentColor: Colors.redAccent,
+              icon: Icons.error_outline_rounded,
             );
           }
         }
