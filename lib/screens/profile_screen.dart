@@ -946,11 +946,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _collegeController.text = user.collegeName;
                         _saveError = '';
                       });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content:
-                                const Text('Form fields reset to default values.'),
-                            backgroundColor: AppColors.glassCardBorder),
+                      InAppNotification.show(
+                        context,
+                        title: 'Form Reset',
+                        message: 'Form fields reset to original values.',
+                        accentColor: AppColors.primary,
+                        icon: Icons.refresh_rounded,
                       );
                     },
               style: OutlinedButton.styleFrom(
@@ -985,11 +986,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _collegeController.text = user.collegeName;
                           _saveError = '';
                         });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content:
-                                  const Text('Form fields reset to default values.'),
-                              backgroundColor: AppColors.glassCardBorder),
+                        InAppNotification.show(
+                          context,
+                          title: 'Form Reset',
+                          message: 'Form fields reset to original values.',
+                          accentColor: AppColors.primary,
+                          icon: Icons.refresh_rounded,
                         );
                       },
                 style: OutlinedButton.styleFrom(
@@ -1393,10 +1395,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       }
                     } catch (e) {
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Failed: $e'),
-                              backgroundColor: Colors.redAccent),
+                        InAppNotification.show(
+                          context,
+                          title: 'Password Reset Failed',
+                          message: 'Failed: $e',
+                          accentColor: Colors.redAccent,
+                          icon: Icons.error_outline_rounded,
                         );
                       }
                     }
@@ -1443,10 +1447,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : () async {
                         if (_currentPasswordController.text.isEmpty ||
                             _newPasswordController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      'Please fill both password fields.')));
+                          InAppNotification.show(
+                            context,
+                            title: 'Password Required',
+                            message: 'Please fill both password fields.',
+                            accentColor: Colors.amber,
+                            icon: Icons.lock_outline_rounded,
+                          );
                           return;
                         }
                         setState(() => _isSaving = true);
@@ -1469,9 +1476,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           }
                         } catch (e) {
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text('Failed: $e'),
-                                backgroundColor: Colors.redAccent));
+                            InAppNotification.show(
+                              context,
+                              title: 'Password Update Failed',
+                              message: 'Failed: $e',
+                              accentColor: Colors.redAccent,
+                              icon: Icons.error_outline_rounded,
+                            );
                           }
                         } finally {
                           if (mounted) setState(() => _isSaving = false);
@@ -1638,22 +1649,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (hasAdminAccess) {
           themeService.setTheme(name, syncToFirestore: true);
         } else {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.lock, color: Colors.amber, size: 20),
-                  SizedBox(width: 8),
-                  Text('Only CRs or Admins can customize global themes.',
-                      style: TextStyle(color: AppColors.textPrimary)),
-                ],
-              ),
-              backgroundColor: const Color(0xFF1E293B),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
+          InAppNotification.show(
+            context,
+            title: 'Admin Required',
+            message: 'Only CRs or Admins can customize global themes.',
+            accentColor: Colors.amber,
+            icon: Icons.lock_rounded,
           );
         }
       },

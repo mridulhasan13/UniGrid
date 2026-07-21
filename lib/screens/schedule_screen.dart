@@ -650,19 +650,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   'levelTerm': 'Level-1 Term-2',
                 });
 
-                scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('Routine successfully reset to factory defaults!'),
-                    backgroundColor: Colors.green,
-                  ),
+                InAppNotification.show(
+                  context,
+                  title: 'Routine Reset',
+                  message: 'Routine successfully reset to factory defaults!',
+                  accentColor: Colors.green,
+                  icon: Icons.restart_alt_rounded,
                 );
               } catch (e) {
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to reset: $e'),
-                    backgroundColor: Colors.redAccent,
-                  ),
+                InAppNotification.show(
+                  context,
+                  title: 'Reset Failed',
+                  message: 'Failed to reset: $e',
+                  accentColor: Colors.redAccent,
+                  icon: Icons.error_outline_rounded,
                 );
               }
             },
@@ -975,11 +976,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         // Close loading dialog
         if (context.mounted) Navigator.pop(context);
         
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('No classes found in the previous week ($prevWeekStr) to copy.'),
-            backgroundColor: Colors.amber,
-          ),
+        InAppNotification.show(
+          context,
+          title: 'No Classes Found',
+          message: 'No classes found in the previous week ($prevWeekStr) to copy.',
+          accentColor: Colors.amber,
+          icon: Icons.calendar_today_rounded,
         );
         return;
       }
@@ -1023,21 +1025,23 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       // Close loading dialog
       if (context.mounted) Navigator.pop(context);
 
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('Successfully copied ${prevQuery.docs.length} classes to the selected week!'),
-          backgroundColor: Colors.green,
-        ),
+      InAppNotification.show(
+        context,
+        title: 'Schedule Copied',
+        message: 'Successfully copied ${prevQuery.docs.length} classes to the selected week!',
+        accentColor: Colors.green,
+        icon: Icons.content_copy_rounded,
       );
     } catch (e) {
       // Close loading dialog
       if (context.mounted) Navigator.pop(context);
 
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('Failed to copy schedule: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
+      InAppNotification.show(
+        context,
+        title: 'Copy Failed',
+        message: 'Failed to copy schedule: $e',
+        accentColor: Colors.redAccent,
+        icon: Icons.error_outline_rounded,
       );
     }
   }

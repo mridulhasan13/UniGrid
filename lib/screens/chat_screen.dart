@@ -802,8 +802,12 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to upload image: $e')),
+          InAppNotification.show(
+            context,
+            title: 'Upload Failed',
+            message: 'Failed to upload image: $e',
+            accentColor: Colors.redAccent,
+            icon: Icons.error_outline_rounded,
           );
         }
       } finally {
@@ -1536,11 +1540,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 }
               } catch (e) {
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(
-                      content: Text('Upload failed: $e'),
-                      backgroundColor: Colors.redAccent,
-                    ),
+                  InAppNotification.show(
+                    ctx,
+                    title: 'Upload Failed',
+                    message: 'Upload failed: $e',
+                    accentColor: Colors.redAccent,
+                    icon: Icons.error_outline_rounded,
                   );
                 }
               } finally {
@@ -1733,20 +1738,12 @@ class _ChatScreenState extends State<ChatScreen> {
                                         }, SetOptions(merge: true));
                                         if (ctx.mounted) {
                                           Navigator.pop(ctx);
-                                          ScaffoldMessenger.of(ctx)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: const Text(
-                                                  'Department details updated successfully!'),
-                                              backgroundColor:
-                                                  AppColors.primary,
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                            ),
+                                          InAppNotification.show(
+                                            ctx,
+                                            title: 'Department Updated',
+                                            message: 'Department details updated successfully!',
+                                            accentColor: AppColors.primary,
+                                            icon: Icons.business_rounded,
                                           );
                                         }
                                       },
