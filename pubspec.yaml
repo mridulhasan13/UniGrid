@@ -51,6 +51,11 @@ flutter_launcher_icons:
   image_path: "assets/images/logo_launcher.png"
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/images/logo_adaptive_foreground.png"
+  web:
+    generate: true
+    image_path: "assets/images/logo_launcher.png"
+    background_color: "#FFFFFF"
+    theme_color: "#030710"
 
 flutter:
   uses-material-design: true

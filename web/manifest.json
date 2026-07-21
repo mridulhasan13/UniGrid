@@ -3,13 +3,19 @@
     "short_name": "UniGrid",
     "start_url": ".",
     "display": "standalone",
-    "display_override": ["standalone", "minimal-ui"],
-    "background_color": "#030710",
+    "display_override": [
+        "standalone",
+        "minimal-ui"
+    ],
+    "background_color": "#FFFFFF",
     "theme_color": "#030710",
     "description": "The official academic and interactive communication hub for the UniGrid platform.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
-    "categories": ["education", "productivity"],
+    "categories": [
+        "education",
+        "productivity"
+    ],
     "icons": [
         {
             "src": "icons/Icon-192.png",
@@ -35,4 +41,3 @@
         }
     ]
 }
-
