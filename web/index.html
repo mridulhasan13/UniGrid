@@ -269,7 +269,7 @@
   </div>
 
   <script>
-    // --- Splash helpers ---
+    // --- Auto-Recovery System for UniGrid Web ---
     function _removeSplash() {
       var splash = document.getElementById('unigrid-splash');
       if (splash) {
@@ -279,48 +279,100 @@
       }
     }
 
+    var _retryCount = parseInt(sessionStorage.getItem('unigrid_retry_count') || '0', 10);
+
+    function _clearCachesAndReload() {
+      sessionStorage.setItem('unigrid_retry_count', (_retryCount + 1).toString());
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            registrations[i].unregister();
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          for (var name of names) caches.delete(name);
+        });
+      }
+      setTimeout(function() {
+        window.location.reload(true);
+      }, 300);
+    }
+
     function _showRetry(msg) {
       var subtext = document.getElementById('unigrid-loading-subtext');
       var spinner = document.getElementById('unigrid-spinner');
       var btn = document.getElementById('unigrid-retry-btn');
       var loadingText = document.getElementById('unigrid-loading-text');
-      if (subtext) subtext.textContent = msg || 'Something went wrong.';
-      if (loadingText) loadingText.textContent = 'Could not load UniGrid';
-      if (spinner) spinner.style.display = 'none';
-      if (btn) btn.style.display = 'block';
+
+      if (subtext) subtext.textContent = msg || 'Attempting automatic recovery...';
+      if (loadingText) loadingText.textContent = 'Refreshing UniGrid...';
+      if (spinner) {
+        spinner.style.borderTopColor = '#00E676';
+        spinner.style.display = 'block';
+      }
+
+      if (btn) {
+        btn.textContent = 'Clean Cache & Reload';
+        btn.onclick = _clearCachesAndReload;
+        btn.style.display = 'block';
+      }
+
+      // Auto-retry once after 3.5 seconds if stuck
+      if (_retryCount < 3) {
+        setTimeout(_clearCachesAndReload, 3500);
+      }
     }
 
-    // --- 20-second timeout fallback ---
-    var _loadTimeout = setTimeout(function() {
-      _showRetry('Taking too long. Check your connection and tap to retry.');
-    }, 20000);
+    // Reset retry counter on successful load
+    window._onAppLoaded = function() {
+      sessionStorage.removeItem('unigrid_retry_count');
+      _removeSplash();
+    };
 
-    // --- Global JS error handler (catches Flutter engine crashes) ---
+    // Auto-reload when internet connection is restored
+    window.addEventListener('online', function() {
+      var btn = document.getElementById('unigrid-retry-btn');
+      if (btn && btn.style.display === 'block') {
+        _clearCachesAndReload();
+      }
+    });
+
+    // --- 30-second load timeout fallback ---
+    var _loadTimeout = setTimeout(function() {
+      _showRetry('Network timeout. Clearing cache and reloading...');
+    }, 30000);
+
+    // --- Global JS error handler ---
     window.addEventListener('error', function(e) {
       console.error('UniGrid load error:', e.message);
       clearTimeout(_loadTimeout);
-      _showRetry('Failed to load. Tap to retry.');
+      _showRetry('Load error encountered. Recovering automatically...');
     });
 
     window.addEventListener('load', function(ev) {
+      // Unregister any legacy service workers on startup to ensure fresh loading
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            registrations[i].unregister();
+          }
+        });
+      }
+
       _flutter.loader.loadEntrypoint({
-        // Service worker disabled — prevents stale-cache loading issues in
-        // returning browsers. Netlify Cache-Control headers handle caching.
         serviceWorker: {
           serviceWorkerVersion: null,
         },
         onEntrypointLoaded: function(engineInitializer) {
-          // Clear the timeout — Flutter JS loaded successfully
           clearTimeout(_loadTimeout);
           engineInitializer.initializeEngine().then(function(appRunner) {
-            // Remove splash as soon as engine is ready (before runApp).
-            // Splash removal here is more reliable than inside runApp().then()
-            // because runApp() may not return a thenable in all browsers.
-            _removeSplash();
+            window._onAppLoaded();
             appRunner.runApp();
           }).catch(function(err) {
             console.error('Flutter engine init failed:', err);
-            _showRetry('Engine failed to start. Tap to retry.');
+            _showRetry('Engine initialization error. Tap below to reload.');
           });
         }
       });
