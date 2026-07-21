@@ -32,9 +32,12 @@ class _DeptSetupGuardState extends State<DeptSetupGuard> {
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AppUser?>(context);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isRootAdmin =
+        user != null && (user.isAdmin || authService.isRootAdmin(user.email));
 
-    // If no user, or user already has department & batch setup, proceed to child
-    if (user == null || user.hasDeptScope) {
+    // If no user, user has department & batch set up, OR is root admin/admin, proceed to child
+    if (user == null || user.hasDeptScope || isRootAdmin) {
       return widget.child;
     }
 
