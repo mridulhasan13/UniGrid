@@ -140,15 +140,30 @@ class AuthService {
             );
           }
 
-          // Auto-promote root admins — always ensure isCR, isAdmin, and isApproved are true
-          if (isRoot && (data['isCR'] != true || data['isAdmin'] != true || data['isApproved'] != true)) {
-            _firestore.collection('users').doc(uid).set(
-              {'isCR': true, 'isAdmin': true, 'isApproved': true, 'email': email},
-              SetOptions(merge: true),
-            );
-            data['isCR'] = true;
-            data['isAdmin'] = true;
-            data['isApproved'] = true;
+          // Auto-promote root admins — always ensure isCR, isAdmin, and isApproved are true, and set default department 'IPE' & batch '51'
+          final currentDept = (data['department'] as String?)?.trim() ?? '';
+          final currentBatch = (data['batch'] as String?)?.trim() ?? '';
+
+          if (isRoot) {
+            final Map<String, dynamic> rootUpdates = {};
+            if (data['isCR'] != true) rootUpdates['isCR'] = true;
+            if (data['isAdmin'] != true) rootUpdates['isAdmin'] = true;
+            if (data['isApproved'] != true) rootUpdates['isApproved'] = true;
+            if (currentDept.isEmpty) rootUpdates['department'] = 'IPE';
+            if (currentBatch.isEmpty) rootUpdates['batch'] = '51';
+
+            if (rootUpdates.isNotEmpty) {
+              rootUpdates['email'] = email;
+              _firestore.collection('users').doc(uid).set(
+                rootUpdates,
+                SetOptions(merge: true),
+              );
+              data['isCR'] = true;
+              data['isAdmin'] = true;
+              data['isApproved'] = true;
+              if (currentDept.isEmpty) data['department'] = 'IPE';
+              if (currentBatch.isEmpty) data['batch'] = '51';
+            }
           }
 
           final appUser = AppUser.fromMap(data, doc.id);
@@ -167,6 +182,8 @@ class AuthService {
             isCR: isRoot,
             isAdmin: isRoot,
             isApproved: isRoot,
+            department: isRoot ? 'IPE' : '',
+            batch: isRoot ? '51' : '',
             name: displayName ?? '',
             photoUrl: photoUrl ?? '',
             createdAt: DateTime.now(),
