@@ -348,6 +348,12 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                       width: messageWidth.toDouble(),
                       fit: BoxFit.cover,
                     );
+                  } else if (kIsWeb) {
+                    imgWidget = Image.network(
+                      message.uri,
+                      width: messageWidth.toDouble(),
+                      fit: BoxFit.cover,
+                    );
                   } else {
                     imgWidget = Image.file(
                       File(message.uri),

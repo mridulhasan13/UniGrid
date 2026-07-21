@@ -640,6 +640,8 @@ class _MessageBubble extends StatelessWidget {
           loadingBuilder: (ctx, child, prog) => prog == null
               ? child
               : const Center(child: CircularProgressIndicator()));
+    } else if (kIsWeb) {
+      img = Image.network(uri, fit: BoxFit.cover);
     } else {
       img = Image.file(File(uri), fit: BoxFit.cover);
     }

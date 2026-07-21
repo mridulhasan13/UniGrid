@@ -278,7 +278,8 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                               for (final pickedFile in result.files) {
                                 Uint8List? fileBytes = pickedFile.bytes;
                                 if (fileBytes == null &&
-                                    pickedFile.path != null) {
+                                    pickedFile.path != null &&
+                                    !kIsWeb) {
                                   final file = File(pickedFile.path!);
                                   fileBytes = await file.readAsBytes();
                                 }

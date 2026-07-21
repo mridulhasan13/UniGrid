@@ -949,10 +949,11 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                                   for (final pickedFile in selectedFiles) {
                                     Uint8List? fileBytes = pickedFile.bytes;
                                     if (fileBytes == null &&
-                                        pickedFile.path != null) {
-                                      final file = File(pickedFile.path!);
-                                      fileBytes = await file.readAsBytes();
-                                    }
+                                         pickedFile.path != null &&
+                                         !kIsWeb) {
+                                       final file = File(pickedFile.path!);
+                                       fileBytes = await file.readAsBytes();
+                                     }
 
                                     if (fileBytes != null) {
                                       final fileName = pickedFile.name;

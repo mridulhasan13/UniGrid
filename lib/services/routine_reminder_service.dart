@@ -13,19 +13,35 @@ class RoutineReminderService {
   static Timer? _reminderTimer;
   static final Set<String> _notifiedSlotsToday = {};
 
+  static String? _lastSyncedUserId;
+
   /// Synchronizes class reminder notifications with current user preferences.
   static Future<void> syncRoutineReminders(AppUser? user) async {
-    _reminderTimer?.cancel();
-    _reminderTimer = null;
-
-    if (user == null || !user.hasDeptScope) return;
+    if (user == null || !user.hasDeptScope) {
+      _reminderTimer?.cancel();
+      _reminderTimer = null;
+      _lastSyncedUserId = null;
+      return;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool('notif_routine') ?? true;
     if (!enabled) {
+      _reminderTimer?.cancel();
+      _reminderTimer = null;
+      _lastSyncedUserId = null;
       debugPrint('[RoutineReminder] Disabled by user settings.');
       return;
     }
+
+    if (_lastSyncedUserId == user.id &&
+        _reminderTimer != null &&
+        _reminderTimer!.isActive) {
+      return;
+    }
+
+    _reminderTimer?.cancel();
+    _lastSyncedUserId = user.id;
 
     // Check for upcoming classes immediately and every 60 seconds
     _checkUpcomingClasses(user);
