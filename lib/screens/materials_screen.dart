@@ -66,7 +66,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
               children: [
                 Image.asset(
                   'assets/images/logo.png',
-                  height: 64,
+                  height: 48,
                 ),
                 const SizedBox(height: 16),
                 const Text('Department not set',

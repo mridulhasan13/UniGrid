@@ -161,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           child: Image.asset(
                             'assets/images/logo.png',
-                            height: 100,
+                            height: 72,
                           ),
                         ),
                       ).animate().fade(duration: 800.ms).scale(delay: 100.ms, curve: Curves.easeOutBack),
