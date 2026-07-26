@@ -368,6 +368,107 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                   .collection(coursesPath)
                                   .doc(courseToEdit.id)
                                   .update(newCourseData);
+
+                              // Automatically sync update to all matching routine schedule entries
+                              final schedulePath = user != null && user.hasDeptScope
+                                  ? deptBatchCol(
+                                      user.department, user.batch, 'schedule')
+                                  : 'schedule';
+
+                              final oldCode = courseToEdit.courseCode.trim();
+                              final oldName = courseToEdit.courseName.trim();
+                              final oldTShort = courseToEdit.teacherShort.trim();
+                              final oldTName = courseToEdit.teacherName.trim();
+
+                              final newCode = codeCtrl.text.trim();
+                              final newName = nameCtrl.text.trim();
+                              final newTShort = teacherShortCtrl.text.trim();
+                              final newTName = teacherNameCtrl.text.trim();
+
+                              final schedSnap = await FirebaseFirestore.instance
+                                  .collection(schedulePath)
+                                  .get();
+
+                              final batch = FirebaseFirestore.instance.batch();
+                              bool hasUpdates = false;
+
+                              for (var doc in schedSnap.docs) {
+                                final data = doc.data();
+                                final schedSubject =
+                                    (data['subject'] ?? '').toString();
+                                final schedTeacher =
+                                    (data['teacher'] ?? '').toString();
+                                final schedSubname =
+                                    (data['subname'] ?? '').toString();
+
+                                bool isMatch = false;
+
+                                // Check if schedule matches old course code, old course name, or old teacher
+                                if (oldCode.isNotEmpty &&
+                                    (schedSubject.toLowerCase().contains(
+                                            oldCode.toLowerCase()) ||
+                                        schedSubname.toLowerCase().contains(
+                                            oldCode.toLowerCase()))) {
+                                  isMatch = true;
+                                } else if (oldName.isNotEmpty &&
+                                    (schedSubject.toLowerCase().contains(
+                                            oldName.toLowerCase()) ||
+                                        schedSubname.toLowerCase().contains(
+                                            oldName.toLowerCase()))) {
+                                  isMatch = true;
+                                } else if (oldTShort.isNotEmpty &&
+                                    schedTeacher.toLowerCase().contains(
+                                        oldTShort.toLowerCase())) {
+                                  isMatch = true;
+                                } else if (oldTName.isNotEmpty &&
+                                    schedTeacher.toLowerCase().contains(
+                                        oldTName.toLowerCase())) {
+                                  isMatch = true;
+                                }
+
+                                if (isMatch) {
+                                  final updates = <String, dynamic>{
+                                    'teacher': newTShort.isNotEmpty
+                                        ? newTShort
+                                        : newTName,
+                                    'lastUpdatedDate':
+                                        FieldValue.serverTimestamp(),
+                                  };
+
+                                  if (oldCode.isNotEmpty &&
+                                      newCode.isNotEmpty &&
+                                      oldCode != newCode) {
+                                    String updatedSubject =
+                                        schedSubject.replaceAll(
+                                      RegExp(RegExp.escape(oldCode),
+                                          caseSensitive: false),
+                                      newCode,
+                                    );
+                                    updates['subject'] = updatedSubject;
+                                  }
+                                  if (oldName.isNotEmpty &&
+                                      newName.isNotEmpty &&
+                                      oldName != newName) {
+                                    String currentSub =
+                                        (updates['subject'] as String?) ??
+                                            schedSubject;
+                                    String updatedSubject =
+                                        currentSub.replaceAll(
+                                      RegExp(RegExp.escape(oldName),
+                                          caseSensitive: false),
+                                      newName,
+                                    );
+                                    updates['subject'] = updatedSubject;
+                                  }
+
+                                  batch.update(doc.reference, updates);
+                                  hasUpdates = true;
+                                }
+                              }
+
+                              if (hasUpdates) {
+                                await batch.commit();
+                              }
                             } else {
                               await FirebaseFirestore.instance
                                   .collection(coursesPath)
@@ -696,55 +797,187 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                             itemBuilder: (context, index) {
                               final course = courses[index];
 
-                              // Filter teacher schedules
-                              final teacherSchedules = schedules.where((s) {
-                                final schedTeacher =
-                                    s.teacher.trim().toLowerCase();
-                                final tShort =
-                                    course.teacherShort.trim().toLowerCase();
-                                final tName =
-                                    course.teacherName.trim().toLowerCase();
+                              // Filter schedules belonging specifically to this course (matching section, lab/theory, course code, and teacher)
+                              final courseSchedules = schedules.where((s) {
+                                final sSub = s.subject.trim().toLowerCase();
+                                final sSubname = s.subname.trim().toLowerCase();
+                                final sTeacher = s.teacher.trim().toLowerCase();
 
-                                if (schedTeacher.isEmpty) return false;
+                                final cCode = course.courseCode.trim().toLowerCase();
+                                final cName = course.courseName.trim().toLowerCase();
+                                final tShort = course.teacherShort.trim().toLowerCase();
+                                final tName = course.teacherName.trim().toLowerCase();
 
-                                // Exact matches
-                                if (tShort.isNotEmpty && schedTeacher == tShort)
-                                  return true;
-                                if (tName.isNotEmpty && schedTeacher == tName)
-                                  return true;
+                                // 1. Strict Lab vs Theory check
+                                bool courseIsLab = cName.contains('lab') ||
+                                    cCode.contains('lab');
+                                bool scheduleIsLab = sSub.contains('lab') ||
+                                    sSubname.contains('lab');
 
-                                // Substring matches (e.g. "MM / SA" contains "MM" or "Dr. Mohammad" contains "Mohammad")
-                                if (tShort.isNotEmpty &&
-                                    schedTeacher.contains(tShort)) return true;
-                                if (tName.isNotEmpty &&
-                                    (schedTeacher.contains(tName) ||
-                                        tName.contains(schedTeacher)))
+                                if (courseIsLab != scheduleIsLab) {
+                                  return false; // One is lab, one is theory
+                                }
+
+                                // 2. Strict Section check (A vs B vs C)
+                                String? courseSection;
+                                final courseSecMatch =
+                                    RegExp(r'-\s*([a-c])\b|\bsec(tion)?\s*([a-c])\b')
+                                        .firstMatch(cName);
+                                if (courseSecMatch != null) {
+                                  courseSection = (courseSecMatch.group(1) ??
+                                          courseSecMatch.group(3))
+                                      ?.toLowerCase();
+                                }
+
+                                if (courseSection != null) {
+                                  final schedSecMatch =
+                                      RegExp(r'-\s*([a-c])\b|\bsec(tion)?\s*([a-c])\b')
+                                          .firstMatch(sSub);
+                                  if (schedSecMatch != null) {
+                                    final schedSection = (schedSecMatch.group(1) ??
+                                            schedSecMatch.group(3))
+                                        ?.toLowerCase();
+                                    if (schedSection != courseSection) {
+                                      return false; // Different section!
+                                    }
+                                  }
+                                }
+
+                                // 3. Strict Course Code matching
+                                if (cCode.isNotEmpty && sSub.isNotEmpty) {
+                                  final RegExp courseCodeRegex =
+                                      RegExp(r'[a-z]{2,4}\s*\d{3}(-\d{4})?');
+                                  final Iterable<Match> matches =
+                                      courseCodeRegex.allMatches(sSub);
+                                  if (matches.isNotEmpty) {
+                                    bool codeMatched = false;
+                                    final cleanCCode =
+                                        cCode.replaceAll(RegExp(r'[\s-]'), '');
+                                    final cleanSSub =
+                                        sSub.replaceAll(RegExp(r'[\s-]'), '');
+
+                                    for (final m in matches) {
+                                      final text = m.group(0)!;
+                                      final cleanText =
+                                          text.replaceAll(RegExp(r'[\s-]'), '');
+                                      if (cleanText == cleanCCode ||
+                                          cleanSSub.contains(cleanCCode) ||
+                                          cleanCCode.contains(cleanText)) {
+                                        codeMatched = true;
+                                        break;
+                                      }
+                                    }
+                                    if (!codeMatched) {
+                                      return false; // Mentions a different course code
+                                    }
+                                  }
+                                }
+
+                                // 4. Course Code or Name match
+                                bool hasCodeMatch = cCode.isNotEmpty &&
+                                    (sSub.contains(cCode) ||
+                                        sSubname.contains(cCode));
+                                bool hasNameMatch = cName.isNotEmpty &&
+                                    (sSub.contains(cName) ||
+                                        sSubname.contains(cName) ||
+                                        cName.contains(sSub));
+
+                                if (hasCodeMatch || hasNameMatch) {
                                   return true;
+                                }
+
+                                // 5. Teacher match (ONLY as fallback if schedule subject is generic or empty)
+                                // If schedule subject explicitly names another course/subject, DO NOT match by teacher fallback alone
+                                if (sSub.isNotEmpty) {
+                                  final subjectLetters =
+                                      sSub.replaceAll(RegExp(r'[^a-z]'), '');
+                                  if (subjectLetters.isNotEmpty &&
+                                      subjectLetters.length >= 3) {
+                                    return false; // sSub specifies a different course subject
+                                  }
+                                }
+
+                                if (sTeacher.isNotEmpty) {
+                                  if (tShort.isNotEmpty) {
+                                    final tShortTokens = tShort
+                                        .split(RegExp(r'[\s/,-]+'))
+                                        .where((t) => t.isNotEmpty)
+                                        .toList();
+                                    for (var tok in tShortTokens) {
+                                      if (sTeacher.contains(tok)) return true;
+                                    }
+                                  }
+                                  if (tName.isNotEmpty &&
+                                      (sTeacher.contains(tName) ||
+                                          tName.contains(sTeacher))) {
+                                    return true;
+                                  }
+                                }
 
                                 return false;
                               }).toList();
 
-                              final totalClasses = teacherSchedules.length;
-                              final completedClasses = teacherSchedules
-                                  .where((s) =>
-                                      s.status.trim().toLowerCase() ==
-                                      'completed')
-                                  .length;
-                               final cancelledClasses = teacherSchedules
-                                  .where((s) {
-                                    final stat = s.status.trim().toLowerCase();
-                                    return stat == 'cancelled' ||
-                                        stat == 'no class' ||
-                                        stat == 'no_class';
-                                  })
-                                  .length;
-                               final upcomingClasses = teacherSchedules
-                                  .where((s) =>
-                                      s.status.trim().toLowerCase() ==
-                                          'upcoming' ||
-                                      s.status.trim().toLowerCase() ==
-                                          'pending')
-                                  .length;
+                              // Group parallel lab/class slots by (dayOfWeek, startSlot, scheduledDate)
+                              // Each parallel group in the same slot counts as 1 class session (with merged slot span count)
+                              final Map<String, List<ClassSchedule>> slotGroups = {};
+                              for (var s in courseSchedules) {
+                                final day = s.dayOfWeek.trim().toLowerCase();
+                                final slot = s.startSlot;
+                                final dateKey = s.scheduledDate != null
+                                    ? '${s.scheduledDate!.year}_${s.scheduledDate!.month}_${s.scheduledDate!.day}'
+                                    : 'recurring';
+                                final groupKey = '${day}_${slot}_$dateKey';
+
+                                slotGroups.putIfAbsent(groupKey, () => []).add(s);
+                              }
+
+                              int totalClasses = 0;
+                              int completedClasses = 0;
+                              int cancelledClasses = 0;
+                              int upcomingClasses = 0;
+
+                              for (var entry in slotGroups.entries) {
+                                final list = entry.value;
+                                if (list.isEmpty) continue;
+
+                                // Check if this class uses the parallel structure (group split / parallel option)
+                                bool isParallel = list.length > 1 ||
+                                    list.any((s) =>
+                                        s.group.trim().isNotEmpty &&
+                                        s.group.trim().toLowerCase() != 'none');
+
+                                // Calculate class count weight:
+                                // - When parallel option is used: each parallel class = 1 class
+                                // - When regular double/triple slot is used (non-parallel): count = merged slots (span)
+                                int classWeight = 1;
+                                if (!isParallel) {
+                                  for (var s in list) {
+                                    if (s.span > classWeight) {
+                                      classWeight = s.span;
+                                    }
+                                  }
+                                }
+
+                                // Determine overall status for this time slot session
+                                bool isCompleted = list.any((s) =>
+                                    s.status.trim().toLowerCase() == 'completed');
+                                bool isCancelled = !isCompleted &&
+                                    list.any((s) {
+                                      final stat = s.status.trim().toLowerCase();
+                                      return stat == 'cancelled' ||
+                                          stat == 'no class' ||
+                                          stat == 'no_class';
+                                    });
+
+                                if (isCompleted) {
+                                  completedClasses += classWeight;
+                                } else if (isCancelled) {
+                                  cancelledClasses += classWeight;
+                                } else {
+                                  upcomingClasses += classWeight;
+                                }
+                                totalClasses += classWeight;
+                              }
 
                               return GlassCard(
                                 margin: const EdgeInsets.only(bottom: 12),
