@@ -1,32 +1,9 @@
 // netlify/functions/send-notification.js
-// Netlify serverless function for FCM push notification proxy (125k requests/mo free).
-//
-// Expects POST body: { tokens: string[], title: string, bodyText: string, senderUserId: string }
+// Pure Node.js zero-dependency FCM HTTP v1 proxy.
+// Uses built-in crypto & https modules — NO node_modules needed!
 
-const admin = require("firebase-admin");
-
-let initialized = false;
-function ensureInit() {
-  if (admin.apps.length > 0) {
-    initialized = true;
-    return;
-  }
-  const raw = process.env.SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error("SERVICE_ACCOUNT_JSON environment variable not set in Netlify");
-  let serviceAccount;
-  try {
-    serviceAccount = typeof raw === "object" ? raw : JSON.parse(raw);
-  } catch (e) {
-    throw new Error("Invalid SERVICE_ACCOUNT_JSON format: " + e.message);
-  }
-
-  if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
-  }
-
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  initialized = true;
-}
+const crypto = require("crypto");
+const https = require("https");
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +11,133 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// ─── Base64Url Helper ────────────────────────────────────────────────────────
+function base64UrlEncode(str) {
+  return Buffer.from(str)
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+// ─── Generate Google OAuth2 Access Token via Private Key RSA-SHA256 ──────────
+function getAccessToken(serviceAccount) {
+  return new Promise((resolve, reject) => {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const header = JSON.stringify({ alg: "RS256", typ: "JWT" });
+      const claimSet = JSON.stringify({
+        iss: serviceAccount.client_email,
+        scope: "https://www.googleapis.com/auth/firebase.messaging",
+        aud: "https://oauth2.googleapis.com/token",
+        exp: now + 3600,
+        iat: now,
+      });
+
+      const encodedHeader = base64UrlEncode(header);
+      const encodedClaim = base64UrlEncode(claimSet);
+      const toSign = `${encodedHeader}.${encodedClaim}`;
+
+      let privateKey = serviceAccount.private_key;
+      if (typeof privateKey === "string") {
+        privateKey = privateKey.replace(/\\n/g, "\n");
+      }
+
+      const signer = crypto.createSign("RSA-SHA256");
+      signer.update(toSign);
+      const signature = signer.sign(privateKey, "base64")
+        .replace(/=/g, "")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_");
+
+      const jwt = `${toSign}.${signature}`;
+      const postData = `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`;
+
+      const req = https.request(
+        "https://oauth2.googleapis.com/token",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Length": Buffer.byteLength(postData),
+          },
+        },
+        (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
+            if (res.statusCode === 200) {
+              const parsed = JSON.parse(data);
+              resolve(parsed.access_token);
+            } else {
+              reject(new Error(`OAuth failed (${res.statusCode}): ${data}`));
+            }
+          });
+        }
+      );
+
+      req.on("error", reject);
+      req.write(postData);
+      req.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// ─── Post single FCM message to FCM HTTP v1 API ─────────────────────────────
+function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId) {
+  return new Promise((resolve) => {
+    const payload = JSON.stringify({
+      message: {
+        token: token,
+        notification: { title: title, body: bodyText },
+        data: { senderUserId: senderUserId || "" },
+        android: {
+          priority: "high",
+          notification: { sound: "default", channel_id: "unigrid_notifications" },
+        },
+        apns: {
+          payload: { aps: { sound: "default" } },
+        },
+        webpush: {
+          notification: {
+            title: title,
+            body: bodyText,
+            icon: "/icons/Icon-192.png",
+            requireInteraction: false,
+          },
+          fcm_options: { link: "/" },
+        },
+      },
+    });
+
+    const req = https.request(
+      `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Length": Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          resolve({ status: res.statusCode, body: data });
+        });
+      }
+    );
+
+    req.on("error", (err) => resolve({ status: 500, error: err.message }));
+    req.write(payload);
+    req.end();
+  });
+}
+
+// ─── Main Handler ─────────────────────────────────────────────────────────────
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: CORS, body: "" };
@@ -42,128 +146,58 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: "Method not allowed" }) };
   }
 
-  let parsed;
+  let body;
   try {
-    parsed = JSON.parse(event.body);
+    body = JSON.parse(event.body);
   } catch {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
-  const { tokens, title, bodyText, senderUserId } = parsed;
-
+  const { tokens, title, bodyText, senderUserId } = body;
   if (!Array.isArray(tokens) || tokens.length === 0) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'tokens' must be a non-empty array" }) };
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'tokens' array is required" }) };
   }
   if (!title || !bodyText) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'title' and 'bodyText' are required" }) };
   }
 
-  try {
-    ensureInit();
-  } catch (err) {
-    console.error("Firebase init error:", err.message);
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: err.message }) };
+  const rawEnv = process.env.SERVICE_ACCOUNT_JSON;
+  if (!rawEnv) {
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: "SERVICE_ACCOUNT_JSON not set on Netlify" }) };
   }
 
-  const message = {
-    tokens: tokens,
-    notification: {
-      title: title,
-      body: bodyText,
-    },
-    data: {
-      senderUserId: senderUserId || "",
-    },
-    android: {
-      priority: "high",
-      notification: {
-        channelId: "unigrid_notifications",
-        sound: "default",
-      },
-    },
-    apns: {
-      payload: {
-        aps: {
-          sound: "default",
-        },
-      },
-    },
-    webpush: {
-      notification: {
-        title: title,
-        body: bodyText,
-        icon: "/icons/Icon-192.png",
-        requireInteraction: false,
-      },
-      fcmOptions: {
-        link: "/",
-      },
-    },
-  };
-
-  let totalSent = 0;
-  let totalFailed = 0;
-  const chunkSize = 500;
-  const db = admin.firestore();
-
+  let serviceAccount;
   try {
-    for (let i = 0; i < tokens.length; i += chunkSize) {
-      const chunk = tokens.slice(i, i + chunkSize);
-      const chunkMessage = { ...message, tokens: chunk };
-      const result = await admin.messaging().sendEachForMulticast(chunkMessage);
-      totalSent += result.successCount;
-      totalFailed += result.failureCount;
+    serviceAccount = typeof rawEnv === "object" ? rawEnv : JSON.parse(rawEnv);
+  } catch (err) {
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: "Invalid SERVICE_ACCOUNT_JSON: " + err.message }) };
+  }
 
-      // Clean up dead tokens from this chunk
-      if (result.responses) {
-        result.responses.forEach(async (resp, idx) => {
-          if (!resp.success) {
-            const code = resp.error?.code;
-            if (
-              code === "messaging/registration-token-not-registered" ||
-              code === "messaging/invalid-registration-token"
-            ) {
-              const deadToken = chunk[idx];
-              console.log(`Cleaning dead FCM token from Firestore: ${deadToken}`);
-              try {
-                const snap = await db.collection("users")
-                    .where("fcmTokens", "array-contains", deadToken)
-                    .get();
-                snap.forEach(async (doc) => {
-                  await doc.ref.update({
-                    fcmTokens: admin.firestore.FieldValue.arrayRemove(deadToken),
-                  });
-                  if (doc.data().fcmToken === deadToken) {
-                    await doc.ref.update({ fcmToken: admin.firestore.FieldValue.delete() });
-                  }
-                });
-              } catch (cleanErr) {
-                console.error(`Error cleaning dead token:`, cleanErr);
-              }
-            }
-          }
-        });
-      }
+  let accessToken;
+  try {
+    accessToken = await getAccessToken(serviceAccount);
+  } catch (err) {
+    console.error("OAuth error:", err);
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: "OAuth failed: " + err.message }) };
+  }
+
+  const projectId = serviceAccount.project_id;
+  let sentCount = 0;
+  let failCount = 0;
+
+  for (const token of tokens) {
+    const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId);
+    if (res.status === 200) {
+      sentCount++;
+    } else {
+      failCount++;
+      console.warn(`FCM send failed for token ${token.slice(0, 15)}...: ${res.status} ${res.body || res.error}`);
     }
-
-    console.log(`FCM Multicast total sent ${totalSent}/${tokens.length}`);
-
-    return {
-      statusCode: 200,
-      headers: { ...CORS, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        success: true,
-        sent: totalSent,
-        failed: totalFailed,
-        total: tokens.length,
-      }),
-    };
-  } catch (err) {
-    console.error("FCM multicast error:", err);
-    return {
-      statusCode: 500,
-      headers: CORS,
-      body: JSON.stringify({ error: "FCM multicast failed", detail: err.message }),
-    };
   }
+
+  return {
+    statusCode: 200,
+    headers: { ...CORS, "Content-Type": "application/json" },
+    body: JSON.stringify({ success: true, sent: sentCount, failed: failCount, total: tokens.length }),
+  };
 };
