@@ -292,7 +292,15 @@ class FCMService {
   }
 
   // ─── Netlify Free Serverless Endpoint ──────────────────────────────────
-  static const String _netlifyFunctionUrl = '/.netlify/functions/send-notification';
+  static String get _netlifyFunctionUrl {
+    if (kIsWeb) {
+      final host = Uri.base.host;
+      if (host.contains('unigrid.netlify.app')) {
+        return '/.netlify/functions/send-notification';
+      }
+    }
+    return 'https://unigrid.netlify.app/.netlify/functions/send-notification';
+  }
 
   static Future<void> _removeStaleToken(String token) async {
     try {
