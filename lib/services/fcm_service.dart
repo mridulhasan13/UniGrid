@@ -349,11 +349,15 @@ class FCMService {
     if (tokens.isEmpty) return;
 
     // Deduplicate tokens set & remove current user device token
-    final currentToken = kIsWeb
-        ? await _messaging.getToken(vapidKey: _webVapidKey)
-        : await _messaging.getToken();
+    String? currentToken;
+    try {
+      currentToken = kIsWeb
+          ? await _messaging.getToken(vapidKey: _webVapidKey).timeout(const Duration(seconds: 2))
+          : await _messaging.getToken().timeout(const Duration(seconds: 2));
+    } catch (_) {}
+
     final Set<String> targetTokens = tokens.toSet();
-    if (currentToken != null) {
+    if (currentToken != null && currentToken.isNotEmpty) {
       targetTokens.remove(currentToken);
     }
     if (targetTokens.isEmpty) return;

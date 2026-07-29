@@ -88,49 +88,60 @@ exports.handler = async (event) => {
     },
   };
 
-  try {
-    const result = await admin.messaging().sendEachForMulticast(message);
-    console.log(`FCM Multicast sent ${result.successCount}/${tokens.length}`);
+  let totalSent = 0;
+  let totalFailed = 0;
+  const chunkSize = 500;
+  const db = admin.firestore();
 
-    // Clean up any dead/stale tokens from Firestore asynchronously
-    if (result.responses) {
-      const db = admin.firestore();
-      result.responses.forEach(async (resp, i) => {
-        if (!resp.success) {
-          const code = resp.error?.code;
-          if (
-            code === "messaging/registration-token-not-registered" ||
-            code === "messaging/invalid-registration-token"
-          ) {
-            const deadToken = tokens[i];
-            console.log(`Cleaning dead FCM token from Firestore: ${deadToken}`);
-            try {
-              const snap = await db.collection("users")
-                  .where("fcmTokens", "array-contains", deadToken)
-                  .get();
-              snap.forEach(async (doc) => {
-                await doc.ref.update({
-                  fcmTokens: admin.firestore.FieldValue.arrayRemove(deadToken),
+  try {
+    for (let i = 0; i < tokens.length; i += chunkSize) {
+      const chunk = tokens.slice(i, i + chunkSize);
+      const chunkMessage = { ...message, tokens: chunk };
+      const result = await admin.messaging().sendEachForMulticast(chunkMessage);
+      totalSent += result.successCount;
+      totalFailed += result.failureCount;
+
+      // Clean up dead tokens from this chunk
+      if (result.responses) {
+        result.responses.forEach(async (resp, idx) => {
+          if (!resp.success) {
+            const code = resp.error?.code;
+            if (
+              code === "messaging/registration-token-not-registered" ||
+              code === "messaging/invalid-registration-token"
+            ) {
+              const deadToken = chunk[idx];
+              console.log(`Cleaning dead FCM token from Firestore: ${deadToken}`);
+              try {
+                const snap = await db.collection("users")
+                    .where("fcmTokens", "array-contains", deadToken)
+                    .get();
+                snap.forEach(async (doc) => {
+                  await doc.ref.update({
+                    fcmTokens: admin.firestore.FieldValue.arrayRemove(deadToken),
+                  });
+                  if (doc.data().fcmToken === deadToken) {
+                    await doc.ref.update({ fcmToken: admin.firestore.FieldValue.delete() });
+                  }
                 });
-                if (doc.data().fcmToken === deadToken) {
-                  await doc.ref.update({ fcmToken: admin.firestore.FieldValue.delete() });
-                }
-              });
-            } catch (cleanErr) {
-              console.error(`Error cleaning dead token:`, cleanErr);
+              } catch (cleanErr) {
+                console.error(`Error cleaning dead token:`, cleanErr);
+              }
             }
           }
-        }
-      });
+        });
+      }
     }
+
+    console.log(`FCM Multicast total sent ${totalSent}/${tokens.length}`);
 
     return {
       statusCode: 200,
       headers: { ...CORS, "Content-Type": "application/json" },
       body: JSON.stringify({
         success: true,
-        sent: result.successCount,
-        failed: result.failureCount,
+        sent: totalSent,
+        failed: totalFailed,
         total: tokens.length,
       }),
     };
