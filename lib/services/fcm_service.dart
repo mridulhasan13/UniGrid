@@ -12,6 +12,13 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart' show Icons;
 import '../widgets/in_app_notification.dart';
 
+// ─── Web Push VAPID Key ──────────────────────────────────────────────────────
+// Generate this in Firebase Console → Project Settings → Cloud Messaging
+// → Web Push certificates → Generate key pair.
+// Replace the placeholder below with your actual VAPID key.
+const String _webVapidKey =
+    'BNR1QB2c8bLrptm_9N8Zus_K4h4W7J7XFPj0tLTlB_195BQmphwUtImtcskWrbr1QfwnH4PCVoPvfywDcr5ajE8';
+
 /// Top-level background message handler — must be a top-level function.
 /// Called by Firebase when a notification arrives while the app is terminated or in background.
 @pragma('vm:entry-point')
@@ -29,9 +36,64 @@ class FCMService {
 
   // ─── Initialize FCM ───────────────────────────────────────────────────────
   static Future<void> initialize() async {
-    if (kIsWeb) return;
     if (_initialized) return;
     _initialized = true;
+
+    if (kIsWeb) {
+      // ── Web-specific init ────────────────────────────────────────────────
+      // Request permission from the browser.
+      final settings = await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      if (settings.authorizationStatus != AuthorizationStatus.authorized) {
+        debugPrint('FCM web: notification permission denied');
+        return;
+      }
+
+      // Save token for any already-logged-in user.
+      final currentUser = fb_auth.FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        await saveTokenForUser(currentUser.uid);
+      }
+
+      // Refresh listener — keep Firestore in sync when browser rotates the token.
+      _messaging.onTokenRefresh.listen((newToken) async {
+        final user = fb_auth.FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          try {
+            await _firestore.collection('users').doc(user.uid).set(
+              {'fcmToken': newToken, 'fcmUpdatedAt': FieldValue.serverTimestamp()},
+              SetOptions(merge: true),
+            );
+            debugPrint('FCM web token refreshed for user: ${user.uid}');
+          } catch (e) {
+            debugPrint('FCM web token refresh save error: $e');
+          }
+        }
+      });
+
+      // Foreground messages on web — show the in-app banner (no local notifications API on web).
+      FirebaseMessaging.onMessage.listen((message) {
+        final notification = message.notification;
+        if (notification == null) return;
+        final currentUid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
+        final senderUserId = message.data['senderUserId'] ?? '';
+        if (senderUserId.isNotEmpty && senderUserId == currentUid) return;
+
+        InAppNotification.showGlobal(
+          title: notification.title ?? 'UniGrid',
+          message: notification.body ?? '',
+          icon: Icons.notifications_active_rounded,
+        );
+      });
+
+      debugPrint('FCM web initialized successfully');
+      return;
+    }
+
+    // ── Native (Android / iOS) init ──────────────────────────────────────────
 
     // Register token refresh listener immediately
     _messaging.onTokenRefresh.listen((newToken) async {
@@ -195,9 +257,12 @@ class FCMService {
 
   // ─── Save FCM Token to Firestore ──────────────────────────────────────────
   static Future<void> saveTokenForUser(String userId) async {
-    if (kIsWeb) return;
     try {
-      final token = await _messaging.getToken();
+      // On web, a VAPID key is required to get the push subscription token.
+      // On native platforms, getToken() works without any arguments.
+      final token = kIsWeb
+          ? await _messaging.getToken(vapidKey: _webVapidKey)
+          : await _messaging.getToken();
       if (token == null) {
         debugPrint('FCM token is null for user: $userId');
         return;
@@ -206,7 +271,10 @@ class FCMService {
         {'fcmToken': token, 'fcmUpdatedAt': FieldValue.serverTimestamp()},
         SetOptions(merge: true),
       );
-      debugPrint('FCM token saved for user: $userId');
+      print('\n====================================================');
+      print('🔥 FCM TOKEN (User: $userId, Web: $kIsWeb):');
+      print(token);
+      print('====================================================\n');
     } catch (e) {
       debugPrint('FCM token save error: $e');
     }
@@ -223,82 +291,136 @@ class FCMService {
     return accessToken;
   }
 
-  // ─── Send FCM HTTP v1 to a list of tokens ────────────────────────────────
+  // ─── Netlify Free Serverless Endpoint ──────────────────────────────────
+  static const String _netlifyFunctionUrl = '/.netlify/functions/send-notification';
+
+  static Future<void> _removeStaleToken(String token) async {
+    try {
+      final staleQuery = await _firestore
+          .collection('users')
+          .where('fcmToken', isEqualTo: token)
+          .limit(1)
+          .get();
+      for (final doc in staleQuery.docs) {
+        await doc.reference.update({
+          'fcmToken': FieldValue.delete(),
+          'fcmUpdatedAt': FieldValue.delete(),
+        });
+        debugPrint('Removed stale token for user: ${doc.id}');
+      }
+    } catch (e) {
+      debugPrint('Could not clean stale token: $e');
+    }
+  }
+
+  // ─── Send FCM to a list of target FCM tokens ─────────────────────────────
+  // Free notification delivery across ALL platforms:
+  // - Web to App
+  // - App to Web
+  // - App to App
+  // - Web to Web
   static Future<void> _sendFCMHttp({
     required List<String> tokens,
     required String title,
     required String body,
     required String senderUserId,
   }) async {
-    try {
-      final jsonString = await rootBundle.loadString('assets/service_account.json');
-      final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
-      final projectId = jsonMap['project_id'] as String;
-      final accessToken = await _getAccessToken();
-      final endpoint =
-          'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
+    if (tokens.isEmpty) return;
 
-      for (final token in tokens) {
-        final response = await http.post(
-          Uri.parse(endpoint),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $accessToken',
-          },
-          body: jsonEncode({
-            'message': {
-              'token': token,
-              'notification': {
-                'title': title,
-                'body': body,
-              },
-              'data': {
-                'senderUserId': senderUserId,
-              },
-              'android': {
-                'priority': 'high',
+    // 1. First, attempt delivery via Netlify free serverless proxy (125k/mo free)
+    try {
+      final netlifyUri = Uri.parse(_netlifyFunctionUrl);
+      final response = await http.post(
+        netlifyUri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'tokens': tokens,
+          'title': title,
+          'bodyText': body,
+          'senderUserId': senderUserId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('[FCMService] Sent notification via Netlify proxy to ${tokens.length} token(s)');
+        return;
+      } else {
+        debugPrint('[FCMService] Netlify function returned status ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('[FCMService] Netlify proxy unavailable/failed ($e) — checking native fallback');
+    }
+
+    // 2. Fallback for Native platforms (Android/iOS): Direct FCM HTTP v1 via Service Account
+    if (!kIsWeb) {
+      try {
+        final jsonString = await rootBundle.loadString('assets/service_account.json');
+        final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
+        final projectId = jsonMap['project_id'] as String?;
+        if (projectId == null || projectId.isEmpty) return;
+
+        final accessToken = await _getAccessToken();
+        final endpoint =
+            'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
+
+        for (final token in tokens) {
+          final response = await http.post(
+            Uri.parse(endpoint),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $accessToken',
+            },
+            body: jsonEncode({
+              'message': {
+                'token': token,
                 'notification': {
-                  'sound': 'default',
-                  'channel_id': 'unigrid_notifications',
+                  'title': title,
+                  'body': body,
                 },
-              },
-              'apns': {
-                'payload': {
-                  'aps': {
+                'data': {
+                  'senderUserId': senderUserId,
+                },
+                'android': {
+                  'priority': 'high',
+                  'notification': {
                     'sound': 'default',
+                    'channel_id': 'unigrid_notifications',
+                  },
+                },
+                'apns': {
+                  'payload': {
+                    'aps': {
+                      'sound': 'default',
+                    },
+                  },
+                },
+                'webpush': {
+                  'notification': {
+                    'title': title,
+                    'body': body,
+                    'icon': '/icons/Icon-192.png',
+                    'requireInteraction': false,
+                  },
+                  'fcm_options': {
+                    'link': '/',
                   },
                 },
               },
-            },
-          }),
-        );
-        if (response.statusCode == 200) {
-          debugPrint('FCM sent to token');
-        } else if (response.statusCode == 404) {
-          // Token is stale (user reinstalled app or cleared data) — clean it up
-          debugPrint('Stale FCM token detected, removing from Firestore...');
-          try {
-            final staleQuery = await _firestore
-                .collection('users')
-                .where('fcmToken', isEqualTo: token)
-                .limit(1)
-                .get();
-            for (final doc in staleQuery.docs) {
-              await doc.reference.update({
-                'fcmToken': FieldValue.delete(),
-                'fcmUpdatedAt': FieldValue.delete(),
-              });
-              debugPrint('Removed stale token for user: ${doc.id}');
-            }
-          } catch (e) {
-            debugPrint('Could not clean stale token: $e');
+            }),
+          );
+
+          if (response.statusCode == 200) {
+            debugPrint('FCM sent directly to token: ${token.substring(0, 15)}...');
+          } else if (response.statusCode == 404) {
+            debugPrint('Stale FCM token detected, removing from Firestore...');
+            await _removeStaleToken(token);
+          } else {
+            debugPrint('FCM direct failed: ${response.statusCode} ${response.body}');
           }
-        } else {
-          debugPrint('FCM failed: ${response.statusCode} ${response.body}');
         }
+      } catch (e) {
+        debugPrint('Error sending FCM direct native: $e');
       }
-    } catch (e) {
-      debugPrint('Error sending FCM: $e');
     }
   }
 
@@ -309,7 +431,6 @@ class FCMService {
     required String body,
     required String senderUserId,
   }) async {
-    if (kIsWeb) return;
     try {
       final recipientDoc =
           await _firestore.collection('users').doc(recipientId).get();
@@ -330,6 +451,9 @@ class FCMService {
     }
   }
 
+  // On web: Cloud Functions `onNewMessage`, `onNewAnnouncement`, `onNewMaterial`
+  // handle delivery via Firestore triggers — no client-side send needed.
+  // On native: sends directly via FCM HTTP v1 API.
   static Future<void> sendToDeptAndBatch({
     required String department,
     required String batch,
@@ -338,9 +462,10 @@ class FCMService {
     required String senderUserId,
     bool adminsOnly = false,
   }) async {
-    if (kIsWeb) return;
     try {
-      final currentToken = await _messaging.getToken();
+      final currentToken = kIsWeb
+          ? await _messaging.getToken(vapidKey: _webVapidKey)
+          : await _messaging.getToken();
       final usersSnap = await _firestore
           .collection('users')
           .where('department', isEqualTo: department)
@@ -380,6 +505,7 @@ class FCMService {
   }
 
   // ─── Shortcut Helpers ─────────────────────────────────────────────────────
+  // These helpers work on both web and native — they use Firestore + HTTP v1.
   static Future<void> notifyNewMessage({
     required String senderName,
     required String text,
@@ -387,7 +513,6 @@ class FCMService {
     required String department,
     required String batch,
   }) async {
-    if (kIsWeb) return;
     final preview = text.length > 80 ? '${text.substring(0, 80)}...' : text;
     await sendToDeptAndBatch(
       department: department,
@@ -405,7 +530,6 @@ class FCMService {
     required String department,
     required String batch,
   }) async {
-    if (kIsWeb) return;
     await sendToDeptAndBatch(
       department: department,
       batch: batch,
@@ -422,7 +546,6 @@ class FCMService {
     required String department,
     required String batch,
   }) async {
-    if (kIsWeb) return;
     await sendToDeptAndBatch(
       department: department,
       batch: batch,

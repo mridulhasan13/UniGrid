@@ -49,6 +49,19 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId) {
           },
         },
       },
+      // Required for web push tokens — without this block FCM silently
+      // drops the message for browser (PWA / Flutter Web) endpoints.
+      webpush: {
+        notification: {
+          title: title,
+          body: body,
+          icon: "/icons/Icon-192.png",
+          requireInteraction: false,
+        },
+        fcmOptions: {
+          link: "/",
+        },
+      },
     });
 
     console.log(`Successfully sent ${tokens.length} messages (successCount: ${response.successCount})`);
@@ -163,6 +176,18 @@ exports.onNewPrivateMessage = functions.firestore
               aps: {
                 sound: "default",
               },
+            },
+          },
+          // Required for web push tokens.
+          webpush: {
+            notification: {
+              title: senderName,
+              body: body,
+              icon: "/icons/Icon-192.png",
+              requireInteraction: false,
+            },
+            fcmOptions: {
+              link: "/",
             },
           },
         };

@@ -32,7 +32,17 @@ class AuthService {
     _initSession();
     _auth.authStateChanges().listen((User? firebaseUser) {
       if (firebaseUser != null) {
-        FCMService.saveTokenForUser(firebaseUser.uid);
+        // On web: initialize FCM first (requests browser permission) then save
+        // the token. On native: init already ran in main.dart, just save.
+        if (kIsWeb) {
+          FCMService.initialize().then((_) {
+            FCMService.saveTokenForUser(firebaseUser.uid);
+          }).catchError((e) {
+            debugPrint('[AuthService] FCM web init error: $e');
+          });
+        } else {
+          FCMService.saveTokenForUser(firebaseUser.uid);
+        }
         ThemeService.instance.initGlobalThemeListener();
         _initRootAdminListener();
       } else {

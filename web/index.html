@@ -91,11 +91,11 @@
   <title>UniGrid</title>
   <link rel="manifest" href="manifest.json">
 
+
   <script>
     // The value below is injected by flutter build, do not touch.
     const serviceWorkerVersion = null;
   </script>
-  <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer></script>
 
   <!-- PDF.js library for syncfusion_flutter_pdfviewer web support (deferred to prevent blocking initial load) -->
@@ -290,7 +290,11 @@
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for (var i = 0; i < registrations.length; i++) {
-            registrations[i].unregister();
+            // Only unregister Flutter's SW — preserve firebase-messaging-sw.js
+            var swUrl = registrations[i].active?.scriptURL || registrations[i].installing?.scriptURL || '';
+            if (swUrl.includes('flutter_service_worker')) {
+              registrations[i].unregister();
+            }
           }
         });
       }
@@ -356,13 +360,25 @@
     });
 
     window.addEventListener('load', function(ev) {
-      // Unregister any legacy service workers on startup to ensure fresh loading
+      // Unregister only Flutter's own service worker (flutter_service_worker.js)
+      // to ensure fresh loading. We deliberately PRESERVE firebase-messaging-sw.js
+      // so that FCM web push notifications continue to work in the background.
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for (var i = 0; i < registrations.length; i++) {
-            registrations[i].unregister();
+            var swUrl = registrations[i].active?.scriptURL || registrations[i].installing?.scriptURL || '';
+            if (swUrl.includes('flutter_service_worker')) {
+              registrations[i].unregister();
+            }
           }
         });
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          .then(function(reg) {
+            console.log('[UniGrid] FCM Service Worker registered with scope:', reg.scope);
+          })
+          .catch(function(err) {
+            console.warn('[UniGrid] FCM Service Worker registration notice:', err);
+          });
       }
 
       _flutter.loader.loadEntrypoint({

@@ -6,6 +6,7 @@
   # Leaving command empty stops Netlify from running any build scripts.
   command = "mkdir -p build/web && echo '<html><body>Deploying...</body></html>' > build/web/index.html"
   publish = "build/web"
+  functions = "netlify/functions"
 
 # Direct URL rewrites for Single Page App (SPA) routing.
 # This prevents 404 errors when reloading pages or navigating directly to routes.

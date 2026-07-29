@@ -40,7 +40,13 @@ class GlassCard extends StatelessWidget {
             ),
             boxShadow: AppStyles.emeraldGlow,
           ),
-          child: child,
+          // Wrap in transparent Material so ListTile (and other ink-based widgets)
+          // can paint their splash/highlight effects correctly, instead of being
+          // hidden by this Container's BoxDecoration background.
+          child: Material(
+            color: Colors.transparent,
+            child: child,
+          ),
         ),
         // Layer 2: subtle shimmer gradient overlay on top (purely decorative, does not affect opacity)
         Positioned.fill(
