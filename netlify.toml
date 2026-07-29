@@ -2,9 +2,6 @@
 # https://docs.netlify.com/configure-builds/file-based-configuration/
 
 [build]
-  # Build is handled by GitHub Actions — Netlify should NOT build on its own.
-  # Leaving command empty stops Netlify from running any build scripts.
-  command = "mkdir -p build/web && echo '<html><body>Deploying...</body></html>' > build/web/index.html"
   publish = "build/web"
   functions = "netlify/functions"
 
