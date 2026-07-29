@@ -7,10 +7,23 @@ const admin = require("firebase-admin");
 
 let initialized = false;
 function ensureInit() {
-  if (initialized) return;
+  if (admin.apps.length > 0) {
+    initialized = true;
+    return;
+  }
   const raw = process.env.SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("SERVICE_ACCOUNT_JSON environment variable not set in Netlify");
-  const serviceAccount = JSON.parse(raw);
+  let serviceAccount;
+  try {
+    serviceAccount = typeof raw === "object" ? raw : JSON.parse(raw);
+  } catch (e) {
+    throw new Error("Invalid SERVICE_ACCOUNT_JSON format: " + e.message);
+  }
+
+  if (serviceAccount.private_key) {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+  }
+
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
   initialized = true;
 }
