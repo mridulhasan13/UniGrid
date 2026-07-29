@@ -2,6 +2,7 @@
 # https://docs.netlify.com/configure-builds/file-based-configuration/
 
 [build]
+  command = "bash netlify_build.sh"
   publish = "build/web"
   functions = "netlify/functions"
 
