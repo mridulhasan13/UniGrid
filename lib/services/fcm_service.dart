@@ -318,15 +318,16 @@ class FCMService {
     try {
       final staleQuery = await _firestore
           .collection('users')
-          .where('fcmToken', isEqualTo: token)
-          .limit(1)
+          .where('fcmTokens', arrayContains: token)
           .get();
       for (final doc in staleQuery.docs) {
         await doc.reference.update({
-          'fcmToken': FieldValue.delete(),
-          'fcmUpdatedAt': FieldValue.delete(),
+          'fcmTokens': FieldValue.arrayRemove([token]),
         });
-        debugPrint('Removed stale token for user: ${doc.id}');
+        if (doc.data()['fcmToken'] == token) {
+          await doc.reference.update({'fcmToken': FieldValue.delete()});
+        }
+        debugPrint('Removed dead FCM token from user: ${doc.id}');
       }
     } catch (e) {
       debugPrint('Could not clean stale token: $e');
@@ -347,6 +348,18 @@ class FCMService {
   }) async {
     if (tokens.isEmpty) return;
 
+    // Deduplicate tokens set & remove current user device token
+    final currentToken = kIsWeb
+        ? await _messaging.getToken(vapidKey: _webVapidKey)
+        : await _messaging.getToken();
+    final Set<String> targetTokens = tokens.toSet();
+    if (currentToken != null) {
+      targetTokens.remove(currentToken);
+    }
+    if (targetTokens.isEmpty) return;
+
+    final List<String> finalTokens = targetTokens.toList();
+
     // 1. First, attempt delivery via Netlify free serverless proxy (125k/mo free)
     try {
       final netlifyUri = Uri.parse(_netlifyFunctionUrl);
@@ -354,7 +367,7 @@ class FCMService {
         netlifyUri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'tokens': tokens,
+          'tokens': finalTokens,
           'title': title,
           'bodyText': body,
           'senderUserId': senderUserId,
@@ -362,7 +375,7 @@ class FCMService {
       );
 
       if (response.statusCode == 200) {
-        debugPrint('[FCMService] Sent notification via Netlify proxy to ${tokens.length} token(s)');
+        debugPrint('[FCMService] Sent notification via Netlify proxy to ${finalTokens.length} unique token(s)');
         return;
       } else {
         debugPrint('[FCMService] Netlify function returned status ${response.statusCode}: ${response.body}');

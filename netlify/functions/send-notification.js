@@ -92,6 +92,38 @@ exports.handler = async (event) => {
     const result = await admin.messaging().sendEachForMulticast(message);
     console.log(`FCM Multicast sent ${result.successCount}/${tokens.length}`);
 
+    // Clean up any dead/stale tokens from Firestore asynchronously
+    if (result.responses) {
+      const db = admin.firestore();
+      result.responses.forEach(async (resp, i) => {
+        if (!resp.success) {
+          const code = resp.error?.code;
+          if (
+            code === "messaging/registration-token-not-registered" ||
+            code === "messaging/invalid-registration-token"
+          ) {
+            const deadToken = tokens[i];
+            console.log(`Cleaning dead FCM token from Firestore: ${deadToken}`);
+            try {
+              const snap = await db.collection("users")
+                  .where("fcmTokens", "array-contains", deadToken)
+                  .get();
+              snap.forEach(async (doc) => {
+                await doc.ref.update({
+                  fcmTokens: admin.firestore.FieldValue.arrayRemove(deadToken),
+                });
+                if (doc.data().fcmToken === deadToken) {
+                  await doc.ref.update({ fcmToken: admin.firestore.FieldValue.delete() });
+                }
+              });
+            } catch (cleanErr) {
+              console.error(`Error cleaning dead token:`, cleanErr);
+            }
+          }
+        }
+      });
+    }
+
     return {
       statusCode: 200,
       headers: { ...CORS, "Content-Type": "application/json" },
