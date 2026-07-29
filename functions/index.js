@@ -13,14 +13,16 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId) {
         .where("batch", "==", batch)
         .get();
 
-    const tokens = [];
+    const tokensSet = new Set();
     usersSnap.forEach((doc) => {
+      if (doc.id === senderUserId) return;
       const data = doc.data();
-      // Exclude sender and ensure token exists
-      if (doc.id !== senderUserId && data.fcmToken) {
-        tokens.push(data.fcmToken);
+      if (Array.isArray(data.fcmTokens)) {
+        data.fcmTokens.forEach((t) => { if (t) tokensSet.add(t); });
       }
+      if (data.fcmToken) tokensSet.add(data.fcmToken);
     });
+    const tokens = Array.from(tokensSet);
 
     if (tokens.length === 0) {
       console.log(`No tokens found to notify in department: ${dept}, batch: ${batch}`);
@@ -150,14 +152,20 @@ exports.onNewPrivateMessage = functions.firestore
         if (!recipientSnap.exists) return null;
 
         const recipientData = recipientSnap.data();
-        const token = recipientData.fcmToken;
-        if (!token) {
-          console.log(`No FCM token found for recipient: ${recipientId}`);
+        const tokensSet = new Set();
+        if (Array.isArray(recipientData.fcmTokens)) {
+          recipientData.fcmTokens.forEach((t) => { if (t) tokensSet.add(t); });
+        }
+        if (recipientData.fcmToken) tokensSet.add(recipientData.fcmToken);
+        const tokens = Array.from(tokensSet);
+
+        if (tokens.length === 0) {
+          console.log(`No FCM tokens found for recipient: ${recipientId}`);
           return null;
         }
 
-        const message = {
-          token: token,
+        const response = await admin.messaging().sendEachForMulticast({
+          tokens: tokens,
           notification: {
             title: senderName,
             body: body,
@@ -178,7 +186,6 @@ exports.onNewPrivateMessage = functions.firestore
               },
             },
           },
-          // Required for web push tokens.
           webpush: {
             notification: {
               title: senderName,
@@ -190,9 +197,8 @@ exports.onNewPrivateMessage = functions.firestore
               link: "/",
             },
           },
-        };
-
-        const response = await admin.messaging().send(message);
+        });
+        console.log(`Successfully sent private message notification to ${tokens.length} tokens:`, response);
         console.log(`Successfully sent private message notification:`, response);
       } catch (error) {
         console.error("Error sending private message notification:", error);

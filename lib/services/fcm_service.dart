@@ -64,7 +64,11 @@ class FCMService {
         if (user != null) {
           try {
             await _firestore.collection('users').doc(user.uid).set(
-              {'fcmToken': newToken, 'fcmUpdatedAt': FieldValue.serverTimestamp()},
+              {
+                'fcmToken': newToken,
+                'fcmTokens': FieldValue.arrayUnion([newToken]),
+                'fcmUpdatedAt': FieldValue.serverTimestamp(),
+              },
               SetOptions(merge: true),
             );
             debugPrint('FCM web token refreshed for user: ${user.uid}');
@@ -101,7 +105,11 @@ class FCMService {
       if (currentUser != null) {
         try {
           await _firestore.collection('users').doc(currentUser.uid).set(
-            {'fcmToken': newToken, 'fcmUpdatedAt': FieldValue.serverTimestamp()},
+            {
+              'fcmToken': newToken,
+              'fcmTokens': FieldValue.arrayUnion([newToken]),
+              'fcmUpdatedAt': FieldValue.serverTimestamp(),
+            },
             SetOptions(merge: true),
           );
           debugPrint('FCM token refreshed and saved for user: ${currentUser.uid}');
@@ -268,7 +276,11 @@ class FCMService {
         return;
       }
       await _firestore.collection('users').doc(userId).set(
-        {'fcmToken': token, 'fcmUpdatedAt': FieldValue.serverTimestamp()},
+        {
+          'fcmToken': token,
+          'fcmTokens': FieldValue.arrayUnion([token]),
+          'fcmUpdatedAt': FieldValue.serverTimestamp(),
+        },
         SetOptions(merge: true),
       );
       print('\n====================================================');
@@ -443,13 +455,25 @@ class FCMService {
       final recipientDoc =
           await _firestore.collection('users').doc(recipientId).get();
       if (!recipientDoc.exists) return;
-      final token = recipientDoc.data()?['fcmToken'] as String?;
-      if (token == null || token.isEmpty) {
-        debugPrint('No FCM token for recipient: $recipientId');
+      final data = recipientDoc.data();
+      if (data == null) return;
+
+      final Set<String> tokens = {};
+      if (data['fcmTokens'] is List) {
+        for (final t in data['fcmTokens']) {
+          if (t is String && t.isNotEmpty) tokens.add(t);
+        }
+      }
+      if (tokens.isEmpty && data['fcmToken'] is String && (data['fcmToken'] as String).isNotEmpty) {
+        tokens.add(data['fcmToken'] as String);
+      }
+
+      if (tokens.isEmpty) {
+        debugPrint('No FCM tokens for recipient: $recipientId');
         return;
       }
       await _sendFCMHttp(
-        tokens: [token],
+        tokens: tokens.toList(),
         title: title,
         body: body,
         senderUserId: senderUserId,
@@ -459,9 +483,6 @@ class FCMService {
     }
   }
 
-  // On web: Cloud Functions `onNewMessage`, `onNewAnnouncement`, `onNewMaterial`
-  // handle delivery via Firestore triggers — no client-side send needed.
-  // On native: sends directly via FCM HTTP v1 API.
   static Future<void> sendToDeptAndBatch({
     required String department,
     required String batch,
@@ -480,20 +501,28 @@ class FCMService {
           .where('batch', isEqualTo: batch)
           .get();
 
-      final tokens = usersSnap.docs
-          .where((doc) => doc.id != senderUserId)
-          .where((doc) {
-            if (!adminsOnly) return true;
-            final data = doc.data();
-            final isCR = data['isCR'] == true;
-            final isAdmin = data['isAdmin'] == true;
-            return isCR || isAdmin;
-          })
-          .map((doc) => doc.data()['fcmToken'] as String?)
-          .whereType<String>()
-          .where((t) => t.isNotEmpty && t != currentToken)
-          .toSet()
-          .toList();
+      final Set<String> tokens = {};
+      for (final doc in usersSnap.docs) {
+        if (doc.id == senderUserId) continue;
+        final data = doc.data();
+        if (adminsOnly) {
+          final isCR = data['isCR'] == true;
+          final isAdmin = data['isAdmin'] == true;
+          if (!isCR && !isAdmin) continue;
+        }
+
+        if (data['fcmTokens'] is List) {
+          for (final t in data['fcmTokens']) {
+            if (t is String && t.isNotEmpty && t != currentToken) {
+              tokens.add(t);
+            }
+          }
+        }
+        if (data['fcmToken'] is String && (data['fcmToken'] as String).isNotEmpty) {
+          final t = data['fcmToken'] as String;
+          if (t != currentToken) tokens.add(t);
+        }
+      }
 
       if (tokens.isEmpty) {
         debugPrint('No tokens to notify for $department - $batch');
@@ -501,12 +530,12 @@ class FCMService {
       }
 
       await _sendFCMHttp(
-        tokens: tokens,
+        tokens: tokens.toList(),
         title: title,
         body: body,
         senderUserId: senderUserId,
       );
-      debugPrint('Notified ${tokens.length} users in $department - $batch');
+      debugPrint('Notified ${tokens.length} target tokens in $department - $batch');
     } catch (e) {
       debugPrint('sendToDeptAndBatch error: $e');
     }
