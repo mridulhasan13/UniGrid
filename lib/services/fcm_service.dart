@@ -193,8 +193,9 @@ class FCMService {
 
   // ─── Show local notification from FCM remote message ─────────────────────
   static Future<void> _showNotificationFromRemote(RemoteMessage message) async {
-    final notification = message.notification;
-    if (notification == null) return;
+    final title = message.notification?.title ?? message.data['title'] ?? 'UniGrid';
+    final body = message.notification?.body ?? message.data['body'] ?? '';
+    if (title.isEmpty && body.isEmpty) return;
 
     // Block self-notifications
     final currentUid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
@@ -202,9 +203,9 @@ class FCMService {
     if (senderUserId.isNotEmpty && senderUserId == currentUid) return;
 
     await _localNotifications.show(
-      notification.hashCode,
-      notification.title,
-      notification.body,
+      message.hashCode,
+      title,
+      body,
       NotificationDetails(
         android: AndroidNotificationDetails(
           'unigrid_notifications',
@@ -212,11 +213,11 @@ class FCMService {
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
-          ticker: notification.body,
+          ticker: body,
           subText: 'UniGrid',
           styleInformation: BigTextStyleInformation(
-            notification.body ?? '',
-            contentTitle: notification.title,
+            body,
+            contentTitle: title,
           ),
         ),
       ),
@@ -224,8 +225,8 @@ class FCMService {
 
     // Show floating in-app glassmorphic notification banner
     InAppNotification.showGlobal(
-      title: notification.title ?? 'Notification',
-      message: notification.body ?? '',
+      title: title,
+      message: body,
       icon: Icons.notifications_active_rounded,
     );
   }
