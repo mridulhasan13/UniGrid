@@ -1072,6 +1072,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
         senderUserId: userId,
         department: user.department,
         batch: user.batch,
+        messageId: docRef.id,
       );
 
       if (mounted) {

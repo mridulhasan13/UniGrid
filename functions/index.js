@@ -87,10 +87,11 @@ exports.onNewAnnouncement = functions.firestore
     .onCreate(async (snap, context) => {
       const data = snap.data();
       const { dept, batch, announcementId } = context.params;
+      const id = data.id || announcementId;
       const title = `📢 New ${data.type || "Announcement"}`;
       const body = data.title || "A new announcement has been posted.";
       const senderUserId = data.postedByUserId || "";
-      await notifyScopedUsers(dept, batch, title, body, senderUserId, announcementId);
+      await notifyScopedUsers(dept, batch, title, body, senderUserId, id);
     });
 
 // ─────────────────────────────────────────────
@@ -101,11 +102,12 @@ exports.onNewMaterial = functions.firestore
     .onCreate(async (snap, context) => {
       const data = snap.data();
       const { dept, batch, materialId } = context.params;
+      const id = data.id || materialId;
       const type = data.type || "Material";
       const title = `📚 New ${type} Uploaded`;
       const body = `${data.title || "A new file"} has been added to ${data.subject || "your subjects"}.`;
       const senderUserId = data.uploadedByUserId || "";
-      await notifyScopedUsers(dept, batch, title, body, senderUserId, materialId);
+      await notifyScopedUsers(dept, batch, title, body, senderUserId, id);
     });
 
 // ─────────────────────────────────────────────
@@ -116,6 +118,7 @@ exports.onNewMessage = functions.firestore
     .onCreate(async (snap, context) => {
       const data = snap.data();
       const { dept, batch, messageId } = context.params;
+      const id = data.id || messageId;
 
       // Don't notify for image-only messages or system messages
       if (!data.text && !data.content) return null;
@@ -127,7 +130,7 @@ exports.onNewMessage = functions.firestore
       const body = text.length > 80 ? text.substring(0, 80) + "..." : text;
       const senderUserId = data.authorId || "";
 
-      await notifyScopedUsers(dept, batch, title, body, senderUserId, messageId);
+      await notifyScopedUsers(dept, batch, title, body, senderUserId, id);
     });
 
 // ─────────────────────────────────────────────
@@ -138,7 +141,8 @@ exports.onNewPrivateMessage = functions.firestore
     .onCreate(async (snap, context) => {
       const data = snap.data();
       const { conversationId, messageId } = context.params;
-      const notificationTag = messageId || "unigrid-notification";
+      const id = data.id || messageId;
+      const notificationTag = id || "unigrid-notification";
 
       // Don't notify if message text is missing
       if (!data.text && !data.uri) return null;
