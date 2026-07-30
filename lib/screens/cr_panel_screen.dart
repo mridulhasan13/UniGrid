@@ -301,6 +301,15 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
         if (details.isNotEmpty) 'details': details,
       });
 
+      FCMService.notifyNewAnnouncement(
+        title: title,
+        type: type,
+        senderUserId: userId,
+        department: department,
+        batch: batch,
+        messageId: docRef.id,
+      );
+
 
 
       if (mounted) {

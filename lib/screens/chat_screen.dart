@@ -18,6 +18,7 @@ import '../services/theme_service.dart';
 import '../utils/constants.dart';
 import '../services/auth_service.dart';
 
+import '../services/fcm_service.dart';
 import '../utils/dept_scope.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../widgets/in_app_notification.dart';
@@ -840,6 +841,14 @@ class _ChatScreenState extends State<ChatScreen> {
           }
 
           await _firestore.collection(_chatPath).add(msgData);
+          FCMService.notifyNewMessage(
+            senderName: senderName,
+            text: i == 0 && captionText.isNotEmpty ? captionText : 'Sent an image',
+            senderUserId: user.id,
+            department: user.department,
+            batch: user.batch,
+            messageId: msgData['id'] as String?,
+          );
 
         }
       } catch (e) {
@@ -892,6 +901,14 @@ class _ChatScreenState extends State<ChatScreen> {
       _isSending = false;
     });
     _firestore.collection(_chatPath).add(msgData);
+    FCMService.notifyNewMessage(
+      senderName: senderName,
+      text: text,
+      senderUserId: user.id,
+      department: user.department,
+      batch: user.batch,
+      messageId: msgData['id'] as String?,
+    );
 
   }
 

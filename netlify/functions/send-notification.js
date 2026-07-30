@@ -24,7 +24,9 @@ const CORS = {
 // FCM Web tokens start with a very long base64url string (152+ chars).
 // Native tokens are shorter.  Most reliable check is length (web tokens ≥ 140).
 function isWebToken(token) {
-  return token.length >= 140;
+  // Native Android/iOS FCM tokens contain the signature ':APA91b'.
+  // Web Push VAPID tokens do not contain this signature.
+  return !token.includes(':APA91b');
 }
 
 // ─── Base64Url Helper ────────────────────────────────────────────────────────
