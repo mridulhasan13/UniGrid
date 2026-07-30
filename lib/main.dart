@@ -15,6 +15,7 @@ import 'screens/main_screen.dart';
 import 'screens/pending_approval_screen.dart';
 import 'utils/constants.dart';
 import 'services/fcm_service.dart';
+import 'notifications/notification_coordinator.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'widgets/network_aware_wrapper.dart';
@@ -47,6 +48,8 @@ void main() async {
     debugPrint('Failed to initialize FCM: $e');
   });
 
+  // Initialize 4-path notification system (web→web, web→app, app→web, app→app)
+  await NotificationCoordinator.init();
 
   // Load theme settings dynamically before app start
   await ThemeService.instance.init();
