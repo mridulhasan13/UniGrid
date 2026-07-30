@@ -1,17 +1,15 @@
 // UniGrid — Firebase Cloud Messaging Service Worker
 // Served at /firebase-messaging-sw.js
 //
-// ─── How Firebase compat messaging works in a SW ────────────────────────────
+// ─── Firebase compat messaging SW behavior (v10.x) ──────────────────────────
 // • `onBackgroundMessage` fires for ALL background messages (notification + data).
-// • When the FCM payload has `notification` (top-level OR webpush.notification),
-//   Firebase compat SDK auto-shows the notification BEFORE calling our handler.
-//   → We must NOT call showNotification again to avoid a double popup.
-// • When the payload is data-only (no `notification`), Firebase compat does NOT
-//   auto-show — our handler MUST call showNotification itself.
-//
-// Cloud Functions send: top-level `notification` + `data` + `webpush.notification`
-// → Firebase compat auto-shows from webpush.notification → we skip manual show.
-// → Our handler only needs to run for edge-case data-only messages.
+// • When `onBackgroundMessage` IS registered, Firebase compat does NOT auto-show
+//   the notification — it calls our handler and expects us to show it.
+// • We ALWAYS call showNotification here.
+// • To guard against any future SDK version that might auto-show AND call the
+//   handler, we set `tag` on every notification. The browser deduplates by tag:
+//   a second notification with the same tag simply replaces the first, so the
+//   user still sees exactly ONE notification regardless.
 
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
@@ -28,25 +26,39 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // ─── Background message handler ───────────────────────────────────────────────
-// Fires for ALL background messages — notification and data-only alike.
+// Fires for ALL background messages.
+// We ALWAYS show the notification here — Firebase compat does NOT auto-show
+// when this handler is registered. The `tag` field prevents any duplicates.
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message received:', JSON.stringify(payload));
 
-  // If the payload already has a `notification` field, the Firebase compat SDK
-  // auto-displayed it already. Don't show again → prevent double popup.
-  if (payload.notification) {
-    console.log('[SW] Notification field present — auto-shown by Firebase compat SDK, skipping manual show.');
+  // Prefer data fields (sent by Cloud Functions); fall back to notification fields.
+  const title = (payload.data && payload.data.title)
+      ? payload.data.title
+      : (payload.notification && payload.notification.title)
+          ? payload.notification.title
+          : 'UniGrid';
+
+  const body = (payload.data && payload.data.body)
+      ? payload.data.body
+      : (payload.notification && payload.notification.body)
+          ? payload.notification.body
+          : '';
+
+  // Use messageId as tag so the browser deduplicates — same message = same tag
+  // = replaces any existing notification with the same tag (1 popup max).
+  const tag = (payload.data && payload.data.messageId)
+      ? payload.data.messageId
+      : (payload.notification && payload.notification.tag)
+          ? payload.notification.tag
+          : 'unigrid-msg';
+
+  if (!title && !body) {
+    console.log('[SW] Empty title and body — skipping notification.');
     return;
   }
 
-  // Data-only message → we must show the notification manually.
-  const title = (payload.data && payload.data.title) ? payload.data.title : 'UniGrid';
-  const body  = (payload.data && payload.data.body)  ? payload.data.body  : '';
-  const tag   = (payload.data && payload.data.messageId) ? payload.data.messageId : 'unigrid-msg';
-
-  if (!title && !body) return;
-
-  console.log('[SW] Data-only message — showing notification manually.');
+  console.log('[SW] Showing notification:', title, body);
   return self.registration.showNotification(title, {
     body: body,
     icon: '/icons/Icon-192.png',
