@@ -36,9 +36,31 @@ class _DeptSetupGuardState extends State<DeptSetupGuard> {
     final isRootAdmin =
         user != null && (user.isAdmin || authService.isRootAdmin(user.email));
 
-    // If no user, account is approved, user has department & batch set up, OR is root admin/admin, proceed straight to child
+    // Pass through immediately if:
+    // • No Firebase user at all (logged out) — user == null
+    // • Account is approved — isApproved == true
+    // • Dept + batch already set — hasDeptScope == true
+    // • Root admin or admin
     if (user == null || user.isApproved || user.hasDeptScope || isRootAdmin) {
       return widget.child;
+    }
+
+    // If Firebase Auth has a session but the Firestore document is still
+    // loading (or hasn't synced yet from cache), show a loading indicator
+    // instead of the profile form. This prevents the form from flashing
+    // on reload/re-entry for accounts that were already approved.
+    final firebaseUser = authService.currentFirebaseUser;
+    if (firebaseUser != null) {
+      // Firestore doc is being fetched — wait silently
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Container(
+          decoration: BoxDecoration(gradient: AppGradients.mainBackground),
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
     }
 
     return Scaffold(

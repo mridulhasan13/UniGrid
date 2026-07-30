@@ -110,6 +110,10 @@ class AuthService {
     });
   }
 
+  /// The current Firebase Auth user (raw) — non-null means a session exists
+  /// even if the Firestore AppUser hasn't loaded yet.
+  User? get currentFirebaseUser => _auth.currentUser;
+
   void _startFirestoreListener(String? uid, String? email,
       {String? displayName, String? photoUrl}) {
     _userSubscription?.cancel();
