@@ -347,16 +347,20 @@
       }
     });
 
-    // --- 12-second load timeout fallback ---
+    // --- Automatic silent background load timeout (10s) & recovery ---
     var _loadTimeout = setTimeout(function() {
-      _showRetry('Network timeout. Clearing cache and reloading...');
-    }, 12000);
+      if (_retryCount < 3) {
+        _clearCachesAndReload();
+      }
+    }, 10000);
 
-    // --- Global JS error handler ---
+    // --- Global JS error handler (silent background recovery) ---
     window.addEventListener('error', function(e) {
       console.error('UniGrid load error:', e.message);
       clearTimeout(_loadTimeout);
-      _showRetry('Load error encountered. Recovering automatically...');
+      if (_retryCount < 3) {
+        _clearCachesAndReload();
+      }
     });
 
     window.addEventListener('load', function(ev) {
