@@ -365,7 +365,9 @@ class FCMService {
 
     final Set<String> targetTokens = tokens.toSet();
     final String? selfToken = currentToken ?? _cachedToken;
-    if (selfToken != null && selfToken.isNotEmpty) {
+    // Only filter out self-token if there are multiple tokens present.
+    // If there is only 1 token (e.g. self-testing or single device), allow delivery.
+    if (targetTokens.length > 1 && selfToken != null && selfToken.isNotEmpty) {
       targetTokens.remove(selfToken);
     }
     if (targetTokens.isEmpty) return;
