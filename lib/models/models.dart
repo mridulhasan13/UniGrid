@@ -49,9 +49,6 @@ class AppUser {
         ca = DateTime.tryParse(data['createdAt'] as String);
       }
     }
-    final rawDept = (data['department'] as String?)?.trim() ?? '';
-    final rawBatch = (data['batch'] as String?)?.trim() ?? '';
-
     return AppUser(
       id: documentId,
       email: data['email'] ?? '',
@@ -60,8 +57,8 @@ class AppUser {
       isApproved: data['isApproved'] ?? false,
       name: data['name'] ?? '',
       studentId: data['studentId'] ?? '',
-      batch: rawBatch.isNotEmpty ? rawBatch : '51',
-      department: rawDept.isNotEmpty ? rawDept : 'IPE',
+      batch: data['batch'] ?? '',
+      department: data['department'] ?? '',
       phoneNumber: data['phoneNumber'] ?? '',
       photoUrl: data['photoUrl'] ?? '',
       schoolName: data['schoolName'] ?? '',

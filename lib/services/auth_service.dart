@@ -190,6 +190,19 @@ class AuthService {
               if (currentDept.isEmpty) data['department'] = 'IPE';
               if (currentBatch.isEmpty) data['batch'] = '51';
             }
+          } else if (data['isApproved'] == true) {
+            // Guarantee fallback scope for approved users if department/batch was empty
+            if (currentDept.isEmpty || currentBatch.isEmpty) {
+              final Map<String, dynamic> scopeUpdates = {};
+              if (currentDept.isEmpty) scopeUpdates['department'] = 'IPE';
+              if (currentBatch.isEmpty) scopeUpdates['batch'] = '51';
+              _firestore.collection('users').doc(uid).set(
+                scopeUpdates,
+                SetOptions(merge: true),
+              );
+              if (currentDept.isEmpty) data['department'] = 'IPE';
+              if (currentBatch.isEmpty) data['batch'] = '51';
+            }
           }
 
           final appUser = AppUser.fromMap(data, doc.id);
