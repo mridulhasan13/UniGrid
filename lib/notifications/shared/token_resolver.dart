@@ -4,40 +4,38 @@ import 'package:flutter/foundation.dart' show debugPrint;
 /// ─────────────────────────────────────────────────────────────────────────────
 /// TokenResolver
 ///
-/// Reads FCM tokens from Firestore and splits them into:
-///   • Web tokens   — browser Push subscriptions (no ':APA91b' in string)
-///   • Native tokens — Android / iOS FCM registrations (contain ':APA91b')
+/// Reads categorized FCM tokens from Firestore:
+///   • `webTokens`   — explicit array saved when a Web user logs in
+///   • `nativeTokens` — explicit array saved when an Android/iOS user logs in
 ///
-/// This mirrors the same detection logic used in the Netlify function
-/// `netlify/functions/send-notification.js → isWebToken()`.
+/// Falls back to `fcmTokens` if explicit category fields are empty.
 /// ─────────────────────────────────────────────────────────────────────────────
 class TokenResolver {
   TokenResolver._();
 
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // ─── Token classification ──────────────────────────────────────────────────
-  static bool isWebToken(String token) => !token.contains(':APA91b');
-  static bool isNativeToken(String token) => token.contains(':APA91b');
-
   // ─── Per-user lookups ──────────────────────────────────────────────────────
 
   /// All web (browser) tokens for a single user.
   static Future<List<String>> getWebTokensForUser(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
-    return _extract(doc.data(), isWebToken);
+    return _extractCategory(doc.data(), 'webTokens');
   }
 
   /// All native (Android/iOS) tokens for a single user.
   static Future<List<String>> getNativeTokensForUser(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
-    return _extract(doc.data(), isNativeToken);
+    return _extractCategory(doc.data(), 'nativeTokens');
   }
 
   /// All tokens (web + native) for a single user.
   static Future<List<String>> getAllTokensForUser(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
-    return _extract(doc.data(), (_) => true);
+    final Set<String> all = {};
+    all.addAll(_extractCategory(doc.data(), 'webTokens'));
+    all.addAll(_extractCategory(doc.data(), 'nativeTokens'));
+    return all.toList();
   }
 
   // ─── Dept + Batch group lookups ───────────────────────────────────────────
@@ -54,7 +52,7 @@ class TokenResolver {
       batch: batch,
       adminsOnly: adminsOnly,
       excludeUserId: excludeUserId,
-      filter: isWebToken,
+      categoryField: 'webTokens',
     );
   }
 
@@ -70,27 +68,37 @@ class TokenResolver {
       batch: batch,
       adminsOnly: adminsOnly,
       excludeUserId: excludeUserId,
-      filter: isNativeToken,
+      categoryField: 'nativeTokens',
     );
   }
 
   // ─── Internals ────────────────────────────────────────────────────────────
 
-  static List<String> _extract(
+  static List<String> _extractCategory(
     Map<String, dynamic>? data,
-    bool Function(String) filter,
+    String categoryField,
   ) {
     if (data == null) return [];
     final Set<String> tokens = {};
 
-    if (data['fcmTokens'] is List) {
-      for (final t in data['fcmTokens'] as List) {
-        if (t is String && t.isNotEmpty && filter(t)) tokens.add(t);
+    // 1. Primary: check explicit category array
+    if (data[categoryField] is List) {
+      for (final t in data[categoryField] as List) {
+        if (t is String && t.isNotEmpty) tokens.add(t);
       }
     }
-    final single = data['fcmToken'];
-    if (single is String && single.isNotEmpty && filter(single)) {
-      tokens.add(single);
+
+    // 2. Fallback: if category array is empty, check legacy fcmTokens/fcmToken
+    if (tokens.isEmpty) {
+      if (data['fcmTokens'] is List) {
+        for (final t in data['fcmTokens'] as List) {
+          if (t is String && t.isNotEmpty) tokens.add(t);
+        }
+      }
+      final single = data['fcmToken'];
+      if (single is String && single.isNotEmpty) {
+        tokens.add(single);
+      }
     }
 
     return tokens.toList();
@@ -100,7 +108,7 @@ class TokenResolver {
     required String department,
     required String batch,
     required bool adminsOnly,
-    required bool Function(String) filter,
+    required String categoryField,
     String? excludeUserId,
   }) async {
     try {
@@ -119,11 +127,11 @@ class TokenResolver {
             data['isAdmin'] != true) {
           continue;
         }
-        tokens.addAll(_extract(data, filter));
+        tokens.addAll(_extractCategory(data, categoryField));
       }
       return tokens.toList();
     } catch (e) {
-      debugPrint('[TokenResolver] Error querying group: $e');
+      debugPrint('[TokenResolver] Error querying group ($categoryField): $e');
       return [];
     }
   }

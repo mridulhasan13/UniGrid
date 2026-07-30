@@ -45,6 +45,7 @@ class FcmDispatcher {
     required String body,
     required String senderUserId,
     required String messageId,
+    String targetPlatform = 'web',
   }) async {
     if (tokens.isEmpty) return;
 
@@ -59,7 +60,7 @@ class FcmDispatcher {
           : await FirebaseMessaging.instance
               .getToken()
               .timeout(const Duration(seconds: 2));
-      if (selfToken != null && selfToken.isNotEmpty && targets.length > 1) {
+      if (selfToken != null && selfToken.isNotEmpty) {
         targets.remove(selfToken);
       }
     } catch (_) {}
@@ -76,6 +77,7 @@ class FcmDispatcher {
           'bodyText': body,
           'senderUserId': senderUserId,
           'messageId': messageId,
+          'targetPlatform': targetPlatform,
         }),
       );
 

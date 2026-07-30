@@ -6,8 +6,6 @@ import '../shared/fcm_dispatcher.dart';
 /// WWSender  —  Web → Web
 ///
 /// Sends push notifications exclusively to browser (web) FCM tokens.
-/// Called when the sender is running in a web browser and the intended
-/// recipients are also web browser sessions.
 /// ─────────────────────────────────────────────────────────────────────────────
 class WWSender {
   WWSender._();
@@ -32,6 +30,7 @@ class WWSender {
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
+      targetPlatform: 'web',
     );
     debugPrint('[WWSender] Private → ${tokens.length} web token(s)');
   }
@@ -63,6 +62,7 @@ class WWSender {
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
+      targetPlatform: 'web',
     );
     debugPrint('[WWSender] Broadcast → ${tokens.length} web token(s)');
   }

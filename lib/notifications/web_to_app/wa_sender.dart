@@ -6,8 +6,6 @@ import '../shared/fcm_dispatcher.dart';
 /// WASender  —  Web → App
 ///
 /// Sends push notifications exclusively to native (Android / iOS) FCM tokens.
-/// Called when the sender is running in a web browser and the intended
-/// recipients are mobile app users.
 /// ─────────────────────────────────────────────────────────────────────────────
 class WASender {
   WASender._();
@@ -32,6 +30,7 @@ class WASender {
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
+      targetPlatform: 'native',
     );
     debugPrint('[WASender] Private → ${tokens.length} native token(s)');
   }
@@ -63,6 +62,7 @@ class WASender {
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
+      targetPlatform: 'native',
     );
     debugPrint('[WASender] Broadcast → ${tokens.length} native token(s)');
   }

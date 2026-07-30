@@ -6,8 +6,6 @@ import '../shared/fcm_dispatcher.dart';
 /// AASender  —  App → App
 ///
 /// Sends push notifications exclusively to native (Android / iOS) FCM tokens.
-/// Called when the sender is running on a native device and the intended
-/// recipients are also native app users.
 /// ─────────────────────────────────────────────────────────────────────────────
 class AASender {
   AASender._();
@@ -32,6 +30,7 @@ class AASender {
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
+      targetPlatform: 'native',
     );
     debugPrint('[AASender] Private → ${tokens.length} native token(s)');
   }
@@ -63,6 +62,7 @@ class AASender {
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
+      targetPlatform: 'native',
     );
     debugPrint('[AASender] Broadcast → ${tokens.length} native token(s)');
   }

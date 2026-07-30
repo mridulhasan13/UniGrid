@@ -104,7 +104,7 @@ function getAccessToken(serviceAccount) {
 }
 
 // ─── Build Platform-Correct FCM HTTP v1 Payload ──────────────────────────────
-function buildPayload(token, title, bodyText, senderUserId, notificationTag) {
+function buildPayload(token, title, bodyText, senderUserId, notificationTag, targetPlatform) {
   const data = {
     title: title,
     body: bodyText,
@@ -112,7 +112,9 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag) {
     messageId: notificationTag,
   };
 
-  if (isWebToken(token)) {
+  const isWeb = targetPlatform === "web" || isWebToken(token);
+
+  if (isWeb) {
     // ── Web Browser (PWA / Flutter Web) ──────────────────────────────────────
     // Do NOT include top-level `notification` — it causes Firebase Web SDK to
     // auto-display a system popup AND our onBackgroundMessage SW handler to
@@ -175,9 +177,9 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag) {
 }
 
 // ─── Post single FCM message to FCM HTTP v1 API ─────────────────────────────
-function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId) {
+function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId, targetPlatform) {
   const notificationTag = messageId || "unigrid-notification";
-  const payload = JSON.stringify(buildPayload(token, title, bodyText, senderUserId, notificationTag));
+  const payload = JSON.stringify(buildPayload(token, title, bodyText, senderUserId, notificationTag, targetPlatform));
 
   return new Promise((resolve) => {
     const req = https.request(
@@ -221,7 +223,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
-  const { tokens, title, bodyText, senderUserId, messageId } = body;
+  const { tokens, title, bodyText, senderUserId, messageId, targetPlatform } = body;
   if (!Array.isArray(tokens) || tokens.length === 0) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'tokens' array is required" }) };
   }
@@ -255,7 +257,7 @@ exports.handler = async (event) => {
   const deadTokens = [];
 
   for (const token of tokens) {
-    const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId);
+    const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId, targetPlatform);
     if (res.status === 200) {
       sentCount++;
       console.log(`FCM sent OK — ${isWebToken(token) ? "WEB" : "NATIVE"} token: ${token.slice(0, 20)}...`);

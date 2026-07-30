@@ -6,8 +6,6 @@ import '../shared/fcm_dispatcher.dart';
 /// AWSender  —  App → Web
 ///
 /// Sends push notifications exclusively to browser (web) FCM tokens.
-/// Called when the sender is running on a native device (Android / iOS)
-/// and the intended recipients are web browser sessions.
 /// ─────────────────────────────────────────────────────────────────────────────
 class AWSender {
   AWSender._();
@@ -32,6 +30,7 @@ class AWSender {
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
+      targetPlatform: 'web',
     );
     debugPrint('[AWSender] Private → ${tokens.length} web token(s)');
   }
@@ -63,6 +62,7 @@ class AWSender {
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
+      targetPlatform: 'web',
     );
     debugPrint('[AWSender] Broadcast → ${tokens.length} web token(s)');
   }
