@@ -1,47 +1,42 @@
-// UniGrid — Firebase Cloud Messaging Service Worker
-// Served at /firebase-messaging-sw.js
+// web/firebase-messaging-sw.js
+// FCM Background Service Worker for UniGrid Web App
 
-importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
 
-// Force immediate activation across all open tabs
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
-});
-
+// Initialize Firebase in the Service Worker
 firebase.initializeApp({
-  apiKey: 'AIzaSyAKJPM0bF7HtrLMaq95cKTTM0HF4NrxgfE',
-  authDomain: 'dept-ipe.firebaseapp.com',
-  projectId: 'dept-ipe',
-  storageBucket: 'dept-ipe.firebasestorage.app',
-  messagingSenderId: '113354293876',
-  appId: '1:113354293876:web:751f8f635f4ca6f79f0721',
+  apiKey: "AIzaSy...", // auto-loaded by FCM SDK from options
+  projectId: "unigrid-f5979",
+  messagingSenderId: "1071295244583",
+  appId: "1:1071295244583:web:...",
 });
 
 const messaging = firebase.messaging();
 
 // ─── Background message handler ───────────────────────────────────────────────
+// Called by browser Push API when a notification arrives while the web tab is
+// unfocused, minimized, or backgrounded.
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message received:', JSON.stringify(payload));
 
-  // If payload contains notification details, browser/SDK auto-renders it.
-  // Skip manual showNotification to prevent double popup.
-  if (payload.notification || (payload.webpush && payload.webpush.notification)) {
-    console.log('[SW] Notification payload present — browser handles display automatically.');
-    return;
-  }
+  const title = (payload.notification && payload.notification.title)
+    || (payload.webpush && payload.webpush.notification && payload.webpush.notification.title)
+    || (payload.data && payload.data.title)
+    || 'UniGrid';
 
-  // Handle data-only push messages
-  const title = (payload.data && payload.data.title) ? payload.data.title : 'UniGrid';
-  const body  = (payload.data && payload.data.body)  ? payload.data.body  : '';
-  const tag   = (payload.data && payload.data.messageId) ? payload.data.messageId : 'unigrid-msg';
+  const body = (payload.notification && payload.notification.body)
+    || (payload.webpush && payload.webpush.notification && payload.webpush.notification.body)
+    || (payload.data && payload.data.body)
+    || '';
+
+  const tag = (payload.data && payload.data.messageId)
+    || (payload.webpush && payload.webpush.notification && payload.webpush.notification.tag)
+    || 'unigrid-msg';
 
   if (!title && !body) return;
 
+  // Always show the system desktop notification popup for background web pushes
   return self.registration.showNotification(title, {
     body: body,
     icon: '/icons/Icon-192.png',
@@ -55,12 +50,20 @@ messaging.onBackgroundMessage((payload) => {
 // ─── Notification click → focus or open tab ───────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url && 'focus' in client) return client.focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // If a tab is already open, focus it
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url.includes(self.registration.scope) && 'focus' in client) {
+          return client.focus();
+        }
       }
-      if (clients.openWindow) return clients.openWindow('/');
+      // Otherwise open a new window
+      if (clients.openWindow) {
+        return clients.openWindow('/');
+      }
     })
   );
 });

@@ -60,12 +60,15 @@ class FcmDispatcher {
           : await FirebaseMessaging.instance
               .getToken()
               .timeout(const Duration(seconds: 2));
-      if (selfToken != null && selfToken.isNotEmpty) {
+      if (selfToken != null && selfToken.isNotEmpty && targets.length > 1) {
         targets.remove(selfToken);
       }
     } catch (_) {}
 
-    if (targets.isEmpty) return;
+    if (targets.isEmpty) {
+      debugPrint('[FcmDispatcher] Targets empty (self-token removed or no active tokens)');
+      return;
+    }
 
     try {
       final response = await http.post(
