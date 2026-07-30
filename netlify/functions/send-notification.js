@@ -206,6 +206,7 @@ exports.handler = async (event) => {
   const projectId = serviceAccount.project_id;
   let sentCount = 0;
   let failCount = 0;
+  const deadTokens = [];
 
   for (const token of tokens) {
     const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId);
@@ -213,13 +214,19 @@ exports.handler = async (event) => {
       sentCount++;
     } else {
       failCount++;
-      console.warn(`FCM send failed for token ${token.slice(0, 15)}...: ${res.status} ${res.body || res.error}`);
+      const bodyStr = res.body || "";
+      if (res.status === 404 || bodyStr.includes("UNREGISTERED") || bodyStr.includes("NOT_FOUND") || bodyStr.includes("INVALID_ARGUMENT")) {
+        deadTokens.push(token);
+        console.log(`Identified dead/unregistered FCM token: ${token.slice(0, 20)}...`);
+      } else {
+        console.warn(`FCM send failed for token ${token.slice(0, 15)}...: ${res.status} ${res.body || res.error}`);
+      }
     }
   }
 
   return {
     statusCode: 200,
     headers: { ...CORS, "Content-Type": "application/json" },
-    body: JSON.stringify({ success: true, sent: sentCount, failed: failCount, total: tokens.length }),
+    body: JSON.stringify({ success: true, sent: sentCount, failed: failCount, total: tokens.length, deadTokens: deadTokens }),
   };
 };

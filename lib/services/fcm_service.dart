@@ -391,6 +391,16 @@ class FCMService {
 
       if (response.statusCode == 200) {
         debugPrint('[FCMService] Sent notification via Netlify proxy to ${finalTokens.length} unique token(s)');
+        try {
+          final resData = jsonDecode(response.body);
+          if (resData['deadTokens'] is List) {
+            for (final deadToken in resData['deadTokens']) {
+              if (deadToken is String && deadToken.isNotEmpty) {
+                _removeStaleToken(deadToken);
+              }
+            }
+          }
+        } catch (_) {}
         return;
       } else {
         debugPrint('[FCMService] Netlify function returned status ${response.statusCode}: ${response.body}');

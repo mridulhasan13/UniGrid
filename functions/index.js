@@ -81,7 +81,31 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId, message
       },
     });
 
-    console.log(`Successfully sent ${tokens.length} messages (successCount: ${response.successCount})`);
+    console.log(`Successfully sent ${tokens.length} messages (successCount: ${response.successCount}, failureCount: ${response.failureCount})`);
+
+    // Clean up dead/unregistered tokens automatically
+    if (response.failureCount > 0) {
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success && resp.error) {
+          const errCode = resp.error.code || "";
+          if (errCode.includes("not-registered") || errCode.includes("invalid-registration-token")) {
+            const deadToken = tokens[idx];
+            console.log(`Purging dead FCM token: ${deadToken.substring(0, 20)}...`);
+            admin.firestore().collection("users")
+                .where("fcmTokens", "arrayContains", deadToken)
+                .get()
+                .then((snap) => {
+                  snap.forEach((doc) => {
+                    doc.ref.update({
+                      fcmTokens: admin.firestore.FieldValue.arrayRemove(deadToken),
+                    });
+                  });
+                })
+                .catch((err) => console.error("Error purging dead token:", err));
+          }
+        }
+      });
+    }
   } catch (error) {
     console.error("Error sending scoped messages:", error);
   }
