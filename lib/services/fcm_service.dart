@@ -436,6 +436,7 @@ class FCMService {
                     'title': title,
                     'body': body,
                     'icon': '/icons/Icon-192.png',
+                    'tag': 'unigrid-notification',
                     'requireInteraction': false,
                   },
                   'fcm_options': {

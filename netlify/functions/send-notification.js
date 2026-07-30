@@ -105,6 +105,7 @@ function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUse
             title: title,
             body: bodyText,
             icon: "/icons/Icon-192.png",
+            tag: "unigrid-notification",
             requireInteraction: false,
           },
           fcm_options: { link: "/" },
