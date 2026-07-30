@@ -306,9 +306,9 @@ class FCMService {
   // ─── Netlify Free Serverless Endpoint ──────────────────────────────────
   static String get _netlifyFunctionUrl {
     if (kIsWeb) {
-      final host = Uri.base.host;
-      if (host.contains('unigrid.netlify.app')) {
-        return '/.netlify/functions/send-notification';
+      final origin = Uri.base.origin;
+      if (origin.contains('unigrid.netlify.app')) {
+        return '$origin/.netlify/functions/send-notification';
       }
     }
     return 'https://unigrid.netlify.app/.netlify/functions/send-notification';
@@ -509,9 +509,6 @@ class FCMService {
     bool adminsOnly = false,
   }) async {
     try {
-      final currentToken = kIsWeb
-          ? await _messaging.getToken(vapidKey: _webVapidKey)
-          : await _messaging.getToken();
       final usersSnap = await _firestore
           .collection('users')
           .where('department', isEqualTo: department)
@@ -530,14 +527,14 @@ class FCMService {
 
         if (data['fcmTokens'] is List) {
           for (final t in data['fcmTokens']) {
-            if (t is String && t.isNotEmpty && t != currentToken) {
+            if (t is String && t.isNotEmpty) {
               tokens.add(t);
             }
           }
         }
         if (data['fcmToken'] is String && (data['fcmToken'] as String).isNotEmpty) {
           final t = data['fcmToken'] as String;
-          if (t != currentToken) tokens.add(t);
+          tokens.add(t);
         }
       }
 
