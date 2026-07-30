@@ -347,10 +347,10 @@
       }
     });
 
-    // --- 30-second load timeout fallback ---
+    // --- 12-second load timeout fallback ---
     var _loadTimeout = setTimeout(function() {
       _showRetry('Network timeout. Clearing cache and reloading...');
-    }, 30000);
+    }, 12000);
 
     // --- Global JS error handler ---
     window.addEventListener('error', function(e) {

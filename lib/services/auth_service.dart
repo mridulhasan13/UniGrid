@@ -69,7 +69,7 @@ class AuthService {
   Future<void> waitForSessionInit() async {
     if (_sessionInitCompleter.isCompleted) return;
     await _sessionInitCompleter.future.timeout(
-      const Duration(seconds: 3),
+      const Duration(milliseconds: 1000),
       onTimeout: () {},
     );
   }
@@ -511,8 +511,8 @@ class AuthService {
         try {
           await _auth
               .authStateChanges()
-              .firstWhere((user) => user != null)
-              .timeout(const Duration(milliseconds: 2500));
+              .first
+              .timeout(const Duration(milliseconds: 800));
         } catch (_) {
           // Timed out or no user restored — continue with session logic below.
         }
