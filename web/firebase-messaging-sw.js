@@ -33,16 +33,24 @@ messaging.onBackgroundMessage((payload) => {
   const body  = payload.data?.body  || payload.notification?.body  || payload.webpush?.notification?.body  || '';
   const tag   = payload.data?.messageId || payload.data?.tag || payload.notification?.tag || 'unigrid-notification';
 
-  const options = {
-    body: body,
-    icon: '/icons/Icon-192.png',
-    badge: '/icons/Icon-192.png',
-    tag: tag,
-    renotify: false,
-    data: payload.data ?? {},
-  };
+  // Check if browser/Firebase SDK already rendered a notification with this tag to prevent double popups
+  return self.registration.getNotifications({ tag: tag }).then((existing) => {
+    if (existing && existing.length > 0) {
+      console.log('[firebase-messaging-sw.js] Notification already rendered, skipping duplicate for tag:', tag);
+      return;
+    }
 
-  return self.registration.showNotification(title, options);
+    const options = {
+      body: body,
+      icon: '/icons/Icon-192.png',
+      badge: '/icons/Icon-192.png',
+      tag: tag,
+      renotify: false,
+      data: payload.data ?? {},
+    };
+
+    return self.registration.showNotification(title, options);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

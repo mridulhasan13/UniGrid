@@ -266,6 +266,8 @@ class FCMService {
     }
   }
 
+  static String? _cachedToken;
+
   // ─── Save FCM Token to Firestore ──────────────────────────────────────────
   static Future<void> saveTokenForUser(String userId) async {
     try {
@@ -278,6 +280,7 @@ class FCMService {
         debugPrint('FCM token is null for user: $userId');
         return;
       }
+      _cachedToken = token;
       await _firestore.collection('users').doc(userId).set(
         {
           'fcmToken': token,
@@ -361,8 +364,9 @@ class FCMService {
     } catch (_) {}
 
     final Set<String> targetTokens = tokens.toSet();
-    if (currentToken != null && currentToken.isNotEmpty) {
-      targetTokens.remove(currentToken);
+    final String? selfToken = currentToken ?? _cachedToken;
+    if (selfToken != null && selfToken.isNotEmpty) {
+      targetTokens.remove(selfToken);
     }
     if (targetTokens.isEmpty) return;
 
