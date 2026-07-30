@@ -99,7 +99,7 @@ function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUse
         },
         android: {
           priority: "high",
-          notification: { sound: "default", channel_id: "unigrid_notifications", tag: notificationTag },
+          notification: { sound: "default", channel_id: "unigrid_notifications", tag: notificationTag, icon: "@mipmap/ic_launcher" },
         },
         apns: {
           payload: { aps: { sound: "default" } },
@@ -109,6 +109,7 @@ function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUse
             title: title,
             body: bodyText,
             icon: "/icons/Icon-192.png",
+            badge: "/icons/Icon-192.png",
             tag: notificationTag,
             requireInteraction: false,
           },

@@ -44,10 +44,13 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId, message
         messageId: notificationTag,
       },
       android: {
+        priority: "high",
         notification: {
           channelId: "unigrid_notifications",
           priority: "high",
           tag: notificationTag,
+          icon: "@mipmap/ic_launcher",
+          sound: "default",
         },
       },
       apns: {
@@ -64,6 +67,7 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId, message
           title: title,
           body: body,
           icon: "/icons/Icon-192.png",
+          badge: "/icons/Icon-192.png",
           tag: notificationTag,
           requireInteraction: false,
         },
@@ -187,10 +191,13 @@ exports.onNewPrivateMessage = functions.firestore
             messageId: notificationTag,
           },
           android: {
+            priority: "high",
             notification: {
               channelId: "unigrid_notifications",
               priority: "high",
               tag: notificationTag,
+              icon: "@mipmap/ic_launcher",
+              sound: "default",
             },
           },
           apns: {
@@ -205,6 +212,7 @@ exports.onNewPrivateMessage = functions.firestore
               title: senderName,
               body: body,
               icon: "/icons/Icon-192.png",
+              badge: "/icons/Icon-192.png",
               tag: notificationTag,
               requireInteraction: false,
             },
