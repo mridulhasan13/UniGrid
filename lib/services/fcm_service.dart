@@ -412,23 +412,30 @@ class FCMService {
             body: jsonEncode({
               'message': {
                 'token': token,
-                'notification': {
+                'data': {
                   'title': title,
                   'body': body,
-                },
-                'data': {
                   'senderUserId': senderUserId,
+                  'messageId': messageId ?? 'unigrid-notification',
                 },
                 'android': {
                   'priority': 'high',
                   'notification': {
+                    'title': title,
+                    'body': body,
                     'sound': 'default',
                     'channel_id': 'unigrid_notifications',
+                    'tag': messageId ?? 'unigrid-notification',
+                    'icon': '@mipmap/ic_launcher',
                   },
                 },
                 'apns': {
                   'payload': {
                     'aps': {
+                      'alert': {
+                        'title': title,
+                        'body': body,
+                      },
                       'sound': 'default',
                     },
                   },
@@ -438,7 +445,8 @@ class FCMService {
                     'title': title,
                     'body': body,
                     'icon': '/icons/Icon-192.png',
-                    'tag': 'unigrid-notification',
+                    'badge': '/icons/Icon-192.png',
+                    'tag': messageId ?? 'unigrid-notification',
                     'requireInteraction': false,
                   },
                   'fcm_options': {
