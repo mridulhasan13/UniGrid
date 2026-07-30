@@ -130,7 +130,6 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
           await conversationRef.collection('messages').add(imageMessage);
         }
       }
-      }
 
       await conversationRef.set({
         'participants': [user.id, widget.recipient.id],
