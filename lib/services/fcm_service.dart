@@ -78,17 +78,19 @@ class FCMService {
         }
       });
 
-      // Foreground messages on web — show the in-app banner (no local notifications API on web).
+      // Foreground messages on web — show the in-app banner.
       FirebaseMessaging.onMessage.listen((message) {
-        final notification = message.notification;
-        if (notification == null) return;
+        final title = message.notification?.title ?? message.data['title'] ?? 'UniGrid';
+        final body  = message.notification?.body  ?? message.data['body']  ?? '';
+        if (title.isEmpty && body.isEmpty) return;
+
         final currentUid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
         final senderUserId = message.data['senderUserId'] ?? '';
         if (senderUserId.isNotEmpty && senderUserId == currentUid) return;
 
         InAppNotification.showGlobal(
-          title: notification.title ?? 'UniGrid',
-          message: notification.body ?? '',
+          title: title,
+          message: body,
           icon: Icons.notifications_active_rounded,
         );
       });

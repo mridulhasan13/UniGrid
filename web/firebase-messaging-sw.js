@@ -29,18 +29,9 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Background message received:', payload);
 
-  // If the FCM payload contains a `notification` object (title/body), Firebase JS SDK
-  // automatically handles displaying the notification in the browser.
-  // DO NOT call self.registration.showNotification() here if payload.notification is present,
-  // as doing so causes Chrome/Samsung Browser to display a duplicate second notification.
-  if (payload.notification) {
-    console.log('[firebase-messaging-sw.js] Skipping manual showNotification because payload.notification is already handled natively.');
-    return;
-  }
-
-  const title = payload.data?.title ?? 'UniGrid';
-  const body  = payload.data?.body  ?? '';
-  const tag   = payload.data?.messageId || payload.data?.tag || 'unigrid-notification';
+  const title = payload.data?.title || payload.notification?.title || payload.webpush?.notification?.title || 'UniGrid';
+  const body  = payload.data?.body  || payload.notification?.body  || payload.webpush?.notification?.body  || '';
+  const tag   = payload.data?.messageId || payload.data?.tag || payload.notification?.tag || 'unigrid-notification';
 
   const options = {
     body: body,
