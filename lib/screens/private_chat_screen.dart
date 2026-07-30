@@ -77,6 +77,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
       body: message.text,
       senderUserId: user.id,
+      messageId: textMessage['id'] as String?,
     );
 
     // Update conversation metadata for Inbox sorting
@@ -84,11 +85,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       'participants': [user.id, widget.recipient.id],
       'lastMessage': message.text,
       'lastMessageTime': timestamp,
-      'preciseTime': preciseTime,
-      'readStatus': {
-        user.id: true,
-        widget.recipient.id: false,
-      }
+      'lastMessageSenderId': user.id,
+      'unreadCount_${widget.recipient.id}': FieldValue.increment(1),
     }, SetOptions(merge: true));
   }
 
@@ -141,6 +139,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
             body: 'Sent an image',
             senderUserId: user.id,
+            messageId: imageMessage['id'] as String?,
           );
         }
       }

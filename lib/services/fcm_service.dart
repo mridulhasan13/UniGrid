@@ -345,6 +345,7 @@ class FCMService {
     required String title,
     required String body,
     required String senderUserId,
+    String? messageId,
   }) async {
     if (tokens.isEmpty) return;
 
@@ -375,6 +376,7 @@ class FCMService {
           'title': title,
           'bodyText': body,
           'senderUserId': senderUserId,
+          'messageId': messageId,
         }),
       );
 
@@ -463,11 +465,13 @@ class FCMService {
   }
 
   // ─── Send to a Specific User (Private DM) ─────────────────────────────────
+  // ─── Send to a Specific User (Private DM) ─────────────────────────────────
   static Future<void> sendPrivateNotification({
     required String recipientId,
     required String title,
     required String body,
     required String senderUserId,
+    String? messageId,
   }) async {
     try {
       final recipientDoc =
@@ -495,6 +499,7 @@ class FCMService {
         title: title,
         body: body,
         senderUserId: senderUserId,
+        messageId: messageId,
       );
     } catch (e) {
       debugPrint('sendPrivateNotification error: $e');
@@ -508,6 +513,7 @@ class FCMService {
     required String body,
     required String senderUserId,
     bool adminsOnly = false,
+    String? messageId,
   }) async {
     try {
       final usersSnap = await _firestore
@@ -549,6 +555,7 @@ class FCMService {
         title: title,
         body: body,
         senderUserId: senderUserId,
+        messageId: messageId,
       );
       debugPrint('Notified ${tokens.length} target tokens in $department - $batch');
     } catch (e) {
@@ -564,6 +571,7 @@ class FCMService {
     required String senderUserId,
     required String department,
     required String batch,
+    String? messageId,
   }) async {
     final preview = text.length > 80 ? '${text.substring(0, 80)}...' : text;
     await sendToDeptAndBatch(
@@ -572,6 +580,7 @@ class FCMService {
       title: senderName,
       body: preview,
       senderUserId: senderUserId,
+      messageId: messageId,
     );
   }
 
@@ -581,6 +590,7 @@ class FCMService {
     required String senderUserId,
     required String department,
     required String batch,
+    String? messageId,
   }) async {
     await sendToDeptAndBatch(
       department: department,
@@ -588,6 +598,7 @@ class FCMService {
       title: 'New ${type.isNotEmpty ? type : "Announcement"}',
       body: title,
       senderUserId: senderUserId,
+      messageId: messageId,
     );
   }
 
@@ -597,6 +608,7 @@ class FCMService {
     required String senderUserId,
     required String department,
     required String batch,
+    String? messageId,
   }) async {
     await sendToDeptAndBatch(
       department: department,
@@ -604,6 +616,7 @@ class FCMService {
       title: 'New Material Uploaded',
       body: '$title${subject.isNotEmpty ? ' · $subject' : ''}',
       senderUserId: senderUserId,
+      messageId: messageId,
     );
   }
 }

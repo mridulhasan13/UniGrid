@@ -86,16 +86,20 @@ function getAccessToken(serviceAccount) {
 }
 
 // ─── Post single FCM message to FCM HTTP v1 API ─────────────────────────────
-function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId) {
+function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId) {
+  const notificationTag = messageId || "unigrid-notification";
   return new Promise((resolve) => {
     const payload = JSON.stringify({
       message: {
         token: token,
         notification: { title: title, body: bodyText },
-        data: { senderUserId: senderUserId || "" },
+        data: {
+          senderUserId: senderUserId || "",
+          messageId: notificationTag,
+        },
         android: {
           priority: "high",
-          notification: { sound: "default", channel_id: "unigrid_notifications" },
+          notification: { sound: "default", channel_id: "unigrid_notifications", tag: notificationTag },
         },
         apns: {
           payload: { aps: { sound: "default" } },
@@ -105,7 +109,7 @@ function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUse
             title: title,
             body: bodyText,
             icon: "/icons/Icon-192.png",
-            tag: "unigrid-notification",
+            tag: notificationTag,
             requireInteraction: false,
           },
           fcm_options: { link: "/" },
@@ -154,7 +158,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
-  const { tokens, title, bodyText, senderUserId } = body;
+  const { tokens, title, bodyText, senderUserId, messageId } = body;
   if (!Array.isArray(tokens) || tokens.length === 0) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'tokens' array is required" }) };
   }
@@ -187,7 +191,7 @@ exports.handler = async (event) => {
   let failCount = 0;
 
   for (const token of tokens) {
-    const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId);
+    const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId);
     if (res.status === 200) {
       sentCount++;
     } else {

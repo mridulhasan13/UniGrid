@@ -6,7 +6,11 @@ admin.initializeApp();
 // ─────────────────────────────────────────────
 // Helper: Send notification to a specific department and batch
 // ─────────────────────────────────────────────
-async function notifyScopedUsers(dept, batch, title, body, senderUserId) {
+// ─────────────────────────────────────────────
+// Helper: Send notification to a specific department and batch
+// ─────────────────────────────────────────────
+async function notifyScopedUsers(dept, batch, title, body, senderUserId, messageId) {
+  const notificationTag = messageId || "unigrid-notification";
   try {
     const usersSnap = await admin.firestore().collection("users")
         .where("department", "==", dept)
@@ -37,11 +41,13 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId) {
       },
       data: {
         senderUserId: senderUserId || "",
+        messageId: notificationTag,
       },
       android: {
         notification: {
           channelId: "unigrid_notifications",
           priority: "high",
+          tag: notificationTag,
         },
       },
       apns: {
@@ -58,6 +64,7 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId) {
           title: title,
           body: body,
           icon: "/icons/Icon-192.png",
+          tag: notificationTag,
           requireInteraction: false,
         },
         fcmOptions: {
@@ -79,11 +86,11 @@ exports.onNewAnnouncement = functions.firestore
     .document("depts/{dept}/batches/{batch}/announcements/{announcementId}")
     .onCreate(async (snap, context) => {
       const data = snap.data();
-      const { dept, batch } = context.params;
+      const { dept, batch, announcementId } = context.params;
       const title = `📢 New ${data.type || "Announcement"}`;
       const body = data.title || "A new announcement has been posted.";
       const senderUserId = data.postedByUserId || "";
-      await notifyScopedUsers(dept, batch, title, body, senderUserId);
+      await notifyScopedUsers(dept, batch, title, body, senderUserId, announcementId);
     });
 
 // ─────────────────────────────────────────────
@@ -93,12 +100,12 @@ exports.onNewMaterial = functions.firestore
     .document("depts/{dept}/batches/{batch}/materials/{materialId}")
     .onCreate(async (snap, context) => {
       const data = snap.data();
-      const { dept, batch } = context.params;
+      const { dept, batch, materialId } = context.params;
       const type = data.type || "Material";
       const title = `📚 New ${type} Uploaded`;
       const body = `${data.title || "A new file"} has been added to ${data.subject || "your subjects"}.`;
       const senderUserId = data.uploadedByUserId || "";
-      await notifyScopedUsers(dept, batch, title, body, senderUserId);
+      await notifyScopedUsers(dept, batch, title, body, senderUserId, materialId);
     });
 
 // ─────────────────────────────────────────────
@@ -108,7 +115,7 @@ exports.onNewMessage = functions.firestore
     .document("depts/{dept}/batches/{batch}/chat_messages/{messageId}")
     .onCreate(async (snap, context) => {
       const data = snap.data();
-      const { dept, batch } = context.params;
+      const { dept, batch, messageId } = context.params;
 
       // Don't notify for image-only messages or system messages
       if (!data.text && !data.content) return null;
@@ -120,7 +127,7 @@ exports.onNewMessage = functions.firestore
       const body = text.length > 80 ? text.substring(0, 80) + "..." : text;
       const senderUserId = data.authorId || "";
 
-      await notifyScopedUsers(dept, batch, title, body, senderUserId);
+      await notifyScopedUsers(dept, batch, title, body, senderUserId, messageId);
     });
 
 // ─────────────────────────────────────────────
@@ -130,7 +137,8 @@ exports.onNewPrivateMessage = functions.firestore
     .document("conversations/{conversationId}/messages/{messageId}")
     .onCreate(async (snap, context) => {
       const data = snap.data();
-      const { conversationId } = context.params;
+      const { conversationId, messageId } = context.params;
+      const notificationTag = messageId || "unigrid-notification";
 
       // Don't notify if message text is missing
       if (!data.text && !data.uri) return null;
@@ -172,11 +180,13 @@ exports.onNewPrivateMessage = functions.firestore
           },
           data: {
             senderUserId: authorId,
+            messageId: notificationTag,
           },
           android: {
             notification: {
               channelId: "unigrid_notifications",
               priority: "high",
+              tag: notificationTag,
             },
           },
           apns: {
@@ -191,6 +201,7 @@ exports.onNewPrivateMessage = functions.firestore
               title: senderName,
               body: body,
               icon: "/icons/Icon-192.png",
+              tag: notificationTag,
               requireInteraction: false,
             },
             fcmOptions: {
@@ -199,7 +210,6 @@ exports.onNewPrivateMessage = functions.firestore
           },
         });
         console.log(`Successfully sent private message notification to ${tokens.length} tokens:`, response);
-        console.log(`Successfully sent private message notification:`, response);
       } catch (error) {
         console.error("Error sending private message notification:", error);
       }

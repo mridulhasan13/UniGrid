@@ -32,14 +32,14 @@ messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title ?? payload.data?.title ?? 'UniGrid';
   const body  = payload.notification?.body  ?? payload.data?.body  ?? '';
 
-  // Use tag deduplication to ensure single notification display
-  const notificationTag = payload.messageId || payload.data?.tag || 'unigrid-notification';
+  // Use specific messageId or tag to collapse duplicate notifications from multiple senders/triggers
+  const tag = payload.data?.messageId || payload.data?.tag || payload.notification?.tag || payload.messageId || 'unigrid-notification';
 
   const options = {
     body: body,
     icon: '/icons/Icon-192.png',
     badge: '/icons/Icon-192.png',
-    tag: notificationTag,
+    tag: tag,
     renotify: false,
     data: payload.data ?? {},
   };

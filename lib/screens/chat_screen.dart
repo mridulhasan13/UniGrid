@@ -856,6 +856,7 @@ class _ChatScreenState extends State<ChatScreen> {
       senderUserId: user.id,
       department: user.department,
       batch: user.batch,
+      messageId: msgData['id'] as String?,
     );
   }
 
