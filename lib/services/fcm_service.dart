@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart' show Icons;
 import '../widgets/in_app_notification.dart';
+import '../notifications/notification_coordinator.dart';
 
 // ─── Web Push VAPID Key ──────────────────────────────────────────────────────
 // Generate this in Firebase Console → Project Settings → Cloud Messaging
@@ -78,23 +79,7 @@ class FCMService {
         }
       });
 
-      // Foreground messages on web — show the in-app banner.
-      FirebaseMessaging.onMessage.listen((message) {
-        final title = message.notification?.title ?? message.data['title'] ?? 'UniGrid';
-        final body  = message.notification?.body  ?? message.data['body']  ?? '';
-        if (title.isEmpty && body.isEmpty) return;
-
-        final currentUid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
-        final senderUserId = message.data['senderUserId'] ?? '';
-        if (senderUserId.isNotEmpty && senderUserId == currentUid) return;
-
-        InAppNotification.showGlobal(
-          title: title,
-          message: body,
-          icon: Icons.notifications_active_rounded,
-        );
-      });
-
+      // Note: Foreground messages are handled by NotificationCoordinator (WWReceiver / AWReceiver).
       debugPrint('FCM web initialized successfully');
       return;
     }
@@ -176,11 +161,7 @@ class FCMService {
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
-    // Handle messages when app is in FOREGROUND
-    // NOTE: When the app is in background/terminated, FCM shows the system
-    // notification automatically from the `notification` block in the payload.
-    // We only need to handle the foreground case here.
-    FirebaseMessaging.onMessage.listen(_showNotificationFromRemote);
+    // Note: Foreground messages are handled by NotificationCoordinator (WAReceiver / AAReceiver).
   }
 
   // ─── Request Battery Optimization Exclusion ───────────────────────────────
@@ -201,6 +182,7 @@ class FCMService {
   // When the app is background/terminated, Android FCM plugin shows the system
   // tray notification automatically from the payload's `notification` block.
   // Showing a local notification here in that case would create a duplicate.
+  // ignore: unused_element
   static Future<void> _showNotificationFromRemote(RemoteMessage message) async {
     final title = message.notification?.title ?? message.data['title'] ?? 'UniGrid';
     final body = message.notification?.body ?? message.data['body'] ?? '';
@@ -350,6 +332,7 @@ class FCMService {
   // - App to Web
   // - App to App
   // - Web to Web
+  // ignore: unused_element
   static Future<void> _sendFCMHttp({
     required List<String> tokens,
     required String title,
@@ -496,37 +479,13 @@ class FCMService {
     required String senderUserId,
     String? messageId,
   }) async {
-    try {
-      final recipientDoc =
-          await _firestore.collection('users').doc(recipientId).get();
-      if (!recipientDoc.exists) return;
-      final data = recipientDoc.data();
-      if (data == null) return;
-
-      final Set<String> tokens = {};
-      if (data['fcmTokens'] is List) {
-        for (final t in data['fcmTokens']) {
-          if (t is String && t.isNotEmpty) tokens.add(t);
-        }
-      }
-      if (data['fcmToken'] is String && (data['fcmToken'] as String).isNotEmpty) {
-        tokens.add(data['fcmToken'] as String);
-      }
-
-      if (tokens.isEmpty) {
-        debugPrint('No FCM tokens for recipient: $recipientId');
-        return;
-      }
-      await _sendFCMHttp(
-        tokens: tokens.toList(),
-        title: title,
-        body: body,
-        senderUserId: senderUserId,
-        messageId: messageId,
-      );
-    } catch (e) {
-      debugPrint('sendPrivateNotification error: $e');
-    }
+    await NotificationCoordinator.sendPrivate(
+      title: title,
+      body: body,
+      senderUserId: senderUserId,
+      recipientId: recipientId,
+      messageId: messageId,
+    );
   }
 
   static Future<void> sendToDeptAndBatch({
@@ -538,52 +497,15 @@ class FCMService {
     bool adminsOnly = false,
     String? messageId,
   }) async {
-    try {
-      final usersSnap = await _firestore
-          .collection('users')
-          .where('department', isEqualTo: department)
-          .where('batch', isEqualTo: batch)
-          .get();
-
-      final Set<String> tokens = {};
-      for (final doc in usersSnap.docs) {
-        if (doc.id == senderUserId) continue;
-        final data = doc.data();
-        if (adminsOnly) {
-          final isCR = data['isCR'] == true;
-          final isAdmin = data['isAdmin'] == true;
-          if (!isCR && !isAdmin) continue;
-        }
-
-        if (data['fcmTokens'] is List) {
-          for (final t in data['fcmTokens']) {
-            if (t is String && t.isNotEmpty) {
-              tokens.add(t);
-            }
-          }
-        }
-        if (data['fcmToken'] is String && (data['fcmToken'] as String).isNotEmpty) {
-          final t = data['fcmToken'] as String;
-          tokens.add(t);
-        }
-      }
-
-      if (tokens.isEmpty) {
-        debugPrint('No tokens to notify for $department - $batch');
-        return;
-      }
-
-      await _sendFCMHttp(
-        tokens: tokens.toList(),
-        title: title,
-        body: body,
-        senderUserId: senderUserId,
-        messageId: messageId,
-      );
-      debugPrint('Notified ${tokens.length} target tokens in $department - $batch');
-    } catch (e) {
-      debugPrint('sendToDeptAndBatch error: $e');
-    }
+    await NotificationCoordinator.sendBroadcast(
+      title: title,
+      body: body,
+      senderUserId: senderUserId,
+      department: department,
+      batch: batch,
+      adminsOnly: adminsOnly,
+      messageId: messageId,
+    );
   }
 
   // ─── Shortcut Helpers ─────────────────────────────────────────────────────
