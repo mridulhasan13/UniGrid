@@ -337,8 +337,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                       }
                       imgWidget = Image.memory(
                         bytes,
-                        width: messageWidth.toDouble(),
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        gaplessPlayback: true,
                       );
                     } catch (e) {
                       imgWidget = const SizedBox(
@@ -351,20 +352,20 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                       message.uri.startsWith('https')) {
                     imgWidget = Image.network(
                       message.uri,
-                      width: messageWidth.toDouble(),
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
                     );
                   } else if (kIsWeb) {
                     imgWidget = Image.network(
                       message.uri,
-                      width: messageWidth.toDouble(),
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
                     );
                   } else {
                     imgWidget = Image.file(
                       File(message.uri),
-                      width: messageWidth.toDouble(),
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
                     );
                   }
                   return GestureDetector(
@@ -372,14 +373,26 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => FileViewerScreen(
-                            fileName: message.name,
-                            fileUrl: message.uri,
+                          builder: (context) => Scaffold(
+                            backgroundColor: Colors.black,
+                            appBar: AppBar(
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                            ),
+                            body: Center(
+                              child: InteractiveViewer(child: imgWidget),
+                            ),
                           ),
                         ),
                       );
                     },
-                    child: imgWidget,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: messageWidth.toDouble(),
+                        maxHeight: 360,
+                      ),
+                      child: imgWidget,
+                    ),
                   );
                 },
                 theme: DefaultChatTheme(

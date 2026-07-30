@@ -630,20 +630,22 @@ img.Image? _decodeImageFromBytes(Uint8List bytes) {
   return img.decodeImage(bytes);
 }
 
-/// Optimize chat images for crisp HD resolution (notes, diagrams, equations)
+/// Optimize chat images — preserve 100% original for files under 3MB.
+/// Only resize if over 3MB (very large camera photos).
 Uint8List _compressImageForChat(Uint8List bytes) {
   try {
-    // Preserve 100% original pixel perfection for images up to 1.5MB
-    if (bytes.lengthInBytes <= 1500 * 1024) {
+    // Preserve 100% original pixel perfection for images up to 3MB
+    // This covers all handwritten notes, equations, diagrams, and screenshots.
+    if (bytes.lengthInBytes <= 3 * 1024 * 1024) {
       return bytes;
     }
 
     final image = _decodeImageFromBytes(bytes);
     if (image == null) return bytes;
 
-    // For large high-res camera photos (>1.5MB):
-    // Resize to 2048px max dimension (2K Ultra HD) using bicubic interpolation
-    // for crystal-clear mathematical equations and study notes.
+    // For very large high-res camera photos (>3MB):
+    // Resize to 2048px max dimension using bicubic interpolation, then
+    // encode as high-quality JPEG (95%) for crystal-clear text and diagrams.
     img.Image resized = image;
     if (image.width > 2048 || image.height > 2048) {
       if (image.width > image.height) {
@@ -653,7 +655,7 @@ Uint8List _compressImageForChat(Uint8List bytes) {
       }
     }
 
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 92));
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   } catch (e) {
     debugPrint('[ChatCompress] Error during HD image optimization: $e');
     return bytes;

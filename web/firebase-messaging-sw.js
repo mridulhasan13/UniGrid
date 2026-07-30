@@ -1,15 +1,23 @@
 // UniGrid — Firebase Cloud Messaging Service Worker
-// This file MUST be at the root of the web directory (served at /firebase-messaging-sw.js).
-// It handles FCM push notifications when the web tab is in the background or closed.
-// Firebase SDK version must match the version used in the app.
+// Served at /firebase-messaging-sw.js
+//
+// KEY: When FCM payload contains `notification` at top-level, Firebase JS SDK
+// shows the notification automatically. When payload is data-only (no top-level
+// `notification`), our onBackgroundMessage fires and we show it manually.
+//
+// Our Netlify function sends:
+//   • Android/iOS tokens → top-level `notification` (handled natively by OS)
+//   • Web tokens → NO top-level `notification`, only `webpush.notification`
+//
+// The Firebase compat SDK handles `webpush.notification` automatically, so
+// onBackgroundMessage is NOT called for webpush messages. The browser's built-in
+// Push API delivers webpush.notification directly.
+//
+// This file handles ONLY the data-only fallback case.
 
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Initialize Firebase in the service worker context.
-// These values MUST match lib/firebase_options.dart (web config).
-// ─────────────────────────────────────────────────────────────────────────────
 firebase.initializeApp({
   apiKey: 'AIzaSyAKJPM0bF7HtrLMaq95cKTTM0HF4NrxgfE',
   authDomain: 'dept-ipe.firebaseapp.com',
@@ -21,56 +29,38 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Handle background messages (tab hidden or closed).
-// When the tab is in the FOREGROUND, FCMService.dart handles the message via
-// FirebaseMessaging.onMessage — this handler is only called in the background.
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Background message handler ───────────────────────────────────────────────
+// This ONLY fires for data-only messages (no `notification` key in payload).
+// For webpush.notification messages, the browser handles display automatically.
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Background message received:', payload);
+  console.log('[firebase-messaging-sw.js] Data-only background message:', payload);
 
-  const title = payload.data?.title || payload.notification?.title || payload.webpush?.notification?.title || 'UniGrid';
-  const body  = payload.data?.body  || payload.notification?.body  || payload.webpush?.notification?.body  || '';
-  const tag   = payload.data?.messageId || payload.data?.tag || payload.notification?.tag || 'unigrid-notification';
+  // Extract title/body from data field
+  const title = (payload.data && payload.data.title) ? payload.data.title : 'UniGrid';
+  const body  = (payload.data && payload.data.body)  ? payload.data.body  : '';
+  const tag   = (payload.data && payload.data.messageId) ? payload.data.messageId : 'unigrid-msg';
 
-  // Check if browser/Firebase SDK already rendered a notification with this tag to prevent double popups
-  return self.registration.getNotifications({ tag: tag }).then((existing) => {
-    if (existing && existing.length > 0) {
-      console.log('[firebase-messaging-sw.js] Notification already rendered, skipping duplicate for tag:', tag);
-      return;
-    }
+  if (!title && !body) return;
 
-    const options = {
-      body: body,
-      icon: '/icons/Icon-192.png',
-      badge: '/icons/Icon-192.png',
-      tag: tag,
-      renotify: false,
-      data: payload.data ?? {},
-    };
-
-    return self.registration.showNotification(title, options);
+  return self.registration.showNotification(title, {
+    body: body,
+    icon: '/icons/Icon-192.png',
+    badge: '/icons/Icon-192.png',
+    tag: tag,
+    renotify: false,
+    data: payload.data || {},
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Handle notification click — bring the app tab into focus (or open a new tab).
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Notification click → focus or open tab ───────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a UniGrid tab is already open, focus it
       for (const client of clientList) {
-        if (client.url && 'focus' in client) {
-          return client.focus();
-        }
+        if (client.url && 'focus' in client) return client.focus();
       }
-      // Otherwise open a new tab
-      if (clients.openWindow) {
-        return clients.openWindow('/');
-      }
+      if (clients.openWindow) return clients.openWindow('/');
     })
   );
 });

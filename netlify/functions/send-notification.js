@@ -1,6 +1,15 @@
 // netlify/functions/send-notification.js
 // Pure Node.js zero-dependency FCM HTTP v1 proxy.
 // Uses built-in crypto & https modules — NO node_modules needed!
+//
+// KEY DESIGN DECISION — Platform-Split Payload:
+//   • Android/iOS tokens: top-level `notification` + `data` (no webpush block)
+//   • Web (browser) tokens: `data` only + `webpush.notification` (no top-level notification)
+//     This prevents the Firebase Web JS SDK from showing a duplicate system popup
+//     while ALSO letting our Service Worker show it once via onBackgroundMessage.
+//
+//   Web token format: starts with "http" or contains "fcm.googleapis.com/projects"
+//   Android/iOS token format: opaque string (no http prefix)
 
 const crypto = require("crypto");
 const https = require("https");
@@ -10,6 +19,13 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// ─── Detect if a token belongs to a Web Push subscription ───────────────────
+// FCM Web tokens start with a very long base64url string (152+ chars).
+// Native tokens are shorter.  Most reliable check is length (web tokens ≥ 140).
+function isWebToken(token) {
+  return token.length >= 140;
+}
 
 // ─── Base64Url Helper ────────────────────────────────────────────────────────
 function base64UrlEncode(str) {
@@ -85,23 +101,53 @@ function getAccessToken(serviceAccount) {
   });
 }
 
-// ─── Post single FCM message to FCM HTTP v1 API ─────────────────────────────
-function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId) {
-  const notificationTag = messageId || "unigrid-notification";
-  return new Promise((resolve) => {
-    const payload = JSON.stringify({
+// ─── Build Platform-Correct FCM HTTP v1 Payload ──────────────────────────────
+function buildPayload(token, title, bodyText, senderUserId, notificationTag) {
+  const data = {
+    title: title,
+    body: bodyText,
+    senderUserId: senderUserId || "",
+    messageId: notificationTag,
+  };
+
+  if (isWebToken(token)) {
+    // ── Web Browser (PWA / Flutter Web) ──────────────────────────────────────
+    // Do NOT include top-level `notification` — it causes Firebase Web SDK to
+    // auto-display a system popup AND our onBackgroundMessage SW handler to
+    // also call showNotification → double notification.
+    // Instead, we use `webpush.notification` only, which is delivered exclusively
+    // by the browser's Push API and shown once by our SW.
+    return {
+      message: {
+        token: token,
+        data: data,
+        webpush: {
+          notification: {
+            title: title,
+            body: bodyText,
+            icon: "/icons/Icon-192.png",
+            badge: "/icons/Icon-192.png",
+            tag: notificationTag,
+            renotify: false,
+          },
+          fcm_options: { link: "/" },
+        },
+      },
+    };
+  } else {
+    // ── Android / iOS Native App ──────────────────────────────────────────────
+    // Top-level `notification` tells FCM to display system tray notification
+    // when the app is in background/terminated.
+    // `data` carries extra info for our foreground handler.
+    // NO `webpush` block — it would confuse FCM when targeting native tokens.
+    return {
       message: {
         token: token,
         notification: {
           title: title,
           body: bodyText,
         },
-        data: {
-          title: title,
-          body: bodyText,
-          senderUserId: senderUserId || "",
-          messageId: notificationTag,
-        },
+        data: data,
         android: {
           priority: "high",
           notification: {
@@ -116,23 +162,22 @@ function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUse
         apns: {
           payload: {
             aps: {
-              alert: {
-                title: title,
-                body: bodyText,
-              },
+              alert: { title: title, body: bodyText },
               sound: "default",
             },
           },
         },
-        webpush: {
-          headers: {
-            Urgency: "high",
-          },
-          fcm_options: { link: "/" },
-        },
       },
-    });
+    };
+  }
+}
 
+// ─── Post single FCM message to FCM HTTP v1 API ─────────────────────────────
+function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId) {
+  const notificationTag = messageId || "unigrid-notification";
+  const payload = JSON.stringify(buildPayload(token, title, bodyText, senderUserId, notificationTag));
+
+  return new Promise((resolve) => {
     const req = https.request(
       `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
       {
@@ -211,14 +256,15 @@ exports.handler = async (event) => {
     const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId);
     if (res.status === 200) {
       sentCount++;
+      console.log(`FCM sent OK — ${isWebToken(token) ? "WEB" : "NATIVE"} token: ${token.slice(0, 20)}...`);
     } else {
       failCount++;
       const bodyStr = res.body || "";
       if (res.status === 404 || bodyStr.includes("UNREGISTERED") || bodyStr.includes("NOT_FOUND") || bodyStr.includes("INVALID_ARGUMENT")) {
         deadTokens.push(token);
-        console.log(`Identified dead/unregistered FCM token: ${token.slice(0, 20)}...`);
+        console.log(`Dead token detected: ${token.slice(0, 20)}...`);
       } else {
-        console.warn(`FCM send failed for token ${token.slice(0, 15)}...: ${res.status} ${res.body || res.error}`);
+        console.warn(`FCM send failed for ${isWebToken(token) ? "WEB" : "NATIVE"} token ${token.slice(0, 15)}...: ${res.status} ${res.body || res.error}`);
       }
     }
   }
@@ -226,6 +272,6 @@ exports.handler = async (event) => {
   return {
     statusCode: 200,
     headers: { ...CORS, "Content-Type": "application/json" },
-    body: JSON.stringify({ success: true, sent: sentCount, failed: failCount, total: tokens.length, deadTokens: deadTokens }),
+    body: JSON.stringify({ success: true, sent: sentCount, failed: failCount, total: tokens.length, deadTokens }),
   };
 };

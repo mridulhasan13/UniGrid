@@ -177,6 +177,9 @@ class FCMService {
         ?.createNotificationChannel(channel);
 
     // Handle messages when app is in FOREGROUND
+    // NOTE: When the app is in background/terminated, FCM shows the system
+    // notification automatically from the `notification` block in the payload.
+    // We only need to handle the foreground case here.
     FirebaseMessaging.onMessage.listen(_showNotificationFromRemote);
   }
 
@@ -193,7 +196,11 @@ class FCMService {
     }
   }
 
-  // ─── Show local notification from FCM remote message ─────────────────────
+  // ─── Show local notification from FCM remote message (foreground only) ──────
+  // Called ONLY when the app is in the FOREGROUND.
+  // When the app is background/terminated, Android FCM plugin shows the system
+  // tray notification automatically from the payload's `notification` block.
+  // Showing a local notification here in that case would create a duplicate.
   static Future<void> _showNotificationFromRemote(RemoteMessage message) async {
     final title = message.notification?.title ?? message.data['title'] ?? 'UniGrid';
     final body = message.notification?.body ?? message.data['body'] ?? '';
@@ -204,28 +211,25 @@ class FCMService {
     final senderUserId = message.data['senderUserId'] ?? '';
     if (senderUserId.isNotEmpty && senderUserId == currentUid) return;
 
+    // Show system tray notification only for data-only messages
+    // (messages WITH a `notification` block are already shown by FCM plugin
+    // in background; in foreground they are suppressed by Android — safe to show).
     await _localNotifications.show(
       message.hashCode,
       title,
       body,
-      NotificationDetails(
+      const NotificationDetails(
         android: AndroidNotificationDetails(
           'unigrid_notifications',
           'UniGrid Notifications',
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
-          ticker: body,
-          subText: 'UniGrid',
-          styleInformation: BigTextStyleInformation(
-            body,
-            contentTitle: title,
-          ),
         ),
       ),
     );
 
-    // Show floating in-app glassmorphic notification banner
+    // Always show the floating in-app glassmorphic banner in foreground
     InAppNotification.showGlobal(
       title: title,
       message: body,
@@ -428,6 +432,7 @@ class FCMService {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $accessToken',
             },
+            // Native (Android/iOS) fallback — no webpush block, top-level notification
             body: jsonEncode({
               'message': {
                 'token': token,
@@ -461,14 +466,6 @@ class FCMService {
                       },
                       'sound': 'default',
                     },
-                  },
-                },
-                'webpush': {
-                  'headers': {
-                    'Urgency': 'high',
-                  },
-                  'fcm_options': {
-                    'link': '/',
                   },
                 },
               },

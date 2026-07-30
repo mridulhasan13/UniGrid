@@ -651,25 +651,51 @@ class _MessageBubble extends StatelessWidget {
     if (uri.startsWith('data:image')) {
       try {
         final bytes = base64Decode(uri.split(',').last);
-        img = Image.memory(bytes, fit: BoxFit.cover);
+        img = Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+          gaplessPlayback: true,
+        );
       } catch (_) {
-        img = Center(
-            child: Icon(Icons.broken_image, color: AppColors.textSecondary, size: 48));
+        img = const Center(
+            child: Icon(Icons.broken_image, size: 48));
       }
     } else if (uri.startsWith('http')) {
-      img = Image.network(uri,
-          fit: BoxFit.cover,
-          loadingBuilder: (ctx, child, prog) => prog == null
-              ? child
-              : const Center(child: CircularProgressIndicator()));
+      img = Image.network(
+        uri,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        loadingBuilder: (ctx, child, prog) => prog == null
+            ? child
+            : const Center(child: CircularProgressIndicator()),
+      );
     } else if (kIsWeb) {
-      img = Image.network(uri, fit: BoxFit.cover);
+      img = Image.network(uri, fit: BoxFit.contain, filterQuality: FilterQuality.high);
     } else {
-      img = Image.file(File(uri), fit: BoxFit.cover);
+      img = Image.file(File(uri), fit: BoxFit.contain, filterQuality: FilterQuality.high);
     }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: SizedBox(width: 200, height: 180, child: img),
+    return GestureDetector(
+      onTap: () {
+        // Open full-screen image viewer on tap
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => Scaffold(
+            backgroundColor: Colors.black,
+            appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
+            body: Center(child: InteractiveViewer(child: img)),
+          ),
+        ));
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 280,
+            maxHeight: 340,
+          ),
+          child: img,
+        ),
+      ),
     );
   }
 }
