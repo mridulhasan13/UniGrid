@@ -319,6 +319,10 @@ class AuthService {
 
   Future<void> signOut() async {
     try {
+      final currentUid = _auth.currentUser?.uid;
+      if (currentUid != null) {
+        await FCMService.removeCurrentTokenOnLogout(currentUid);
+      }
       _userSubscription?.cancel();
       await _clearSession();
       await _auth.signOut();

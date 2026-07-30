@@ -42,21 +42,23 @@ class FCMService {
 
     if (kIsWeb) {
       // ── Web-specific init ────────────────────────────────────────────────
-      // Request permission from the browser.
-      final settings = await _messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-        debugPrint('FCM web: notification permission denied');
-        return;
-      }
-
-      // Save token for any already-logged-in user.
-      final currentUser = fb_auth.FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        await saveTokenForUser(currentUser.uid);
+      try {
+        final settings = await _messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+        if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional) {
+          final currentUser = fb_auth.FirebaseAuth.instance.currentUser;
+          if (currentUser != null) {
+            await saveTokenForUser(currentUser.uid);
+          }
+        } else {
+          debugPrint('FCM web permission status: ${settings.authorizationStatus}');
+        }
+      } catch (e) {
+        debugPrint('FCM web permission request notice: $e');
       }
 
       // Refresh listener — keep Firestore in sync when browser rotates the token.
@@ -64,6 +66,7 @@ class FCMService {
         final user = fb_auth.FirebaseAuth.instance.currentUser;
         if (user != null) {
           try {
+            await removeTokenFromAllExcept(newToken, user.uid);
             await _firestore.collection('users').doc(user.uid).set(
               {
                 'fcmToken': newToken,
@@ -257,16 +260,19 @@ class FCMService {
   // ─── Save FCM Token to Firestore ──────────────────────────────────────────
   static Future<void> saveTokenForUser(String userId) async {
     try {
-      // On web, a VAPID key is required to get the push subscription token.
-      // On native platforms, getToken() works without any arguments.
       final token = kIsWeb
           ? await _messaging.getToken(vapidKey: _webVapidKey)
           : await _messaging.getToken();
-      if (token == null) {
-        debugPrint('FCM token is null for user: $userId');
+      if (token == null || token.isEmpty) {
+        debugPrint('FCM token is null or empty for user: $userId');
         return;
       }
       _cachedToken = token;
+
+      // 1. Remove this token from any OTHER user account (cross-account cleanup)
+      await removeTokenFromAllExcept(token, userId);
+
+      // 2. Add to current user doc
       await _firestore.collection('users').doc(userId).set(
         {
           'fcmToken': token,
@@ -275,12 +281,48 @@ class FCMService {
         },
         SetOptions(merge: true),
       );
-      print('\n====================================================');
-      print('🔥 FCM TOKEN (User: $userId, Web: $kIsWeb):');
-      print(token);
-      print('====================================================\n');
+      debugPrint('FCM token saved successfully for user: $userId');
     } catch (e) {
       debugPrint('FCM token save error: $e');
+    }
+  }
+
+  /// Removes [token] from all user documents except [currentUserId]
+  static Future<void> removeTokenFromAllExcept(String token, String currentUserId) async {
+    try {
+      final snap = await _firestore
+          .collection('users')
+          .where('fcmTokens', arrayContains: token)
+          .get();
+      for (final doc in snap.docs) {
+        if (doc.id == currentUserId) continue;
+        await doc.reference.update({
+          'fcmTokens': FieldValue.arrayRemove([token]),
+        });
+        if (doc.data()['fcmToken'] == token) {
+          await doc.reference.update({'fcmToken': FieldValue.delete()});
+        }
+        debugPrint('Cleaned up token from previous account: ${doc.id}');
+      }
+    } catch (e) {
+      debugPrint('removeTokenFromAllExcept error: $e');
+    }
+  }
+
+  /// Removes current device token on user logout
+  static Future<void> removeCurrentTokenOnLogout(String userId) async {
+    try {
+      final token = _cachedToken ?? (kIsWeb
+          ? await _messaging.getToken(vapidKey: _webVapidKey).catchError((_) => null)
+          : await _messaging.getToken().catchError((_) => null));
+      if (token != null && token.isNotEmpty) {
+        await _firestore.collection('users').doc(userId).update({
+          'fcmTokens': FieldValue.arrayRemove([token]),
+        });
+        debugPrint('Removed FCM token on logout for user: $userId');
+      }
+    } catch (e) {
+      debugPrint('removeCurrentTokenOnLogout error: $e');
     }
   }
 
