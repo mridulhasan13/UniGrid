@@ -1066,6 +1066,15 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
+      FCMService.notifyNewMaterial(
+        title: title,
+        subject: subject,
+        senderUserId: userId,
+        department: user.department,
+        batch: user.batch,
+        messageId: docRef.id,
+      );
+
       if (mounted) {
         InAppNotification.show(
           context,

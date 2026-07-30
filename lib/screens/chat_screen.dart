@@ -814,6 +814,14 @@ class _ChatScreenState extends State<ChatScreen> {
           }
 
           await _firestore.collection(_chatPath).add(msgData);
+          FCMService.notifyNewMessage(
+            senderName: senderName,
+            text: i == 0 && captionText.isNotEmpty ? captionText : 'Sent an image',
+            senderUserId: user.id,
+            department: user.department,
+            batch: user.batch,
+            messageId: msgData['id'] as String?,
+          );
         }
       } catch (e) {
         if (mounted) {
@@ -865,6 +873,14 @@ class _ChatScreenState extends State<ChatScreen> {
       _isSending = false;
     });
     _firestore.collection(_chatPath).add(msgData);
+    FCMService.notifyNewMessage(
+      senderName: senderName,
+      text: text,
+      senderUserId: user.id,
+      department: user.department,
+      batch: user.batch,
+      messageId: msgData['id'] as String?,
+    );
   }
 
   // ---- MARK AS SEEN ----

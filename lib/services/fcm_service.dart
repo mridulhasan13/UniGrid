@@ -486,7 +486,7 @@ class FCMService {
           if (t is String && t.isNotEmpty) tokens.add(t);
         }
       }
-      if (tokens.isEmpty && data['fcmToken'] is String && (data['fcmToken'] as String).isNotEmpty) {
+      if (data['fcmToken'] is String && (data['fcmToken'] as String).isNotEmpty) {
         tokens.add(data['fcmToken'] as String);
       }
 

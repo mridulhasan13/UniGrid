@@ -73,6 +73,13 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
 
      // Write message
     await conversationRef.collection('messages').add(textMessage);
+    FCMService.sendPrivateNotification(
+      recipientId: widget.recipient.id,
+      title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
+      body: message.text,
+      senderUserId: user.id,
+      messageId: textMessage['id'] as String?,
+    );
 
     // Update conversation metadata for Inbox sorting
     await conversationRef.set({
@@ -128,6 +135,13 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
           };
 
           await conversationRef.collection('messages').add(imageMessage);
+          FCMService.sendPrivateNotification(
+            recipientId: widget.recipient.id,
+            title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
+            body: 'Sent an image',
+            senderUserId: user.id,
+            messageId: imageMessage['id'] as String?,
+          );
         }
       }
 
