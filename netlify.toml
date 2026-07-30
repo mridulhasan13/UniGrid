@@ -27,6 +27,12 @@
     Pragma = "no-cache"
     Expires = "0"
 
+# Service Worker must NEVER be cached — browsers must always fetch the latest version
+[[headers]]
+  for = "/firebase-messaging-sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
 # Cache optimizations for Flutter Web static assets
 [[headers]]
   for = "/*.js"

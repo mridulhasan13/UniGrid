@@ -14,6 +14,18 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
 
+// ─── Force immediate SW activation ────────────────────────────────────────────
+// Without skipWaiting(), the new SW waits in `waiting` state until ALL tabs
+// using the old SW are closed. This would leave the broken old SW handling
+// notifications until the user manually closes every tab.
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
+
 firebase.initializeApp({
   apiKey: 'AIzaSyAKJPM0bF7HtrLMaq95cKTTM0HF4NrxgfE',
   authDomain: 'dept-ipe.firebaseapp.com',
