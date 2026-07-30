@@ -29,14 +29,20 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Background message received:', payload);
 
-  const title = payload.notification?.title ?? 'UniGrid';
-  const body  = payload.notification?.body  ?? '';
+  // If payload contains notification object, Firebase SDK automatically displays it.
+  // Do NOT call showNotification again here to prevent duplicate browser notifications.
+  if (payload.notification) {
+    return;
+  }
+
+  const title = payload.data?.title ?? 'UniGrid';
+  const body  = payload.data?.body  ?? '';
 
   const options = {
     body: body,
     icon: '/icons/Icon-192.png',
     badge: '/icons/Icon-192.png',
-    tag: 'unigrid-notification',   // Replaces previous notification of same tag
+    tag: payload.data?.tag ?? 'unigrid-notification',
     renotify: true,
     data: payload.data ?? {},
   };
