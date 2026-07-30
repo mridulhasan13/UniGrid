@@ -561,7 +561,7 @@ class _MessageBubble extends StatelessWidget {
               ),
             )
           else if (message.type == 'image' && message.uri != null) ...[
-            _buildImageContent(),
+            _buildImageContent(context),
             if (message.text.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(
@@ -645,7 +645,7 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildImageContent() {
+  Widget _buildImageContent(BuildContext context) {
     final uri = message.uri!;
     Widget img;
     if (uri.startsWith('data:image')) {
