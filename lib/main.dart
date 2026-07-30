@@ -127,8 +127,31 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool _isRestoringSession = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initSessionCheck();
+  }
+
+  Future<void> _initSessionCheck() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    await authService.waitForSessionInit();
+    if (mounted) {
+      setState(() {
+        _isRestoringSession = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,19 +159,19 @@ class AuthWrapper extends StatelessWidget {
     final firebaseUser = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      if (firebaseUser != null) {
-        // Logged in but waiting for Firestore profile to sync
+      if (_isRestoringSession || firebaseUser != null) {
+        // Restoring saved session or waiting for Firestore profile to sync
         return const Scaffold(
           body: Center(
             child: UniGridLoader(
-              title: 'Loading profile...',
-              subtitle: 'Syncing your workspace settings...',
+              title: 'Loading workspace...',
+              subtitle: 'Restoring your session...',
               showBackground: false,
             ),
           ),
         );
       }
-      // Truly not logged in
+      // Session restoration finished and truly not logged in
       return const LoginScreen();
     }
 
@@ -165,8 +188,6 @@ class AuthWrapper extends StatelessWidget {
     }
 
     // Force all logged-in users to have a Department/Batch set up BEFORE proceeding.
-    // DeptSetupGuard will only show its setup UI if `hasDeptScope` is false.
-    // Once they complete it, it yields to `nextScreen` (which might be PendingApproval or MainScreen).
     return DeptSetupGuard(child: nextScreen);
   }
 }
