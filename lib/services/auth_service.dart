@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -618,24 +617,32 @@ img.Image? _decodeImageFromBytes(Uint8List bytes) {
   return img.decodeImage(bytes);
 }
 
-/// Compress image inside a background isolate to prevent UI freezes and support instant chat photo encoding
+/// Optimize chat images for crisp HD resolution (notes, diagrams, equations)
 Uint8List _compressImageForChat(Uint8List bytes) {
   try {
+    // Preserve 100% original pixel perfection for images up to 1.5MB
+    if (bytes.lengthInBytes <= 1500 * 1024) {
+      return bytes;
+    }
+
     final image = _decodeImageFromBytes(bytes);
     if (image == null) return bytes;
 
-    // Aggressive compression to stay under Firestore's 1MB document limit
-    // Target 256px max dimension, quality 70 = ~30-50KB per image
-    img.Image resized;
-    if (image.width > image.height) {
-      resized = img.copyResize(image, width: 256, interpolation: img.Interpolation.nearest);
-    } else {
-      resized = img.copyResize(image, height: 256, interpolation: img.Interpolation.nearest);
+    // For large high-res camera photos (>1.5MB):
+    // Resize to 2048px max dimension (2K Ultra HD) using bicubic interpolation
+    // for crystal-clear mathematical equations and study notes.
+    img.Image resized = image;
+    if (image.width > 2048 || image.height > 2048) {
+      if (image.width > image.height) {
+        resized = img.copyResize(image, width: 2048, interpolation: img.Interpolation.cubic);
+      } else {
+        resized = img.copyResize(image, height: 2048, interpolation: img.Interpolation.cubic);
+      }
     }
 
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 70));
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 92));
   } catch (e) {
-    debugPrint('[ChatCompress] Error during background compression: $e');
+    debugPrint('[ChatCompress] Error during HD image optimization: $e');
     return bytes;
   }
 }
