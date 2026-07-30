@@ -3,9 +3,138 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+function isWebToken(token) {
+  return token.length >= 140;
+}
+
 // ─────────────────────────────────────────────
-// Helper: Send notification to a specific department and batch
+// Helper: Send notification to target tokens with platform split
 // ─────────────────────────────────────────────
+async function sendSplitNotification(tokens, title, body, senderUserId, notificationTag) {
+  if (!tokens || tokens.length === 0) return;
+
+  const nativeTokens = [];
+  const webTokens = [];
+
+  tokens.forEach((t) => {
+    if (isWebToken(t)) {
+      webTokens.push(t);
+    } else {
+      nativeTokens.push(t);
+    }
+  });
+
+  const promises = [];
+
+  // 1. Native tokens (Android / iOS): include top-level `notification`
+  if (nativeTokens.length > 0) {
+    promises.push(
+      admin.messaging().sendEachForMulticast({
+        tokens: nativeTokens,
+        notification: {
+          title: title,
+          body: body,
+        },
+        data: {
+          title: title,
+          body: body,
+          senderUserId: senderUserId || "",
+          messageId: notificationTag,
+        },
+        android: {
+          priority: "high",
+          notification: {
+            title: title,
+            body: body,
+            channelId: "unigrid_notifications",
+            priority: "high",
+            tag: notificationTag,
+            icon: "@mipmap/ic_launcher",
+            sound: "default",
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              alert: {
+                title: title,
+                body: body,
+              },
+              sound: "default",
+            },
+          },
+        },
+      })
+    );
+  }
+
+  // 2. Web tokens: data + webpush.notification ONLY (NO top-level notification to prevent double popup)
+  if (webTokens.length > 0) {
+    promises.push(
+      admin.messaging().sendEachForMulticast({
+        tokens: webTokens,
+        data: {
+          title: title,
+          body: body,
+          senderUserId: senderUserId || "",
+          messageId: notificationTag,
+        },
+        webpush: {
+          notification: {
+            title: title,
+            body: body,
+            icon: "/icons/Icon-192.png",
+            badge: "/icons/Icon-192.png",
+            tag: notificationTag,
+            renotify: false,
+          },
+          headers: {
+            Urgency: "high",
+          },
+          fcmOptions: {
+            link: "/",
+          },
+        },
+      })
+    );
+  }
+
+  const results = await Promise.all(promises);
+  let totalSuccess = 0;
+  let totalFailure = 0;
+  results.forEach((res) => {
+    totalSuccess += res.successCount;
+    totalFailure += res.failureCount;
+
+    if (res.failureCount > 0) {
+      res.responses.forEach((resp, idx) => {
+        if (!resp.success && resp.error) {
+          const errCode = resp.error.code || "";
+          if (errCode.includes("not-registered") || errCode.includes("invalid-registration-token")) {
+            const deadToken = tokens[idx];
+            if (deadToken) {
+              console.log(`Purging dead FCM token: ${deadToken.substring(0, 20)}...`);
+              admin.firestore().collection("users")
+                  .where("fcmTokens", "arrayContains", deadToken)
+                  .get()
+                  .then((snap) => {
+                    snap.forEach((doc) => {
+                      doc.ref.update({
+                        fcmTokens: admin.firestore.FieldValue.arrayRemove(deadToken),
+                      });
+                    });
+                  })
+                  .catch((err) => console.error("Error purging dead token:", err));
+            }
+          }
+        }
+      });
+    }
+  });
+
+  console.log(`Sent notifications: ${totalSuccess} succeeded, ${totalFailure} failed (out of ${tokens.length} tokens).`);
+}
+
 // ─────────────────────────────────────────────
 // Helper: Send notification to a specific department and batch
 // ─────────────────────────────────────────────
@@ -33,84 +162,7 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId, message
       return;
     }
 
-    const response = await admin.messaging().sendEachForMulticast({
-      tokens: tokens,
-      notification: {
-        title: title,
-        body: body,
-      },
-      data: {
-        title: title,
-        body: body,
-        senderUserId: senderUserId || "",
-        messageId: notificationTag,
-      },
-      android: {
-        priority: "high",
-        notification: {
-          title: title,
-          body: body,
-          channelId: "unigrid_notifications",
-          priority: "high",
-          tag: notificationTag,
-          icon: "@mipmap/ic_launcher",
-          sound: "default",
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            alert: {
-              title: title,
-              body: body,
-            },
-            sound: "default",
-          },
-        },
-      },
-      webpush: {
-        notification: {
-          title: title,
-          body: body,
-          icon: "/icons/Icon-192.png",
-          badge: "/icons/Icon-192.png",
-          tag: notificationTag,
-          renotify: false,
-        },
-        headers: {
-          Urgency: "high",
-        },
-        fcmOptions: {
-          link: "/",
-        },
-      },
-    });
-
-    console.log(`Successfully sent ${tokens.length} messages (successCount: ${response.successCount}, failureCount: ${response.failureCount})`);
-
-    // Clean up dead/unregistered tokens automatically
-    if (response.failureCount > 0) {
-      response.responses.forEach((resp, idx) => {
-        if (!resp.success && resp.error) {
-          const errCode = resp.error.code || "";
-          if (errCode.includes("not-registered") || errCode.includes("invalid-registration-token")) {
-            const deadToken = tokens[idx];
-            console.log(`Purging dead FCM token: ${deadToken.substring(0, 20)}...`);
-            admin.firestore().collection("users")
-                .where("fcmTokens", "arrayContains", deadToken)
-                .get()
-                .then((snap) => {
-                  snap.forEach((doc) => {
-                    doc.ref.update({
-                      fcmTokens: admin.firestore.FieldValue.arrayRemove(deadToken),
-                    });
-                  });
-                })
-                .catch((err) => console.error("Error purging dead token:", err));
-          }
-        }
-      });
-    }
+    await sendSplitNotification(tokens, title, body, senderUserId, notificationTag);
   } catch (error) {
     console.error("Error sending scoped messages:", error);
   }
@@ -157,13 +209,11 @@ exports.onNewMessage = functions.firestore
       const { dept, batch, messageId } = context.params;
       const id = data.id || messageId;
 
-      // Don't notify for image-only messages or system messages
       if (!data.text && !data.content) return null;
 
       const senderName = data.authorName || "Someone";
       const text = data.text || data.content || "Sent a message.";
       const title = `💬 ${senderName}`;
-      // Truncate long messages for the notification body
       const body = text.length > 80 ? text.substring(0, 80) + "..." : text;
       const senderUserId = data.authorId || "";
 
@@ -181,13 +231,11 @@ exports.onNewPrivateMessage = functions.firestore
       const id = data.id || messageId;
       const notificationTag = id || "unigrid-notification";
 
-      // Don't notify if message text is missing
       if (!data.text && !data.uri) return null;
 
       const authorId = data.authorId;
       if (!authorId) return null;
 
-      // Parse recipientId from conversationId (format: uid1_uid2, sorted alphabetically)
       const participants = conversationId.split("_");
       const recipientId = participants.find((id) => id !== authorId);
       if (!recipientId) return null;
@@ -213,59 +261,7 @@ exports.onNewPrivateMessage = functions.firestore
           return null;
         }
 
-        const response = await admin.messaging().sendEachForMulticast({
-          tokens: tokens,
-          notification: {
-            title: senderName,
-            body: body,
-          },
-          data: {
-            title: senderName,
-            body: body,
-            senderUserId: authorId,
-            messageId: notificationTag,
-          },
-          android: {
-            priority: "high",
-            notification: {
-              title: senderName,
-              body: body,
-              channelId: "unigrid_notifications",
-              priority: "high",
-              tag: notificationTag,
-              icon: "@mipmap/ic_launcher",
-              sound: "default",
-            },
-          },
-          apns: {
-            payload: {
-              aps: {
-                alert: {
-                  title: senderName,
-                  body: body,
-                },
-                sound: "default",
-              },
-            },
-          },
-          webpush: {
-            notification: {
-              title: senderName,
-              body: body,
-              icon: "/icons/Icon-192.png",
-              badge: "/icons/Icon-192.png",
-              tag: notificationTag,
-              renotify: false,
-            },
-            headers: {
-              Urgency: "high",
-            },
-            fcmOptions: {
-              link: "/",
-            },
-          },
-        });
-        console.log(`Successfully sent private message notification to ${tokens.length} tokens:`, response);
+        await sendSplitNotification(tokens, senderName, body, authorId, notificationTag);
       } catch (error) {
         console.error("Error sending private message notification:", error);
       }
@@ -279,7 +275,6 @@ exports.onNewUserRegistration = functions.firestore
     .onCreate(async (snap, context) => {
       const data = snap.data();
       
-      // Only notify if user registration needs approval (isApproved is false and they are not auto-approved as CR)
       if (data.isApproved === true || data.isCR === true) return null;
 
       const studentName = data.name || "Someone";
@@ -310,24 +305,7 @@ exports.onNewUserRegistration = functions.firestore
         const title = "🆕 New Registration Request";
         const body = `${studentName} (ID: ${studentId}) registered in ${department} Batch ${batch}. Tap to review/approve.`;
 
-        const response = await admin.messaging().sendEachForMulticast({
-          tokens: tokens,
-          notification: {
-            title: title,
-            body: body,
-          },
-          data: {
-            senderUserId: "system",
-          },
-          android: {
-            notification: {
-              channelId: "unigrid_notifications",
-              priority: "high",
-            },
-          },
-        });
-
-        console.log(`Successfully notified ${tokens.length} CR(s) of new registration request`);
+        await sendSplitNotification(tokens, title, body, "system", "unigrid-registration");
       } catch (error) {
         console.error("Error notifying CR of new registration:", error);
       }
