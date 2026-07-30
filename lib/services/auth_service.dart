@@ -303,14 +303,7 @@ class AuthService {
         );
         await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
         
-        FCMService.sendToDeptAndBatch(
-          department: department,
-          batch: batch,
-          title: 'New Registration',
-          body: '$name ($studentId) has registered in your batch and needs approval.',
-          senderUserId: user.uid,
-          adminsOnly: true,
-        );
+
         
         return newUser;
       }

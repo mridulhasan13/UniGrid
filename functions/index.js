@@ -69,6 +69,14 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId, message
         },
       },
       webpush: {
+        notification: {
+          title: title,
+          body: body,
+          icon: "/icons/Icon-192.png",
+          badge: "/icons/Icon-192.png",
+          tag: notificationTag,
+          renotify: false,
+        },
         headers: {
           Urgency: "high",
         },
@@ -241,6 +249,14 @@ exports.onNewPrivateMessage = functions.firestore
             },
           },
           webpush: {
+            notification: {
+              title: senderName,
+              body: body,
+              icon: "/icons/Icon-192.png",
+              badge: "/icons/Icon-192.png",
+              tag: notificationTag,
+              renotify: false,
+            },
             headers: {
               Urgency: "high",
             },

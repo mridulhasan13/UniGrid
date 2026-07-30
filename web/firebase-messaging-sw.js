@@ -1,19 +1,17 @@
 // UniGrid — Firebase Cloud Messaging Service Worker
 // Served at /firebase-messaging-sw.js
 //
-// KEY: When FCM payload contains `notification` at top-level, Firebase JS SDK
-// shows the notification automatically. When payload is data-only (no top-level
-// `notification`), our onBackgroundMessage fires and we show it manually.
+// ─── How Firebase compat messaging works in a SW ────────────────────────────
+// • `onBackgroundMessage` fires for ALL background messages (notification + data).
+// • When the FCM payload has `notification` (top-level OR webpush.notification),
+//   Firebase compat SDK auto-shows the notification BEFORE calling our handler.
+//   → We must NOT call showNotification again to avoid a double popup.
+// • When the payload is data-only (no `notification`), Firebase compat does NOT
+//   auto-show — our handler MUST call showNotification itself.
 //
-// Our Netlify function sends:
-//   • Android/iOS tokens → top-level `notification` (handled natively by OS)
-//   • Web tokens → NO top-level `notification`, only `webpush.notification`
-//
-// The Firebase compat SDK handles `webpush.notification` automatically, so
-// onBackgroundMessage is NOT called for webpush messages. The browser's built-in
-// Push API delivers webpush.notification directly.
-//
-// This file handles ONLY the data-only fallback case.
+// Cloud Functions send: top-level `notification` + `data` + `webpush.notification`
+// → Firebase compat auto-shows from webpush.notification → we skip manual show.
+// → Our handler only needs to run for edge-case data-only messages.
 
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
@@ -30,18 +28,25 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // ─── Background message handler ───────────────────────────────────────────────
-// This ONLY fires for data-only messages (no `notification` key in payload).
-// For webpush.notification messages, the browser handles display automatically.
+// Fires for ALL background messages — notification and data-only alike.
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Data-only background message:', payload);
+  console.log('[SW] Background message received:', JSON.stringify(payload));
 
-  // Extract title/body from data field
+  // If the payload already has a `notification` field, the Firebase compat SDK
+  // auto-displayed it already. Don't show again → prevent double popup.
+  if (payload.notification) {
+    console.log('[SW] Notification field present — auto-shown by Firebase compat SDK, skipping manual show.');
+    return;
+  }
+
+  // Data-only message → we must show the notification manually.
   const title = (payload.data && payload.data.title) ? payload.data.title : 'UniGrid';
   const body  = (payload.data && payload.data.body)  ? payload.data.body  : '';
   const tag   = (payload.data && payload.data.messageId) ? payload.data.messageId : 'unigrid-msg';
 
   if (!title && !body) return;
 
+  console.log('[SW] Data-only message — showing notification manually.');
   return self.registration.showNotification(title, {
     body: body,
     icon: '/icons/Icon-192.png',
