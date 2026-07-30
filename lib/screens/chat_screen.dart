@@ -124,15 +124,22 @@ class _SwipeToReply extends StatefulWidget {
   State<_SwipeToReply> createState() => _SwipeToReplyState();
 }
 
-class _SwipeToReplyState extends State<_SwipeToReply>
-    with SingleTickerProviderStateMixin {
-  double _offset = 0;
+class _SwipeToReplyState extends State<_SwipeToReply> {
+  final ValueNotifier<double> _offsetNotifier = ValueNotifier<double>(0.0);
   bool _triggered = false;
+
+  @override
+  void dispose() {
+    _offsetNotifier.dispose();
+    super.dispose();
+  }
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (details.delta.dx > 0) {
-      setState(() => _offset = (_offset + details.delta.dx).clamp(0.0, 72.0));
-      if (_offset >= 58 && !_triggered) {
+      final newOffset =
+          (_offsetNotifier.value + details.delta.dx).clamp(0.0, 72.0);
+      _offsetNotifier.value = newOffset;
+      if (newOffset >= 58 && !_triggered) {
         _triggered = true;
         HapticFeedback.mediumImpact();
         widget.onReply();
@@ -141,10 +148,8 @@ class _SwipeToReplyState extends State<_SwipeToReply>
   }
 
   void _onDragEnd(DragEndDetails _) {
-    setState(() {
-      _offset = 0;
-      _triggered = false;
-    });
+    _offsetNotifier.value = 0.0;
+    _triggered = false;
   }
 
   @override
@@ -152,38 +157,45 @@ class _SwipeToReplyState extends State<_SwipeToReply>
     return GestureDetector(
       onHorizontalDragUpdate: _onDragUpdate,
       onHorizontalDragEnd: _onDragEnd,
-      child: Stack(
-        children: [
-          // Reply icon revealed behind sliding message
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 12),
-                child: Opacity(
-                  opacity: (_offset / 58).clamp(0.0, 1.0),
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.25),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: AppColors.primary.withOpacity(0.5), width: 1),
+      child: ValueListenableBuilder<double>(
+        valueListenable: _offsetNotifier,
+        builder: (context, offset, child) {
+          return Stack(
+            children: [
+              // Reply icon revealed behind sliding message
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Opacity(
+                      opacity: (offset / 58).clamp(0.0, 1.0),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.25),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: AppColors.primary.withOpacity(0.5),
+                              width: 1),
+                        ),
+                        child: Icon(Icons.reply_rounded,
+                            color: AppColors.textPrimary, size: 18),
+                      ),
                     ),
-                    child: Icon(Icons.reply_rounded,
-                        color: AppColors.textPrimary, size: 18),
                   ),
                 ),
               ),
-            ),
-          ),
-          // Sliding message
-          Transform.translate(
-            offset: Offset(_offset, 0),
-            child: widget.child,
-          ),
-        ],
+              // Sliding message
+              Transform.translate(
+                offset: Offset(offset, 0),
+                child: child,
+              ),
+            ],
+          );
+        },
+        child: widget.child,
       ),
     );
   }
@@ -366,13 +378,22 @@ class _MessageBubble extends StatelessWidget {
     required this.onLongPress,
   });
 
+  static final Map<String, MemoryImage> _base64Cache = {};
+
   ImageProvider? _imgProvider(String photo) {
     if (photo.isEmpty) return null;
     if (kIsWeb && !photo.contains('supabase')) return null;
     if (photo.startsWith('data:image')) {
+      if (_base64Cache.containsKey(photo)) {
+        return _base64Cache[photo];
+      }
       try {
-        return MemoryImage(base64Decode(photo.split(',').last));
-      } catch (_) {}
+        final decoded = MemoryImage(base64Decode(photo.split(',').last));
+        _base64Cache[photo] = decoded;
+        return decoded;
+      } catch (_) {
+        return null;
+      }
     }
     return NetworkImage(photo);
   }
@@ -464,10 +485,11 @@ class _MessageBubble extends StatelessWidget {
       bottomRight: Radius.circular(isOwn ? 4 : 18),
     );
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.72),
+      constraints: BoxConstraints(maxWidth: screenWidth * 0.72),
       decoration: BoxDecoration(
         color: isOwn
             ? (isBW
@@ -1789,12 +1811,14 @@ class _ChatScreenState extends State<ChatScreen> {
         final msgs = snap.data!.docs.map((d) => _ChatMsg.fromDoc(d)).toList()
           ..sort((a, b) => b.preciseTime.compareTo(a.preciseTime));
 
-        // Automatically mark all loaded received unread messages as seen in database
-        for (final msg in msgs) {
-          if (msg.authorId != appUser.id && !msg.seenBy.contains(appUser.id)) {
-            _markAsSeen(msg, appUser.id);
+        // Automatically mark all loaded received unread messages as seen in database post-frame
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          for (final msg in msgs) {
+            if (msg.authorId != appUser.id && !msg.seenBy.contains(appUser.id)) {
+              _markAsSeen(msg, appUser.id);
+            }
           }
-        }
+        });
 
         if (msgs.isEmpty) {
           return Center(

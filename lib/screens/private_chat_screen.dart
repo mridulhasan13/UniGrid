@@ -30,6 +30,7 @@ class PrivateChatScreen extends StatefulWidget {
 
 class _PrivateChatScreenState extends State<PrivateChatScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final Map<String, Uint8List> _base64BytesCache = {};
   List<types.Message> _messages = [];
   int _messageLimit = 50;
   late String _conversationId;
@@ -313,8 +314,14 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   Widget imgWidget;
                   if (message.uri.startsWith('data:image')) {
                     try {
-                      final base64String = message.uri.split(',').last;
-                      final bytes = base64Decode(base64String);
+                      Uint8List bytes;
+                      if (_base64BytesCache.containsKey(message.uri)) {
+                        bytes = _base64BytesCache[message.uri]!;
+                      } else {
+                        final base64String = message.uri.split(',').last;
+                        bytes = base64Decode(base64String);
+                        _base64BytesCache[message.uri] = bytes;
+                      }
                       imgWidget = Image.memory(
                         bytes,
                         width: messageWidth.toDouble(),
