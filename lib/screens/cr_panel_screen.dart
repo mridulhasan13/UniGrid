@@ -286,9 +286,10 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
       String announcementsPath,
       String department,
       String batch) async {
+    DocumentReference? docRef;
     try {
       // Stage 1: Post the text instantly
-      final docRef = await FirebaseFirestore.instance.collection(announcementsPath).add({
+      docRef = await FirebaseFirestore.instance.collection(announcementsPath).add({
         'title': title,
         'content': content,
         'type': type,
