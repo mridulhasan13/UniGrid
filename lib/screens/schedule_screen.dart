@@ -14,7 +14,7 @@ import 'course_registry_screen.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/floating_app_bar.dart';
 import '../services/auth_service.dart';
-import '../widgets/in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});

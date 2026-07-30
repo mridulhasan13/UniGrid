@@ -14,7 +14,7 @@ import '../widgets/unigrid_loader.dart';
 import '../utils/constants.dart';
 import 'file_viewer_screen.dart';
 import '../services/auth_service.dart';
-import '../services/fcm_service.dart';
+import '../notifications/fcm_service.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';

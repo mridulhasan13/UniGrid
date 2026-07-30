@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image/image.dart' as img;
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
-import 'fcm_service.dart';
+import '../notifications/fcm_service.dart';
 import 'theme_service.dart';
 import 'supabase_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';

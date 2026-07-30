@@ -9,7 +9,7 @@ import '../widgets/unigrid_loader.dart';
 import '../utils/dept_scope.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../widgets/in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 class MasterPanelScreen extends StatefulWidget {
   const MasterPanelScreen({super.key});

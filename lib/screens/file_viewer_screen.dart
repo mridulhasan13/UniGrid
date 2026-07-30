@@ -6,7 +6,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../utils/constants.dart';
 import '../widgets/unigrid_loader.dart';
 import 'web_ui_helper.dart' if (dart.library.html) 'web_ui_helper_web.dart';
-import '../widgets/in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 class FileViewerScreen extends StatefulWidget {
   final String fileName;

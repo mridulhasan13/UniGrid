@@ -14,7 +14,7 @@ import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../utils/constants.dart';
 import '../widgets/glass_card.dart';
-import '../services/routine_reminder_service.dart';
+import '../notifications/routine_reminder_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});

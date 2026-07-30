@@ -13,7 +13,7 @@ import '../services/supabase_storage_service.dart';
 import '../widgets/unigrid_loader.dart';
 import '../widgets/floating_app_bar.dart';
 import 'file_viewer_screen.dart';
-import '../widgets/in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});

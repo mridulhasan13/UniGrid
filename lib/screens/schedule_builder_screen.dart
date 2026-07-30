@@ -6,7 +6,7 @@ import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../utils/schedule_constants.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 class ScheduleBuilderScreen extends StatefulWidget {
   final ClassSchedule? classToEdit;

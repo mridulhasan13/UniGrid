@@ -18,10 +18,10 @@ import '../services/theme_service.dart';
 import '../utils/constants.dart';
 import '../services/auth_service.dart';
 
-import '../services/fcm_service.dart';
+import '../notifications/fcm_service.dart';
 import '../utils/dept_scope.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../widgets/in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 // ============================================================
 // Data Model

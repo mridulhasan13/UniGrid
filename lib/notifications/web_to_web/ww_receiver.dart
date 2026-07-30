@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart' show Icons;
-import '../../widgets/in_app_notification.dart';
+import '../in_app_notification.dart';
 import '../shared/duplicate_guard.dart';
 import '../shared/sound_helper.dart';
 

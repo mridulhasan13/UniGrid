@@ -15,10 +15,10 @@ import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/unigrid_loader.dart';
 import 'schedule_builder_screen.dart';
-import '../services/fcm_service.dart';
+import '../notifications/fcm_service.dart';
 import 'course_registry_screen.dart';
 import '../widgets/custom_snack_bar.dart';
-import '../widgets/in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 class CRPanelScreen extends StatefulWidget {
   const CRPanelScreen({super.key});

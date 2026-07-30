@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../utils/dept_scope.dart';
-import '../widgets/in_app_notification.dart';
+import 'in_app_notification.dart';
 import 'fcm_service.dart';
 
 /// Background service for scheduling and dispatching 10-minute class reminders.

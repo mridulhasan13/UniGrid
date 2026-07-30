@@ -10,8 +10,8 @@ import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart' show Icons;
-import '../widgets/in_app_notification.dart';
-import '../notifications/notification_coordinator.dart';
+import 'in_app_notification.dart';
+import 'notification_coordinator.dart';
 
 // ─── Web Push VAPID Key ──────────────────────────────────────────────────────
 // Generate this in Firebase Console → Project Settings → Cloud Messaging

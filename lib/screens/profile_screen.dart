@@ -20,8 +20,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/dept_scope.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../widgets/in_app_notification.dart';
-import '../services/routine_reminder_service.dart';
+import '../notifications/in_app_notification.dart';
+import '../notifications/routine_reminder_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

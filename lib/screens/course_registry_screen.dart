@@ -13,7 +13,7 @@ import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/unigrid_loader.dart';
 import 'file_viewer_screen.dart';
-import '../widgets/in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 class CourseRegistryScreen extends StatefulWidget {
   const CourseRegistryScreen({super.key});

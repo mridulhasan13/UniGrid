@@ -3,7 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart' show Icons;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import '../../widgets/in_app_notification.dart';
+import '../in_app_notification.dart';
 import '../shared/duplicate_guard.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────

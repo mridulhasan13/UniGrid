@@ -9,7 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/models.dart';
 import '../services/supabase_storage_service.dart';
 import '../services/theme_service.dart';
-import '../services/fcm_service.dart';
+import '../notifications/fcm_service.dart';
 import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
@@ -17,7 +17,7 @@ import '../widgets/unigrid_loader.dart';
 import '../widgets/floating_app_bar.dart';
 import '../services/auth_service.dart';
 import 'file_viewer_screen.dart';
-import '../widgets/in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 class MaterialsScreen extends StatefulWidget {
   const MaterialsScreen({super.key});

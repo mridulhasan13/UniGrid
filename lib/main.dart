@@ -14,7 +14,7 @@ import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
 import 'screens/pending_approval_screen.dart';
 import 'utils/constants.dart';
-import 'services/fcm_service.dart';
+import 'notifications/fcm_service.dart';
 import 'notifications/notification_coordinator.dart';
 
 import 'package:google_fonts/google_fonts.dart';
@@ -25,7 +25,7 @@ import 'widgets/dept_setup_guard.dart';
 import 'widgets/version_aware_wrapper.dart';
 import 'widgets/unigrid_loader.dart';
 
-import 'widgets/in_app_notification.dart';
+import 'notifications/in_app_notification.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

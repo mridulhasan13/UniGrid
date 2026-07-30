@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/constants.dart';
-import 'in_app_notification.dart';
+import '../notifications/in_app_notification.dart';
 
 class CustomSnackBar {
   static void show(
