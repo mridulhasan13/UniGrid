@@ -92,17 +92,33 @@ function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUse
     const payload = JSON.stringify({
       message: {
         token: token,
-        notification: { title: title, body: bodyText },
         data: {
+          title: title,
+          body: bodyText,
           senderUserId: senderUserId || "",
           messageId: notificationTag,
         },
         android: {
           priority: "high",
-          notification: { sound: "default", channel_id: "unigrid_notifications", tag: notificationTag, icon: "@mipmap/ic_launcher" },
+          notification: {
+            title: title,
+            body: bodyText,
+            sound: "default",
+            channel_id: "unigrid_notifications",
+            tag: notificationTag,
+            icon: "@mipmap/ic_launcher",
+          },
         },
         apns: {
-          payload: { aps: { sound: "default" } },
+          payload: {
+            aps: {
+              alert: {
+                title: title,
+                body: bodyText,
+              },
+              sound: "default",
+            },
+          },
         },
         webpush: {
           notification: {

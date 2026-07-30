@@ -35,17 +35,17 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId, message
 
     const response = await admin.messaging().sendEachForMulticast({
       tokens: tokens,
-      notification: {
+      data: {
         title: title,
         body: body,
-      },
-      data: {
         senderUserId: senderUserId || "",
         messageId: notificationTag,
       },
       android: {
         priority: "high",
         notification: {
+          title: title,
+          body: body,
           channelId: "unigrid_notifications",
           priority: "high",
           tag: notificationTag,
@@ -56,6 +56,10 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId, message
       apns: {
         payload: {
           aps: {
+            alert: {
+              title: title,
+              body: body,
+            },
             sound: "default",
           },
         },
@@ -182,17 +186,17 @@ exports.onNewPrivateMessage = functions.firestore
 
         const response = await admin.messaging().sendEachForMulticast({
           tokens: tokens,
-          notification: {
+          data: {
             title: senderName,
             body: body,
-          },
-          data: {
             senderUserId: authorId,
             messageId: notificationTag,
           },
           android: {
             priority: "high",
             notification: {
+              title: senderName,
+              body: body,
               channelId: "unigrid_notifications",
               priority: "high",
               tag: notificationTag,
@@ -203,6 +207,10 @@ exports.onNewPrivateMessage = functions.firestore
           apns: {
             payload: {
               aps: {
+                alert: {
+                  title: senderName,
+                  body: body,
+                },
                 sound: "default",
               },
             },
