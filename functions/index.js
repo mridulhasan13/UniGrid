@@ -35,6 +35,10 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId, message
 
     const response = await admin.messaging().sendEachForMulticast({
       tokens: tokens,
+      notification: {
+        title: title,
+        body: body,
+      },
       data: {
         title: title,
         body: body,
@@ -64,16 +68,9 @@ async function notifyScopedUsers(dept, batch, title, body, senderUserId, message
           },
         },
       },
-      // Required for web push tokens — without this block FCM silently
-      // drops the message for browser (PWA / Flutter Web) endpoints.
       webpush: {
-        notification: {
-          title: title,
-          body: body,
-          icon: "/icons/Icon-192.png",
-          badge: "/icons/Icon-192.png",
-          tag: notificationTag,
-          requireInteraction: false,
+        headers: {
+          Urgency: "high",
         },
         fcmOptions: {
           link: "/",
@@ -210,6 +207,10 @@ exports.onNewPrivateMessage = functions.firestore
 
         const response = await admin.messaging().sendEachForMulticast({
           tokens: tokens,
+          notification: {
+            title: senderName,
+            body: body,
+          },
           data: {
             title: senderName,
             body: body,
@@ -240,13 +241,8 @@ exports.onNewPrivateMessage = functions.firestore
             },
           },
           webpush: {
-            notification: {
-              title: senderName,
-              body: body,
-              icon: "/icons/Icon-192.png",
-              badge: "/icons/Icon-192.png",
-              tag: notificationTag,
-              requireInteraction: false,
+            headers: {
+              Urgency: "high",
             },
             fcmOptions: {
               link: "/",

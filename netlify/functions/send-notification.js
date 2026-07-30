@@ -92,6 +92,10 @@ function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUse
     const payload = JSON.stringify({
       message: {
         token: token,
+        notification: {
+          title: title,
+          body: bodyText,
+        },
         data: {
           title: title,
           body: bodyText,
@@ -121,13 +125,8 @@ function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUse
           },
         },
         webpush: {
-          notification: {
-            title: title,
-            body: bodyText,
-            icon: "/icons/Icon-192.png",
-            badge: "/icons/Icon-192.png",
-            tag: notificationTag,
-            requireInteraction: false,
+          headers: {
+            Urgency: "high",
           },
           fcm_options: { link: "/" },
         },

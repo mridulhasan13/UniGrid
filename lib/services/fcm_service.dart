@@ -431,6 +431,10 @@ class FCMService {
             body: jsonEncode({
               'message': {
                 'token': token,
+                'notification': {
+                  'title': title,
+                  'body': body,
+                },
                 'data': {
                   'title': title,
                   'body': body,
@@ -460,13 +464,8 @@ class FCMService {
                   },
                 },
                 'webpush': {
-                  'notification': {
-                    'title': title,
-                    'body': body,
-                    'icon': '/icons/Icon-192.png',
-                    'badge': '/icons/Icon-192.png',
-                    'tag': messageId ?? 'unigrid-notification',
-                    'requireInteraction': false,
+                  'headers': {
+                    'Urgency': 'high',
                   },
                   'fcm_options': {
                     'link': '/',
