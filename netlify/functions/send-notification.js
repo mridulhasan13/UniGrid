@@ -231,20 +231,15 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'title' and 'bodyText' are required" }) };
   }
 
-  // Read service account from file (written by netlify_build.sh during build).
-  // Using a file avoids the 4KB AWS Lambda environment variable size limit.
+  // Require service_account.json directly so Netlify's bundler bundles it into the function zip.
   let serviceAccount;
   try {
-    const fs = require("fs");
-    const path = require("path");
-    const saPath = path.join(__dirname, "service_account.json");
-    const raw = fs.readFileSync(saPath, "utf8").trim();
-    serviceAccount = JSON.parse(raw);
+    serviceAccount = require("./service_account.json");
     if (!serviceAccount.private_key || !serviceAccount.client_email) {
       return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: "service_account.json is missing required fields (placeholder?)" }) };
     }
   } catch (err) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: "Could not read service_account.json: " + err.message }) };
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: "Could not load service_account.json: " + err.message }) };
   }
 
   let accessToken;
