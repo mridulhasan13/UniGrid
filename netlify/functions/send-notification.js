@@ -126,15 +126,21 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
         token: token,
         data: data,
         webpush: {
+          headers: {
+            Urgency: "high",
+          },
           notification: {
             title: title,
             body: bodyText,
             icon: "https://unigrid.netlify.app/icons/Icon-192.png",
             badge: "https://unigrid.netlify.app/icons/Icon-192.png",
+            image: "https://unigrid.netlify.app/icons/Icon-192.png",
             tag: notificationTag,
-            renotify: false,
+            renotify: true,
           },
-          fcm_options: { link: "/" },
+          fcm_options: {
+            link: "https://unigrid.netlify.app/",
+          },
         },
       },
     };
@@ -161,6 +167,7 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
             channel_id: "unigrid_notifications",
             tag: notificationTag,
             icon: "@mipmap/ic_launcher",
+            click_action: "FLUTTER_NOTIFICATION_CLICK",
           },
         },
         apns: {

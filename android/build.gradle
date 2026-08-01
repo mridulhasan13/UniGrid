@@ -21,9 +21,13 @@ subprojects {
     
     afterEvaluate { project ->
         if (project.name != 'app' && (project.plugins.hasPlugin("com.android.application") || project.plugins.hasPlugin("com.android.library"))) {
-            println ">>> Overriding compileSdkVersion for ${project.name}"
+            println ">>> Overriding compileSdkVersion & compileOptions for ${project.name}"
             project.android {
-                compileSdkVersion 34
+                compileSdkVersion 35
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
             }
         }
     }
