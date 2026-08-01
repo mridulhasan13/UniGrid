@@ -166,7 +166,31 @@ class FCMService {
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
+    // Register tap listeners for notifications opened when app is in background or terminated
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('[FCMService] Notification opened app: ${message.data}');
+      _handleNotificationTap(message);
+    });
+
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        debugPrint('[FCMService] App launched from notification: ${message.data}');
+        _handleNotificationTap(message);
+      }
+    });
+
     // Note: Foreground messages are handled by NotificationCoordinator (WAReceiver / AAReceiver).
+  }
+
+  static void _handleNotificationTap(RemoteMessage message) {
+    final route = message.data['route'];
+    if (route != null && route.toString().isNotEmpty && route.toString() != '/') {
+      final targetRoute = route.toString();
+      debugPrint('[FCMService] Navigating to route on tap: $targetRoute');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        globalNavigatorKey.currentState?.pushNamed(targetRoute);
+      });
+    }
   }
 
   // ─── Request Battery Optimization Exclusion ───────────────────────────────

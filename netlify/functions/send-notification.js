@@ -104,12 +104,17 @@ function getAccessToken(serviceAccount) {
 }
 
 // ─── Build Platform-Correct FCM HTTP v1 Payload ──────────────────────────────
-function buildPayload(token, title, bodyText, senderUserId, notificationTag, targetPlatform) {
+function buildPayload(token, title, bodyText, senderUserId, notificationTag, targetPlatform, extraData = {}) {
+  const targetUrl = extraData.url || "https://unigrid.netlify.app/";
+  const targetRoute = extraData.route || "/";
+
   const data = {
     title: title,
     body: bodyText,
     senderUserId: senderUserId || "",
     messageId: notificationTag,
+    url: targetUrl,
+    route: targetRoute,
   };
 
   const isWeb = targetPlatform ? targetPlatform === "web" : isWebToken(token);
@@ -184,9 +189,9 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
 }
 
 // ─── Post single FCM message to FCM HTTP v1 API ─────────────────────────────
-function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId, targetPlatform) {
+function sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId, targetPlatform, extraData = {}) {
   const notificationTag = messageId || "unigrid-notification";
-  const payload = JSON.stringify(buildPayload(token, title, bodyText, senderUserId, notificationTag, targetPlatform));
+  const payload = JSON.stringify(buildPayload(token, title, bodyText, senderUserId, notificationTag, targetPlatform, extraData));
 
   return new Promise((resolve) => {
     const req = https.request(
@@ -230,7 +235,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
-  const { tokens, title, bodyText, senderUserId, messageId, targetPlatform } = body;
+  const { tokens, title, bodyText, senderUserId, messageId, targetPlatform, url, route } = body;
   if (!Array.isArray(tokens) || tokens.length === 0) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'tokens' array is required" }) };
   }
@@ -261,9 +266,10 @@ exports.handler = async (event) => {
   let sentCount = 0;
   let failCount = 0;
   const deadTokens = [];
+  const extraData = { url, route };
 
   for (const token of tokens) {
-    const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId, targetPlatform);
+    const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId, targetPlatform, extraData);
     if (res.status === 200) {
       sentCount++;
       console.log(`FCM sent OK — ${isWebToken(token) ? "WEB" : "NATIVE"} token: ${token.slice(0, 20)}...`);
