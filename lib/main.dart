@@ -162,7 +162,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final firebaseUser = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      if (_isRestoringSession || firebaseUser != null) {
+      if (_isRestoringSession && firebaseUser != null) {
         // Restoring saved session or waiting for Firestore profile to sync
         return const Scaffold(
           body: Center(
@@ -174,7 +174,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           ),
         );
       }
-      // Session restoration finished and truly not logged in
+      // Session restoration finished and truly not logged in (or profile doc missing)
       return const LoginScreen();
     }
 

@@ -38,10 +38,9 @@ class _DeptSetupGuardState extends State<DeptSetupGuard> {
 
     // Pass through immediately if:
     // • No Firebase user at all (logged out) — user == null
-    // • Account is approved — isApproved == true
     // • Dept + batch already set — hasDeptScope == true
     // • Root admin or admin
-    if (user == null || user.isApproved || user.hasDeptScope || isRootAdmin) {
+    if (user == null || user.hasDeptScope || isRootAdmin) {
       return widget.child;
     }
 
