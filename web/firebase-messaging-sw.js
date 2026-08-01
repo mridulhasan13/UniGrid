@@ -19,31 +19,10 @@ const messaging = firebase.messaging();
 // unfocused, minimized, or backgrounded.
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message received:', JSON.stringify(payload));
-
-  // If the browser Web Push engine already handles showing the notification
-  // (via webpush.notification or top-level notification), do NOT call
-  // self.registration.showNotification to avoid duplicate system popups.
-  if ((payload.webpush && payload.webpush.notification) || payload.notification) {
-    console.log('[SW] Browser handles notification display automatically — skipping manual SW popup.');
-    return;
-  }
-
-  const title = (payload.data && payload.data.title) || 'UniGrid';
-  const body = (payload.data && payload.data.body) || '';
-  const tag = (payload.data && payload.data.messageId) || 'unigrid-msg';
-
-  if (!title && !body) return;
-
-  const iconUrl = 'https://unigrid.netlify.app/icons/Icon-maskable-192.png';
-
-  return self.registration.showNotification(title, {
-    body: body,
-    icon: iconUrl,
-    badge: iconUrl,
-    tag: tag,
-    renotify: true,
-    data: payload.data || {},
-  });
+  // WebPush notifications configured with `webpush.notification` in FCM HTTP v1
+  // are automatically displayed by the browser's native Push engine.
+  // We log the payload here for background data sync and do NOT call
+  // self.registration.showNotification to prevent duplicate system popups.
 });
 
 // ─── Notification click → focus or open tab ───────────────────────────────────
