@@ -82,18 +82,16 @@ class TokenResolver {
     final Set<String> tokens = {};
     final bool isWebCategory = categoryField == 'webTokens';
 
-    // 1. Primary: check explicit category array
+    // 1. Primary: check explicit category array (trust the platform-saved tokens)
     if (data[categoryField] is List) {
       for (final t in data[categoryField] as List) {
         if (t is String && t.isNotEmpty) {
-          if (isWebCategory ? !t.contains(':APA91b') : t.contains(':APA91b')) {
-            tokens.add(t);
-          }
+          tokens.add(t);
         }
       }
     }
 
-    // 2. Fallback: if category array is empty, check legacy fcmTokens/fcmToken
+    // 2. Fallback: if category array is empty, check legacy fcmTokens/fcmToken with heuristic
     if (tokens.isEmpty) {
       if (data['fcmTokens'] is List) {
         for (final t in data['fcmTokens'] as List) {

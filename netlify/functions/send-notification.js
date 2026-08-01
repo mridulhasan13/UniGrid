@@ -112,7 +112,7 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
     messageId: notificationTag,
   };
 
-  const isWeb = targetPlatform === "web" || isWebToken(token);
+  const isWeb = targetPlatform ? targetPlatform === "web" : isWebToken(token);
 
   if (isWeb) {
     // ── Web Browser (PWA / Flutter Web) ──────────────────────────────────────
