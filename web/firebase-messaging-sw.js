@@ -12,6 +12,15 @@ firebase.initializeApp({
   appId: "1:1071295244583:web:...",
 });
 
+// Force immediate activation of updated Service Worker (purges old cached SW in Samsung Internet)
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
+
 const messaging = firebase.messaging();
 
 // ─── Background message handler ───────────────────────────────────────────────
