@@ -161,21 +161,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final user = Provider.of<AppUser?>(context);
     final firebaseUser = FirebaseAuth.instance.currentUser;
 
-    if (user == null) {
-      if (_isRestoringSession && firebaseUser != null) {
-        // Restoring saved session or waiting for Firestore profile to sync
-        return const Scaffold(
-          body: Center(
-            child: UniGridLoader(
-              title: 'Loading workspace...',
-              subtitle: 'Restoring your session...',
-              showBackground: false,
-            ),
-          ),
-        );
-      }
-      // Session restoration finished and truly not logged in (or profile doc missing)
+    // 1. Truly logged out (no Firebase Auth session and no AppUser profile)
+    if (firebaseUser == null && user == null) {
       return const LoginScreen();
+    }
+
+    // 2. Firebase Auth session exists, but Firestore AppUser profile is still syncing
+    if (user == null) {
+      return const Scaffold(
+        body: Center(
+          child: UniGridLoader(
+            title: 'Loading workspace...',
+            subtitle: 'Syncing your profile...',
+            showBackground: false,
+          ),
+        ),
+      );
     }
 
     final authService = Provider.of<AuthService>(context, listen: false);
