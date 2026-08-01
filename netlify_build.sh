@@ -12,12 +12,20 @@ if [ -n "$SERVICE_ACCOUNT_JSON" ]; then
   mkdir -p assets
   echo "$SERVICE_ACCOUNT_JSON" > assets/service_account.json
   echo "✅ service_account.json restored successfully."
+
+  # Also write to netlify/functions/ so send-notification.js can read it from disk
+  # at Lambda runtime (avoids the 4KB AWS Lambda env var size limit)
+  mkdir -p netlify/functions
+  echo "$SERVICE_ACCOUNT_JSON" > netlify/functions/service_account.json
+  echo "✅ netlify/functions/service_account.json written for runtime use."
 else
   echo "⚠️ Warning: SERVICE_ACCOUNT_JSON environment variable is not defined."
-  echo "Creating an empty placeholder JSON to prevent Flutter compiler asset-bundler errors..."
+  echo "Creating empty placeholder JSONs to prevent build errors..."
   mkdir -p assets
   echo "{}" > assets/service_account.json
-  echo "⚠️ Placeholder created. Features relying on service_account.json (like FCM notifications) will fail at runtime."
+  mkdir -p netlify/functions
+  echo "{}" > netlify/functions/service_account.json
+  echo "⚠️ Placeholders created. FCM notifications will fail at runtime."
 fi
 
 # 2. Check cache or download/extract Flutter SDK
