@@ -9,7 +9,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/material.dart' show Icons;
+import 'package:flutter/material.dart';
 import 'in_app_notification.dart';
 import 'notification_coordinator.dart';
 
