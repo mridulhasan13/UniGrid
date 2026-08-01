@@ -26,7 +26,7 @@ const CORS = {
 function isWebToken(token) {
   // Native Android/iOS FCM tokens contain the signature ':APA91b'.
   // Web Push VAPID tokens do not contain this signature.
-  return !token.includes(':APA91b');
+  return !token.includes(":APA91b") && token.length >= 140;
 }
 
 // ─── Base64Url Helper ────────────────────────────────────────────────────────

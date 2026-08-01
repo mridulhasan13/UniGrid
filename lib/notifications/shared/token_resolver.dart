@@ -74,6 +74,8 @@ class TokenResolver {
 
   // ─── Internals ────────────────────────────────────────────────────────────
 
+  static bool _isWebToken(String t) => !t.contains(':APA91b') && t.length >= 140;
+
   static List<String> _extractCategory(
     Map<String, dynamic>? data,
     String categoryField,
@@ -96,7 +98,7 @@ class TokenResolver {
       if (data['fcmTokens'] is List) {
         for (final t in data['fcmTokens'] as List) {
           if (t is String && t.isNotEmpty) {
-            if (isWebCategory ? !t.contains(':APA91b') : t.contains(':APA91b')) {
+            if (isWebCategory ? _isWebToken(t) : !_isWebToken(t)) {
               tokens.add(t);
             }
           }
@@ -104,7 +106,7 @@ class TokenResolver {
       }
       final single = data['fcmToken'];
       if (single is String && single.isNotEmpty) {
-        if (isWebCategory ? !single.contains(':APA91b') : single.contains(':APA91b')) {
+        if (isWebCategory ? _isWebToken(single) : !_isWebToken(single)) {
           tokens.add(single);
         }
       }
