@@ -80,11 +80,16 @@ class TokenResolver {
   ) {
     if (data == null) return [];
     final Set<String> tokens = {};
+    final bool isWebCategory = categoryField == 'webTokens';
 
     // 1. Primary: check explicit category array
     if (data[categoryField] is List) {
       for (final t in data[categoryField] as List) {
-        if (t is String && t.isNotEmpty) tokens.add(t);
+        if (t is String && t.isNotEmpty) {
+          if (isWebCategory ? !t.contains(':APA91b') : t.contains(':APA91b')) {
+            tokens.add(t);
+          }
+        }
       }
     }
 
@@ -92,12 +97,18 @@ class TokenResolver {
     if (tokens.isEmpty) {
       if (data['fcmTokens'] is List) {
         for (final t in data['fcmTokens'] as List) {
-          if (t is String && t.isNotEmpty) tokens.add(t);
+          if (t is String && t.isNotEmpty) {
+            if (isWebCategory ? !t.contains(':APA91b') : t.contains(':APA91b')) {
+              tokens.add(t);
+            }
+          }
         }
       }
       final single = data['fcmToken'];
       if (single is String && single.isNotEmpty) {
-        tokens.add(single);
+        if (isWebCategory ? !single.contains(':APA91b') : single.contains(':APA91b')) {
+          tokens.add(single);
+        }
       }
     }
 

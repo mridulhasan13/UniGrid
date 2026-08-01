@@ -40,8 +40,8 @@ class WAReceiver {
 
     // Foreground message handler
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      final msgId = message.messageId ??
-          (message.data['messageId'] as String?) ??
+      final msgId = (message.data['messageId'] as String?) ??
+          message.messageId ??
           'wa_${DateTime.now().millisecondsSinceEpoch}';
 
       // ── Duplicate guard ──────────────────────────────────────────────────

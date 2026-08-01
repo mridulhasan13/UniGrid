@@ -28,8 +28,8 @@ class WWReceiver {
     _initialized = true;
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      final msgId = message.messageId ??
-          (message.data['messageId'] as String?) ??
+      final msgId = (message.data['messageId'] as String?) ??
+          message.messageId ??
           'ww_${DateTime.now().millisecondsSinceEpoch}';
 
       // ── Duplicate guard ──────────────────────────────────────────────────

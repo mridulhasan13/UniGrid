@@ -20,23 +20,20 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message received:', JSON.stringify(payload));
 
-  const title = (payload.notification && payload.notification.title)
-    || (payload.webpush && payload.webpush.notification && payload.webpush.notification.title)
-    || (payload.data && payload.data.title)
-    || 'UniGrid';
+  // If the browser Web Push engine already handles showing the notification
+  // (via webpush.notification or top-level notification), do NOT call
+  // self.registration.showNotification to avoid duplicate system popups.
+  if ((payload.webpush && payload.webpush.notification) || payload.notification) {
+    console.log('[SW] Browser handles notification display automatically — skipping manual SW popup.');
+    return;
+  }
 
-  const body = (payload.notification && payload.notification.body)
-    || (payload.webpush && payload.webpush.notification && payload.webpush.notification.body)
-    || (payload.data && payload.data.body)
-    || '';
-
-  const tag = (payload.data && payload.data.messageId)
-    || (payload.webpush && payload.webpush.notification && payload.webpush.notification.tag)
-    || 'unigrid-msg';
+  const title = (payload.data && payload.data.title) || 'UniGrid';
+  const body = (payload.data && payload.data.body) || '';
+  const tag = (payload.data && payload.data.messageId) || 'unigrid-msg';
 
   if (!title && !body) return;
 
-  // Always show the system desktop notification popup for background web pushes
   return self.registration.showNotification(title, {
     body: body,
     icon: '/icons/Icon-192.png',
