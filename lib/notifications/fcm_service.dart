@@ -71,6 +71,7 @@ class FCMService {
               {
                 'fcmToken': newToken,
                 'fcmTokens': FieldValue.arrayUnion([newToken]),
+                'webTokens': FieldValue.arrayUnion([newToken]),
                 'fcmUpdatedAt': FieldValue.serverTimestamp(),
               },
               SetOptions(merge: true),
@@ -98,6 +99,7 @@ class FCMService {
             {
               'fcmToken': newToken,
               'fcmTokens': FieldValue.arrayUnion([newToken]),
+              'nativeTokens': FieldValue.arrayUnion([newToken]),
               'fcmUpdatedAt': FieldValue.serverTimestamp(),
             },
             SetOptions(merge: true),
@@ -277,6 +279,10 @@ class FCMService {
         {
           'fcmToken': token,
           'fcmTokens': FieldValue.arrayUnion([token]),
+          if (kIsWeb)
+            'webTokens': FieldValue.arrayUnion([token])
+          else
+            'nativeTokens': FieldValue.arrayUnion([token]),
           'fcmUpdatedAt': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
@@ -298,6 +304,8 @@ class FCMService {
         if (doc.id == currentUserId) continue;
         await doc.reference.update({
           'fcmTokens': FieldValue.arrayRemove([token]),
+          'webTokens': FieldValue.arrayRemove([token]),
+          'nativeTokens': FieldValue.arrayRemove([token]),
         });
         if (doc.data()['fcmToken'] == token) {
           await doc.reference.update({'fcmToken': FieldValue.delete()});
@@ -318,6 +326,8 @@ class FCMService {
       if (token != null && token.isNotEmpty) {
         await _firestore.collection('users').doc(userId).update({
           'fcmTokens': FieldValue.arrayRemove([token]),
+          'webTokens': FieldValue.arrayRemove([token]),
+          'nativeTokens': FieldValue.arrayRemove([token]),
         });
         debugPrint('Removed FCM token on logout for user: $userId');
       }
@@ -357,6 +367,8 @@ class FCMService {
       for (final doc in staleQuery.docs) {
         await doc.reference.update({
           'fcmTokens': FieldValue.arrayRemove([token]),
+          'webTokens': FieldValue.arrayRemove([token]),
+          'nativeTokens': FieldValue.arrayRemove([token]),
         });
         if (doc.data()['fcmToken'] == token) {
           await doc.reference.update({'fcmToken': FieldValue.delete()});
