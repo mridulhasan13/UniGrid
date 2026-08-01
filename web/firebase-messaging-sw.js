@@ -34,13 +34,12 @@ messaging.onBackgroundMessage((payload) => {
 
   if (!title && !body) return;
 
-  const iconUrl = 'https://unigrid.netlify.app/icons/Icon-192.png';
+  const iconUrl = 'https://unigrid.netlify.app/icons/Icon-maskable-192.png';
 
   return self.registration.showNotification(title, {
     body: body,
     icon: iconUrl,
     badge: iconUrl,
-    image: iconUrl,
     tag: tag,
     renotify: true,
     data: payload.data || {},
