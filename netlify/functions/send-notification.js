@@ -129,8 +129,8 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
           notification: {
             title: title,
             body: bodyText,
-            icon: "/icons/Icon-192.png",
-            badge: "/icons/Icon-192.png",
+            icon: "https://unigrid.netlify.app/icons/Icon-192.png",
+            badge: "https://unigrid.netlify.app/icons/Icon-192.png",
             tag: notificationTag,
             renotify: false,
           },

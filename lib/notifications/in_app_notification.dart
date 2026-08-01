@@ -235,20 +235,30 @@ class _InAppNotificationWidgetState extends State<_InAppNotificationWidget>
                                 : Container(
                                     width: 40,
                                     height: 40,
+                                    padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
                                       color:
-                                          widget.accentColor.withOpacity(0.18),
+                                          widget.accentColor.withOpacity(0.12),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                         color: widget.accentColor
-                                            .withOpacity(0.35),
+                                            .withOpacity(0.3),
                                         width: 1,
                                       ),
                                     ),
-                                    child: Icon(
-                                      widget.icon,
-                                      color: widget.accentColor,
-                                      size: 20,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.asset(
+                                        'assets/images/logo.png',
+                                        width: 28,
+                                        height: 28,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (ctx, err, stack) => Icon(
+                                          widget.icon,
+                                          color: widget.accentColor,
+                                          size: 20,
+                                        ),
+                                      ),
                                     ),
                                   ),
                           ),
