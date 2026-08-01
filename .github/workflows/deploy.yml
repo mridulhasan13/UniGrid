@@ -31,10 +31,13 @@ jobs:
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
         run: |
           mkdir -p assets
+          mkdir -p netlify/functions
           if [ -n "$SERVICE_ACCOUNT_JSON" ]; then
             echo "$SERVICE_ACCOUNT_JSON" > assets/service_account.json
+            echo "$SERVICE_ACCOUNT_JSON" > netlify/functions/service_account.json
           else
             echo '{}' > assets/service_account.json
+            echo '{}' > netlify/functions/service_account.json
           fi
 
       - name: Install dependencies
