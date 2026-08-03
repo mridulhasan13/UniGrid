@@ -849,6 +849,20 @@ class WeeklyRoutineTable extends StatelessWidget {
       ),
     );
   }
+  bool _isSameScheduledDate(dynamic rawDate, DateTime? targetDate) {
+    if (rawDate == null && targetDate == null) return true;
+    if (rawDate == null || targetDate == null) return false;
+    DateTime? d;
+    if (rawDate is Timestamp) {
+      d = rawDate.toDate();
+    } else if (rawDate is String) {
+      d = DateTime.tryParse(rawDate);
+    }
+    if (d == null) return false;
+    return d.year == targetDate.year &&
+        d.month == targetDate.month &&
+        d.day == targetDate.day;
+  }
 
   Future<void> _updateStatus(
       BuildContext parentContext, BuildContext sheetContext, ClassSchedule cls, String status) async {
@@ -863,7 +877,7 @@ class WeeklyRoutineTable extends StatelessWidget {
     try {
       final collectionRef = FirebaseFirestore.instance.collection(schedulePath);
 
-      // Batch update the target doc AND any duplicates matching the same day, startSlot, subject, and group
+      // Batch update target doc AND any duplicates matching the same day, startSlot, subject, group, and scheduledDate
       final query = await collectionRef
           .where('dayOfWeek', isEqualTo: cls.dayOfWeek)
           .where('startSlot', isEqualTo: cls.startSlot)
@@ -876,7 +890,9 @@ class WeeklyRoutineTable extends StatelessWidget {
         final data = doc.data();
         final String subj = (data['subject'] ?? '').toString().trim();
         final String grp = (data['group'] ?? '').toString().trim();
-        if (doc.id == cls.id || (subj == cls.subject.trim() && grp == cls.group.trim())) {
+        final bool dateMatches = _isSameScheduledDate(data['scheduledDate'], cls.scheduledDate);
+
+        if (doc.id == cls.id || (dateMatches && subj == cls.subject.trim() && grp == cls.group.trim())) {
           batch.update(doc.reference, {
             'status': status,
             'lastUpdatedDate': FieldValue.serverTimestamp(),
@@ -971,7 +987,7 @@ class WeeklyRoutineTable extends StatelessWidget {
       try {
         final collectionRef = FirebaseFirestore.instance.collection(schedulePath);
         
-        // Batch delete the target doc AND any duplicates matching the same day, startSlot, subject, and group
+        // Batch delete target doc AND any duplicates matching the same day, startSlot, subject, group, and scheduledDate
         final query = await collectionRef
             .where('dayOfWeek', isEqualTo: cls.dayOfWeek)
             .where('startSlot', isEqualTo: cls.startSlot)
@@ -984,7 +1000,9 @@ class WeeklyRoutineTable extends StatelessWidget {
           final data = doc.data();
           final String subj = (data['subject'] ?? '').toString().trim();
           final String grp = (data['group'] ?? '').toString().trim();
-          if (doc.id == cls.id || (subj == cls.subject.trim() && grp == cls.group.trim())) {
+          final bool dateMatches = _isSameScheduledDate(data['scheduledDate'], cls.scheduledDate);
+
+          if (doc.id == cls.id || (dateMatches && subj == cls.subject.trim() && grp == cls.group.trim())) {
             batch.delete(doc.reference);
             foundTarget = true;
           }
@@ -1016,7 +1034,6 @@ class WeeklyRoutineTable extends StatelessWidget {
             icon: Icons.error_outline_rounded,
           );
         }
-      }
     }
   }
 }
