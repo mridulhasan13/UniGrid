@@ -951,9 +951,11 @@ class WeeklyRoutineTable extends StatelessWidget {
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
             side: BorderSide(color: AppColors.glassCardBorder)),
-        title: Text('Delete Class Schedule?',
-            style: TextStyle(
-                color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        title: Text(
+          'Delete Class Schedule?',
+          style: TextStyle(
+              color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+        ),
         content: Text(
           'Are you sure you want to delete this class from the routine? This slot will become an empty "No Class" space.',
           style: TextStyle(color: AppColors.textSecondary),
@@ -961,14 +963,16 @@ class WeeklyRoutineTable extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, false),
-            child:
-                Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text('Cancel',
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, true),
-            child: const Text('Delete',
-                style: TextStyle(
-                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                  color: Colors.redAccent, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -985,8 +989,9 @@ class WeeklyRoutineTable extends StatelessWidget {
           : 'schedule';
 
       try {
-        final collectionRef = FirebaseFirestore.instance.collection(schedulePath);
-        
+        final collectionRef =
+            FirebaseFirestore.instance.collection(schedulePath);
+
         // Batch delete target doc AND any duplicates matching the same day, startSlot, subject, group, and scheduledDate
         final query = await collectionRef
             .where('dayOfWeek', isEqualTo: cls.dayOfWeek)
@@ -1000,9 +1005,13 @@ class WeeklyRoutineTable extends StatelessWidget {
           final data = doc.data();
           final String subj = (data['subject'] ?? '').toString().trim();
           final String grp = (data['group'] ?? '').toString().trim();
-          final bool dateMatches = _isSameScheduledDate(data['scheduledDate'], cls.scheduledDate);
+          final bool dateMatches =
+              _isSameScheduledDate(data['scheduledDate'], cls.scheduledDate);
 
-          if (doc.id == cls.id || (dateMatches && subj == cls.subject.trim() && grp == cls.group.trim())) {
+          if (doc.id == cls.id ||
+              (dateMatches &&
+                  subj == cls.subject.trim() &&
+                  grp == cls.group.trim())) {
             batch.delete(doc.reference);
             foundTarget = true;
           }
@@ -1034,6 +1043,7 @@ class WeeklyRoutineTable extends StatelessWidget {
             icon: Icons.error_outline_rounded,
           );
         }
+      }
     }
   }
 }
