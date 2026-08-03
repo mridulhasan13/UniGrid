@@ -735,10 +735,12 @@ class WeeklyRoutineTable extends StatelessWidget {
             SizedBox(height: isCompact ? 1 : 2),
             Text(
               status == 'no class'
-                   ? 'NO CLASS'
-                   : (cls.group.isEmpty
-                       ? cls.subject
-                       : '${cls.subject} (${cls.group})'),
+                  ? 'NO CLASS'
+                  : (status == 'cancelled'
+                      ? 'CANCELLED'
+                      : (cls.group.isEmpty
+                          ? cls.subject
+                          : '${cls.subject} (${cls.group})')),
               textAlign: TextAlign.center,
               maxLines: isCompact ? 1 : 2,
               overflow: TextOverflow.ellipsis,
@@ -785,7 +787,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                   title:
                       Text('Upcoming', style: TextStyle(color: AppColors.textPrimary)),
                   onTap: () {
-                    _updateStatus(ctx, cls.id, 'upcoming');
+                    _updateStatus(context, ctx, cls, 'upcoming');
                   },
                 ),
                 ListTile(
@@ -793,7 +795,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                   title: Text('Completed',
                       style: TextStyle(color: AppColors.textPrimary)),
                   onTap: () {
-                    _updateStatus(ctx, cls.id, 'completed');
+                    _updateStatus(context, ctx, cls, 'completed');
                   },
                 ),
                 ListTile(
@@ -801,7 +803,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                   title: Text('Cancelled',
                       style: TextStyle(color: AppColors.textPrimary)),
                   onTap: () {
-                    _updateStatus(ctx, cls.id, 'cancelled');
+                    _updateStatus(context, ctx, cls, 'cancelled');
                   },
                 ),
                 ListTile(
@@ -809,7 +811,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                   title:
                       Text('No Class', style: TextStyle(color: AppColors.textPrimary)),
                   onTap: () {
-                    _updateStatus(ctx, cls.id, 'no class');
+                    _updateStatus(context, ctx, cls, 'no class');
                   },
                 ),
                 Divider(color: AppColors.glassCardBorder),
@@ -849,19 +851,79 @@ class WeeklyRoutineTable extends StatelessWidget {
   }
 
   Future<void> _updateStatus(
-      BuildContext context, String docId, String status) async {
-    Navigator.pop(context); // close sheet
-    final user = Provider.of<AppUser?>(context, listen: false);
+      BuildContext parentContext, BuildContext sheetContext, ClassSchedule cls, String status) async {
+    if (sheetContext.mounted) {
+      Navigator.pop(sheetContext); // close bottom sheet
+    }
+    final user = Provider.of<AppUser?>(parentContext, listen: false);
     final schedulePath = user != null && user.hasDeptScope
         ? deptBatchCol(user.department, user.batch, 'schedule')
         : 'schedule';
-    await FirebaseFirestore.instance
-        .collection(schedulePath)
-        .doc(docId)
-        .update({
-      'status': status,
-      'lastUpdatedDate': FieldValue.serverTimestamp(),
-    });
+
+    try {
+      final collectionRef = FirebaseFirestore.instance.collection(schedulePath);
+
+      // Batch update the target doc AND any duplicates matching the same day, startSlot, subject, and group
+      final query = await collectionRef
+          .where('dayOfWeek', isEqualTo: cls.dayOfWeek)
+          .where('startSlot', isEqualTo: cls.startSlot)
+          .get();
+
+      final batch = FirebaseFirestore.instance.batch();
+      bool foundTarget = false;
+
+      for (var doc in query.docs) {
+        final data = doc.data();
+        final String subj = (data['subject'] ?? '').toString().trim();
+        final String grp = (data['group'] ?? '').toString().trim();
+        if (doc.id == cls.id || (subj == cls.subject.trim() && grp == cls.group.trim())) {
+          batch.update(doc.reference, {
+            'status': status,
+            'lastUpdatedDate': FieldValue.serverTimestamp(),
+          });
+          foundTarget = true;
+        }
+      }
+
+      if (!foundTarget) {
+        batch.update(collectionRef.doc(cls.id), {
+          'status': status,
+          'lastUpdatedDate': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+
+      if (parentContext.mounted) {
+        final String statusLabel = status == 'no class'
+            ? 'No Class'
+            : status.substring(0, 1).toUpperCase() + status.substring(1);
+        final Color accentColor = status == 'cancelled'
+            ? Colors.redAccent
+            : (status == 'completed'
+                ? Colors.green
+                : (status == 'no class' ? Colors.amberAccent : Colors.blueAccent));
+
+        InAppNotification.show(
+          parentContext,
+          title: 'Status Updated',
+          message: '${cls.subject} status set to $statusLabel.',
+          accentColor: accentColor,
+          icon: Icons.published_with_changes_rounded,
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to update class status: $e');
+      if (parentContext.mounted) {
+        InAppNotification.show(
+          parentContext,
+          title: 'Update Failed',
+          message: 'Failed to update status: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
   }
 
   Future<void> _deleteClass(
