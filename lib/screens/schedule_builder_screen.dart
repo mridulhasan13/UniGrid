@@ -120,6 +120,22 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
       final String timeString = ScheduleConstants.getTimeForSlot(
           _selectedStartSlot, _selectedSpan, widget.customSlots);
 
+      DateTime? targetScheduledDate;
+      if (widget.selectedDate != null) {
+        targetScheduledDate = widget.selectedDate;
+      } else if (widget.classToEdit?.scheduledDate != null) {
+        targetScheduledDate = widget.classToEdit!.scheduledDate;
+      }
+
+      String defaultStatus = widget.classToEdit?.status ?? 'upcoming';
+      if (targetScheduledDate != null && widget.classToEdit == null) {
+        final sunday = _getSundayOfWeek(targetScheduledDate);
+        final currentSunday = _getSundayOfWeek(DateTime.now());
+        if (sunday.isBefore(currentSunday)) {
+          defaultStatus = 'completed';
+        }
+      }
+
       final Map<String, dynamic> scheduleData = {
         'dayOfWeek': _selectedDay,
         'subject': _subjectController.text.trim(),
@@ -129,16 +145,9 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
         'span': _selectedSpan,
         'group': _selectedGroup == 'None' ? '' : _selectedGroup,
         'time': timeString,
-        'status': widget.classToEdit?.status ?? 'upcoming',
+        'status': defaultStatus,
         'lastUpdatedDate': FieldValue.serverTimestamp(),
       };
-
-      DateTime? targetScheduledDate;
-      if (widget.selectedDate != null) {
-        targetScheduledDate = widget.selectedDate;
-      } else if (widget.classToEdit?.scheduledDate != null) {
-        targetScheduledDate = widget.classToEdit!.scheduledDate;
-      }
 
       if (targetScheduledDate != null) {
         final sunday = _getSundayOfWeek(targetScheduledDate);

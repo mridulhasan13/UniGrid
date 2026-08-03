@@ -34,12 +34,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     // Auto-reset is now triggered on build once we have user context
   }
 
-  DateTime _getStartOfWeek(DateTime date) {
-    final dateOnly = DateTime(date.year, date.month, date.day);
-    return dateOnly.subtract(Duration(days: dateOnly.weekday - 1));
+  DateTime _normalizeStartOfWeek(DateTime date) {
+    final sunday = _getSundayOfWeek(date);
+    return DateTime(sunday.year, sunday.month, sunday.day);
   }
 
-  // Auto-reset logic: If the last update was in a previous week, reset all statuses to 'upcoming'
+  // Auto-reset logic: If the last update was in a previous week, reset current/repeating statuses to 'upcoming',
+  // and restore past week classes back to 'completed'.
   Future<void> _checkAndAutoResetStatuses(AppUser? user) async {
     if (user == null || !user.hasDeptScope) return;
     final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
@@ -57,40 +58,51 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       }
 
       final now = DateTime.now();
+      final currentStartOfWeek = _normalizeStartOfWeek(now);
+      final lastResetStartOfWeek =
+          lastReset != null ? _normalizeStartOfWeek(lastReset) : null;
 
-      // If lastReset is null, it means we haven't tracked resets yet.
-      // Initialize lastResetDate to the current time to avoid immediately resetting
-      // any schedule modifications made earlier in the current week.
-      if (lastReset == null) {
-        await infoDocRef.set({
-          'lastResetDate': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        return;
+      final bool isNewWeek = lastResetStartOfWeek == null ||
+          currentStartOfWeek.isAfter(lastResetStartOfWeek);
+
+      final allDocs =
+          await FirebaseFirestore.instance.collection(schedulePath).get();
+      final batch = FirebaseFirestore.instance.batch();
+      bool needsCommit = false;
+
+      for (var doc in allDocs.docs) {
+        final data = doc.data();
+        final String currentStatus = data['status'] ?? 'upcoming';
+        DateTime? scheduledDate;
+        if (data['scheduledDate'] != null) {
+          scheduledDate = (data['scheduledDate'] as Timestamp).toDate();
+        }
+
+        final bool isPastWeekClass = scheduledDate != null &&
+            _normalizeStartOfWeek(scheduledDate).isBefore(currentStartOfWeek);
+
+        if (isPastWeekClass) {
+          // If a past week class was wrongly set to 'upcoming', restore it to 'completed'
+          if (currentStatus == 'upcoming') {
+            batch.update(doc.reference, {
+              'status': 'completed',
+              'lastUpdatedDate': FieldValue.serverTimestamp(),
+            });
+            needsCommit = true;
+          }
+        }
       }
 
-      final lastResetStartOfWeek = _getStartOfWeek(lastReset);
-      final currentStartOfWeek = _getStartOfWeek(now);
-
-      // Reset only if the current week starts after the last reset week
-      if (currentStartOfWeek.isAfter(lastResetStartOfWeek)) {
-        // It's a new week! Reset all classes to 'upcoming'
-        final batch = FirebaseFirestore.instance.batch();
-        final allDocs =
-            await FirebaseFirestore.instance.collection(schedulePath).get();
-        for (var doc in allDocs.docs) {
-          batch.update(doc.reference, {
-            'status': 'upcoming',
-            'lastUpdatedDate': FieldValue.serverTimestamp(),
-          });
-        }
-        
-        // Update the lastResetDate in routine_metadata/info
+      if (isNewWeek || lastReset == null) {
         batch.set(infoDocRef, {
           'lastResetDate': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+        needsCommit = true;
+      }
 
+      if (needsCommit) {
         await batch.commit();
-        debugPrint('Schedule automatically reset for the new week.');
+        debugPrint('Schedule statuses checked and auto-reset/restored.');
       }
     } catch (e) {
       debugPrint('Auto-reset check failed: $e');

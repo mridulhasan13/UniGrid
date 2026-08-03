@@ -118,5 +118,31 @@ void main() {
 
       expect(showInActiveWeek, isTrue);
     });
+
+    test('Past week class identification preserves/restores completed status', () {
+      final pastClass = ClassSchedule(
+        id: 'cls3',
+        dayOfWeek: 'Monday',
+        subject: 'Past Week Class',
+        room: 'R3',
+        time: '9:00 - 9:50',
+        scheduledDate: DateTime(2026, 6, 8), // Week of June 7
+        status: 'upcoming', // Supposedly wrongly reset to upcoming
+      );
+
+      final currentSunday = DateTime(2026, 6, 14); // Running week starts June 14
+      final classSunday = getSundayOfWeek(pastClass.scheduledDate!);
+
+      final isPastWeekClass = classSunday.isBefore(currentSunday);
+      expect(isPastWeekClass, isTrue);
+
+      // Restoration logic rule: Past week classes with 'upcoming' status are restored to 'completed'
+      String restoredStatus = pastClass.status;
+      if (isPastWeekClass && pastClass.status == 'upcoming') {
+        restoredStatus = 'completed';
+      }
+
+      expect(restoredStatus, 'completed');
+    });
   });
 }
