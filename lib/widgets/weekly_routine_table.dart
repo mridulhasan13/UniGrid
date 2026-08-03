@@ -9,6 +9,7 @@ import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../utils/schedule_constants.dart';
 import '../widgets/unigrid_loader.dart';
+import '../notifications/in_app_notification.dart';
 import '../screens/schedule_builder_screen.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
@@ -836,7 +837,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                   title: const Text('Delete Class (Free Slot)',
                       style: TextStyle(color: AppColors.textPrimary)),
                   onTap: () {
-                    _deleteClass(context, cls.id);
+                    _deleteClass(context, ctx, cls);
                   },
                 ),
               ],
@@ -863,28 +864,30 @@ class WeeklyRoutineTable extends StatelessWidget {
     });
   }
 
-  Future<void> _deleteClass(BuildContext context, String docId) async {
+  Future<void> _deleteClass(
+      BuildContext parentContext, BuildContext sheetContext, ClassSchedule cls) async {
     final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
+      context: sheetContext,
+      builder: (dialogCtx) => AlertDialog(
         backgroundColor: AppColors.backgroundTop,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
             side: BorderSide(color: AppColors.glassCardBorder)),
         title: Text('Delete Class Schedule?',
-            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+            style: TextStyle(
+                color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
         content: Text(
           'Are you sure you want to delete this class from the routine? This slot will become an empty "No Class" space.',
           style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(dialogCtx, false),
             child:
                 Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text('Delete',
                 style: TextStyle(
                     color: Colors.redAccent, fontWeight: FontWeight.bold)),
@@ -894,19 +897,64 @@ class WeeklyRoutineTable extends StatelessWidget {
     );
 
     if (confirm == true) {
-      if (!context.mounted) return;
-      Navigator.pop(context); // Close the bottom sheet
-      final user = Provider.of<AppUser?>(context, listen: false);
+      if (sheetContext.mounted) {
+        Navigator.pop(sheetContext); // Close the bottom sheet safely
+      }
+
+      final user = Provider.of<AppUser?>(parentContext, listen: false);
       final schedulePath = user != null && user.hasDeptScope
           ? deptBatchCol(user.department, user.batch, 'schedule')
           : 'schedule';
-      FirebaseFirestore.instance
-          .collection(schedulePath)
-          .doc(docId)
-          .delete()
-          .catchError((e) {
+
+      try {
+        final collectionRef = FirebaseFirestore.instance.collection(schedulePath);
+        
+        // Batch delete the target doc AND any duplicates matching the same day, startSlot, subject, and group
+        final query = await collectionRef
+            .where('dayOfWeek', isEqualTo: cls.dayOfWeek)
+            .where('startSlot', isEqualTo: cls.startSlot)
+            .get();
+
+        final batch = FirebaseFirestore.instance.batch();
+        bool foundTarget = false;
+
+        for (var doc in query.docs) {
+          final data = doc.data();
+          final String subj = (data['subject'] ?? '').toString().trim();
+          final String grp = (data['group'] ?? '').toString().trim();
+          if (doc.id == cls.id || (subj == cls.subject.trim() && grp == cls.group.trim())) {
+            batch.delete(doc.reference);
+            foundTarget = true;
+          }
+        }
+
+        if (!foundTarget) {
+          batch.delete(collectionRef.doc(cls.id));
+        }
+
+        await batch.commit();
+
+        if (parentContext.mounted) {
+          InAppNotification.show(
+            parentContext,
+            title: 'Class Deleted',
+            message: 'Class schedule removed successfully.',
+            accentColor: Colors.redAccent,
+            icon: Icons.delete_forever_rounded,
+          );
+        }
+      } catch (e) {
         debugPrint('Failed to delete class schedule: $e');
-      });
+        if (parentContext.mounted) {
+          InAppNotification.show(
+            parentContext,
+            title: 'Delete Failed',
+            message: 'Failed to delete class: $e',
+            accentColor: Colors.redAccent,
+            icon: Icons.error_outline_rounded,
+          );
+        }
+      }
     }
   }
 }
