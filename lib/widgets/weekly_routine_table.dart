@@ -944,6 +944,7 @@ class WeeklyRoutineTable extends StatelessWidget {
 
   Future<void> _deleteClass(
       BuildContext parentContext, BuildContext sheetContext, ClassSchedule cls) async {
+    final user = Provider.of<AppUser?>(parentContext, listen: false);
     final confirm = await showDialog<bool>(
       context: sheetContext,
       builder: (dialogCtx) => AlertDialog(
@@ -983,7 +984,6 @@ class WeeklyRoutineTable extends StatelessWidget {
         Navigator.pop(sheetContext); // Close the bottom sheet safely
       }
 
-      final user = Provider.of<AppUser?>(parentContext, listen: false);
       final schedulePath = user != null && user.hasDeptScope
           ? deptBatchCol(user.department, user.batch, 'schedule')
           : 'schedule';
