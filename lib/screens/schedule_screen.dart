@@ -688,6 +688,270 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+  Future<void> _saveAsDefaultRoutine(BuildContext context, AppUser? user) async {
+    if (user == null || !user.hasDeptScope) return;
+    final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
+    final defaultPath = deptBatchCol(user.department, user.batch, 'default_schedule');
+
+    try {
+      final activeDocs = await FirebaseFirestore.instance.collection(schedulePath).get();
+      if (activeDocs.docs.isEmpty) {
+        if (context.mounted) {
+          InAppNotification.show(
+            context,
+            title: 'No Routine to Save',
+            message: 'Your active schedule is currently empty.',
+            accentColor: Colors.amberAccent,
+            icon: Icons.warning_amber_rounded,
+          );
+        }
+        return;
+      }
+
+      final currentDefaultDocs = await FirebaseFirestore.instance.collection(defaultPath).get();
+      final deleteBatch = FirebaseFirestore.instance.batch();
+      for (var doc in currentDefaultDocs.docs) {
+        deleteBatch.delete(doc.reference);
+      }
+      await deleteBatch.commit();
+
+      final writeBatch = FirebaseFirestore.instance.batch();
+      for (var doc in activeDocs.docs) {
+        final data = doc.data();
+        final newRef = FirebaseFirestore.instance.collection(defaultPath).doc();
+        writeBatch.set(newRef, {
+          'subject': data['subject'] ?? '',
+          'subname': data['subname'] ?? '',
+          'room': data['room'] ?? '',
+          'teacher': data['teacher'] ?? '',
+          'time': data['time'] ?? '',
+          'dayOfWeek': data['dayOfWeek'] ?? '',
+          'startSlot': data['startSlot'] ?? 1,
+          'span': data['span'] ?? 1,
+          'group': data['group'] ?? '',
+          'status': 'upcoming',
+          'lastUpdatedDate': FieldValue.serverTimestamp(),
+        });
+      }
+      await writeBatch.commit();
+
+      if (context.mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Default Routine Saved',
+          message: 'Saved ${activeDocs.docs.length} class slot(s) as your master Default Routine!',
+          accentColor: Colors.greenAccent,
+          icon: Icons.bookmark_added_rounded,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Save Failed',
+          message: 'Failed to save default routine: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
+  }
+
+  Future<void> _showApplyDefaultRoutineDialog(BuildContext context, AppUser? user) async {
+    if (user == null || !user.hasDeptScope) return;
+    final defaultPath = deptBatchCol(user.department, user.batch, 'default_schedule');
+    final selectedDay = _getDayOfWeekName(_selectedDate);
+
+    try {
+      final defaultDocs = await FirebaseFirestore.instance.collection(defaultPath).get();
+      if (defaultDocs.docs.isEmpty) {
+        if (context.mounted) {
+          InAppNotification.show(
+            context,
+            title: 'No Default Routine',
+            message: 'No saved default routine found. Set up your routine and click "Save as Default Routine" first.',
+            accentColor: Colors.amberAccent,
+            icon: Icons.info_outline_rounded,
+          );
+        }
+        return;
+      }
+
+      final int dayItemCount = defaultDocs.docs
+          .where((d) => (d.data()['dayOfWeek'] ?? '').toString().trim().toLowerCase() == selectedDay.toLowerCase())
+          .length;
+
+      if (!context.mounted) return;
+
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.backgroundTop,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: AppColors.glassCardBorder),
+          ),
+          title: Text(
+            'Apply Default Routine',
+            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Choose how you want to apply your saved Default Routine template:',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.today_rounded, color: Colors.blueAccent),
+                title: Text('Apply for $selectedDay only',
+                    style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text('Replaces $selectedDay\'s active classes ($dayItemCount slot(s) in template)',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _applyDefaultRoutine(context, user, targetDay: selectedDay);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_month_rounded, color: Colors.greenAccent),
+                title: Text('Apply Entire Default Week',
+                    style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text('Replaces active routine for ALL days (${defaultDocs.docs.length} total slot(s))',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _applyDefaultRoutine(context, user, targetDay: null);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Load Failed',
+          message: 'Failed to load default routine: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
+  }
+
+  Future<void> _applyDefaultRoutine(BuildContext context, AppUser user, {String? targetDay}) async {
+    final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
+    final defaultPath = deptBatchCol(user.department, user.batch, 'default_schedule');
+
+    try {
+      final defaultSnap = await FirebaseFirestore.instance.collection(defaultPath).get();
+      final activeSnap = await FirebaseFirestore.instance.collection(schedulePath).get();
+
+      final batch = FirebaseFirestore.instance.batch();
+
+      if (targetDay != null && targetDay.isNotEmpty) {
+        final targetDayLower = targetDay.trim().toLowerCase();
+
+        for (var doc in activeSnap.docs) {
+          final day = (doc.data()['dayOfWeek'] ?? '').toString().trim().toLowerCase();
+          if (day == targetDayLower) {
+            batch.delete(doc.reference);
+          }
+        }
+
+        for (var doc in defaultSnap.docs) {
+          final data = doc.data();
+          final day = (data['dayOfWeek'] ?? '').toString().trim().toLowerCase();
+          if (day == targetDayLower) {
+            final newRef = FirebaseFirestore.instance.collection(schedulePath).doc();
+            batch.set(newRef, {
+              'subject': data['subject'] ?? '',
+              'subname': data['subname'] ?? '',
+              'room': data['room'] ?? '',
+              'teacher': data['teacher'] ?? '',
+              'time': data['time'] ?? '',
+              'dayOfWeek': data['dayOfWeek'] ?? targetDay,
+              'startSlot': data['startSlot'] ?? 1,
+              'span': data['span'] ?? 1,
+              'group': data['group'] ?? '',
+              'status': 'upcoming',
+              'lastUpdatedDate': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+
+        await batch.commit();
+
+        if (context.mounted) {
+          InAppNotification.show(
+            context,
+            title: 'Day Routine Applied',
+            message: 'Default routine applied successfully for $targetDay!',
+            accentColor: Colors.blueAccent,
+            icon: Icons.today_rounded,
+          );
+        }
+      } else {
+        for (var doc in activeSnap.docs) {
+          batch.delete(doc.reference);
+        }
+
+        for (var doc in defaultSnap.docs) {
+          final data = doc.data();
+          final newRef = FirebaseFirestore.instance.collection(schedulePath).doc();
+          batch.set(newRef, {
+            'subject': data['subject'] ?? '',
+            'subname': data['subname'] ?? '',
+            'room': data['room'] ?? '',
+            'teacher': data['teacher'] ?? '',
+            'time': data['time'] ?? '',
+            'dayOfWeek': data['dayOfWeek'] ?? '',
+            'startSlot': data['startSlot'] ?? 1,
+            'span': data['span'] ?? 1,
+            'group': data['group'] ?? '',
+            'status': 'upcoming',
+            'lastUpdatedDate': FieldValue.serverTimestamp(),
+          });
+        }
+
+        await batch.commit();
+
+        if (context.mounted) {
+          InAppNotification.show(
+            context,
+            title: 'Full Routine Applied',
+            message: 'Entire default weekly routine applied successfully!',
+            accentColor: Colors.greenAccent,
+            icon: Icons.published_with_changes_rounded,
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Apply Failed',
+          message: 'Failed to apply default routine: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     Provider.of<ThemeService>(context); // Listen to global theme updates
@@ -809,6 +1073,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                       ),
                                     ),
                                   );
+                                } else if (value == 'save_default') {
+                                  _saveAsDefaultRoutine(context, user);
+                                } else if (value == 'apply_default') {
+                                  _showApplyDefaultRoutineDialog(context, user);
                                 } else if (value == 'copy_prev_week') {
                                   _copyFromPreviousWeek(context, user);
                                 } else if (value == 'clear_data') {
@@ -830,6 +1098,28 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   value: 'add_class',
                                   child: Text('Add New Class',
                                       style: TextStyle(color: AppColors.textPrimary)),
+                                ),
+                                PopupMenuItem(
+                                  value: 'save_default',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.bookmark_added_rounded, color: Colors.greenAccent, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Save as Default Routine',
+                                          style: TextStyle(color: AppColors.textPrimary)),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'apply_default',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.published_with_changes_rounded, color: Colors.blueAccent, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Apply Default Routine...',
+                                          style: TextStyle(color: AppColors.textPrimary)),
+                                    ],
+                                  ),
                                 ),
                                 PopupMenuItem(
                                   value: 'copy_prev_week',

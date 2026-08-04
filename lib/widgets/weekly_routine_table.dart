@@ -134,7 +134,20 @@ class WeeklyRoutineTable extends StatelessWidget {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection(schedulePath).snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Error loading schedule: ${snapshot.error}',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(
             child: UniGridLoader(
               title: 'Loading Routine',
@@ -143,16 +156,8 @@ class WeeklyRoutineTable extends StatelessWidget {
             ),
           );
         }
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'Error loading schedule',
-              style: TextStyle(color: AppColors.textPrimary),
-            ),
-          );
-        }
 
-        final rawClasses = snapshot.data!.docs
+        final rawClasses = (snapshot.data?.docs ?? [])
             .map((doc) => ClassSchedule.fromMap(
                 doc.data() as Map<String, dynamic>, doc.id))
             .where((cls) {
@@ -627,8 +632,12 @@ class WeeklyRoutineTable extends StatelessWidget {
                 return Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(
-                        bottom: idx == classesAtSlot.length - 1 ? 0 : 4),
-                    child: _buildDynamicClassBox(context, cls, isCompact: classesAtSlot.length > 1),
+                        bottom: idx == classesAtSlot.length - 1
+                            ? 0
+                            : (classesAtSlot.length >= 3 ? 2 : 4)),
+                    child: _buildDynamicClassBox(context, cls,
+                        isCompact: classesAtSlot.length > 1,
+                        stackedCount: classesAtSlot.length),
                   ),
                 );
               }).toList(),
@@ -655,7 +664,8 @@ class WeeklyRoutineTable extends StatelessWidget {
     return children;
   }
 
-  Widget _buildDynamicClassBox(BuildContext context, ClassSchedule cls, {bool isCompact = false}) {
+  Widget _buildDynamicClassBox(BuildContext context, ClassSchedule cls,
+      {bool isCompact = false, int stackedCount = 1}) {
     final bool isLab = cls.subject.toLowerCase().contains('lab') ||
         cls.subject.toLowerCase().contains('practical') ||
         cls.span > 1;
@@ -703,6 +713,10 @@ class WeeklyRoutineTable extends StatelessWidget {
     final isRootAdmin = user != null && authService.isRootAdmin(user.email);
     final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
 
+    final double roomFontSize = stackedCount >= 3 ? 5.0 : (isCompact ? 5.5 : 6.5);
+    final double titleFontSize = stackedCount >= 3 ? 6.2 : (isCompact ? 7.0 : 8.0);
+    final double verticalPadding = stackedCount >= 3 ? 0.5 : (isCompact ? 1.0 : 3.0);
+
     return GestureDetector(
       onTap: isCR ? () => _showStatusUpdateDialog(context, cls, user) : null,
       child: Container(
@@ -715,7 +729,7 @@ class WeeklyRoutineTable extends StatelessWidget {
           border: Border.all(color: mainThemeColor.withOpacity(0.35)),
           borderRadius: BorderRadius.circular(4),
         ),
-        padding: EdgeInsets.symmetric(horizontal: 4, vertical: isCompact ? 1 : 3),
+        padding: EdgeInsets.symmetric(horizontal: 2, vertical: verticalPadding),
         alignment: Alignment.center,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -727,12 +741,12 @@ class WeeklyRoutineTable extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: isCompact ? 5.5 : 6.5,
+                fontSize: roomFontSize,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
               ),
             ),
-            SizedBox(height: isCompact ? 1 : 2),
+            if (stackedCount < 3) SizedBox(height: isCompact ? 1 : 2),
             Text(
               status == 'no class'
                   ? 'NO CLASS'
@@ -745,7 +759,7 @@ class WeeklyRoutineTable extends StatelessWidget {
               maxLines: isCompact ? 1 : 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: isCompact ? 7 : 8,
+                fontSize: titleFontSize,
                 fontWeight: FontWeight.bold,
                 color: mainThemeColor,
               ),

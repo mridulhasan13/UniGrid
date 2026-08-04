@@ -43,7 +43,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
   bool _isLoading = false;
   String? _selectedCourseId;
 
-  final List<String> _groupOptions = ['None', 'Gr: A', 'Gr: B'];
+  final List<String> _groupOptions = ['None', 'Gr: A', 'Gr: B', 'Gr: C'];
 
   @override
   void initState() {
@@ -54,6 +54,9 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
       _selectedStartSlot = cls.startSlot;
       _selectedSpan = cls.span;
       _selectedGroup = cls.group.isEmpty ? 'None' : cls.group;
+      if (!_groupOptions.contains(_selectedGroup)) {
+        _groupOptions.add(_selectedGroup);
+      }
       _subjectController.text = cls.subject;
       _teacherController.text = cls.teacher;
       _roomController.text = cls.room;
