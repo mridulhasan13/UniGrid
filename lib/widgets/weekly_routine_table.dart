@@ -51,6 +51,8 @@ Future<void> _checkAndAutoPopulateWeek({
   required AppUser user,
   required DateTime sundayDate,
 }) async {
+  if (!user.isCR && !user.isAdmin) return;
+
   final weekKey = '${user.department}_${user.batch}_${sundayDate.year}_${sundayDate.month}_${sundayDate.day}';
   if (_autoPopulatedWeeks.contains(weekKey)) return;
   _autoPopulatedWeeks.add(weekKey);
@@ -253,7 +255,9 @@ class WeeklyRoutineTable extends StatelessWidget {
             })
             .toList();
 
-        if (rawClasses.isEmpty && user != null && user.hasDeptScope) {
+        final isCR = user != null && (user.isCR || user.isAdmin);
+
+        if (rawClasses.isEmpty && user != null && user.hasDeptScope && isCR) {
           final weekKey = '${user.department}_${user.batch}_${sundayDate.year}_${sundayDate.month}_${sundayDate.day}';
           if (!_autoPopulatedWeeks.contains(weekKey)) {
             _autoPopulatedWeeks.add(weekKey);

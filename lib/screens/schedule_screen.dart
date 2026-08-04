@@ -44,6 +44,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   // and restore past week classes back to 'completed'.
   Future<void> _checkAndAutoResetStatuses(AppUser? user) async {
     if (user == null || !user.hasDeptScope) return;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isRootAdmin = authService.isRootAdmin(user.email);
+    final isCR = user.isCR || user.isAdmin || isRootAdmin;
+    if (!isCR) return;
+
     final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
     final metaPath = deptBatchCol(user.department, user.batch, 'routine_metadata');
     try {
