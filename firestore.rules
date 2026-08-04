@@ -73,10 +73,11 @@ service cloud.firestore {
         )
       );
       
-      // For CR-only collections: announcements, schedule, overrides, metadata, config, courses
+      // For CR-only collections: announcements, schedule, default_schedule, overrides, metadata, config, courses
       allow write: if isApprovedUser() && belongsToScope(dept, batch) && isCR(request.auth.uid) && (
         collection == 'announcements' || 
         collection == 'schedule' || 
+        collection == 'default_schedule' || 
         collection == 'schedule_overrides' || 
         collection == 'routine_metadata' || 
         collection == 'config' || 
