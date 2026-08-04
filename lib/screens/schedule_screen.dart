@@ -65,44 +65,70 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final bool isNewWeek = lastResetStartOfWeek == null ||
           currentStartOfWeek.isAfter(lastResetStartOfWeek);
 
-      final allDocs =
-          await FirebaseFirestore.instance.collection(schedulePath).get();
-      final batch = FirebaseFirestore.instance.batch();
-      bool needsCommit = false;
+      if (isNewWeek || lastReset == null) {
+        final allDocs = await FirebaseFirestore.instance.collection(schedulePath).get();
+        final batch = FirebaseFirestore.instance.batch();
+        bool needsCommit = false;
 
-      for (var doc in allDocs.docs) {
-        final data = doc.data();
-        final String currentStatus = data['status'] ?? 'upcoming';
-        DateTime? scheduledDate;
-        if (data['scheduledDate'] != null) {
-          scheduledDate = (data['scheduledDate'] as Timestamp).toDate();
-        }
+        final defaultPath = deptBatchCol(user.department, user.batch, 'default_schedule');
+        final defaultSnap = await FirebaseFirestore.instance.collection(defaultPath).get();
 
-        final bool isPastWeekClass = scheduledDate != null &&
-            _normalizeStartOfWeek(scheduledDate).isBefore(currentStartOfWeek);
+        if (defaultSnap.docs.isNotEmpty) {
+          bool currentWeekHasClasses = false;
+          final normSun = DateTime(currentStartOfWeek.year, currentStartOfWeek.month, currentStartOfWeek.day);
+          final normSat = DateTime(currentStartOfWeek.year, currentStartOfWeek.month, currentStartOfWeek.day + 6, 23, 59, 59);
 
-        if (isPastWeekClass) {
-          // If a past week class was wrongly set to 'upcoming', restore it to 'completed'
-          if (currentStatus == 'upcoming') {
-            batch.update(doc.reference, {
-              'status': 'completed',
-              'lastUpdatedDate': FieldValue.serverTimestamp(),
-            });
-            needsCommit = true;
+          for (var doc in allDocs.docs) {
+            final data = doc.data();
+            if (data['scheduledDate'] != null) {
+              DateTime? clsDate;
+              if (data['scheduledDate'] is Timestamp) {
+                clsDate = (data['scheduledDate'] as Timestamp).toDate();
+              } else if (data['scheduledDate'] is String) {
+                clsDate = DateTime.tryParse(data['scheduledDate']);
+              }
+              if (clsDate != null) {
+                final normCls = DateTime(clsDate.year, clsDate.month, clsDate.day);
+                if ((normCls.isAtSameMomentAs(normSun) || normCls.isAfter(normSun)) &&
+                    (normCls.isAtSameMomentAs(normSat) || normCls.isBefore(normSat))) {
+                  currentWeekHasClasses = true;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!currentWeekHasClasses) {
+            for (var doc in defaultSnap.docs) {
+              final data = doc.data();
+              final dayStr = (data['dayOfWeek'] ?? '').toString().trim();
+              final dayDate = _getDateTimeForDay(currentStartOfWeek, dayStr);
+              final newRef = FirebaseFirestore.instance.collection(schedulePath).doc();
+
+              batch.set(newRef, {
+                'subject': data['subject'] ?? '',
+                'subname': data['subname'] ?? '',
+                'room': data['room'] ?? '',
+                'teacher': data['teacher'] ?? '',
+                'time': data['time'] ?? '',
+                'dayOfWeek': dayStr,
+                'startSlot': data['startSlot'] ?? 1,
+                'span': data['span'] ?? 1,
+                'group': data['group'] ?? '',
+                'status': 'upcoming',
+                'scheduledDate': Timestamp.fromDate(dayDate),
+                'lastUpdatedDate': FieldValue.serverTimestamp(),
+              });
+            }
           }
         }
-      }
 
-      if (isNewWeek || lastReset == null) {
         batch.set(infoDocRef, {
           'lastResetDate': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        needsCommit = true;
-      }
 
-      if (needsCommit) {
         await batch.commit();
-        debugPrint('Schedule statuses checked and auto-reset/restored.');
+        debugPrint('Schedule master routine populated for new week.');
       }
     } catch (e) {
       debugPrint('Auto-reset check failed: $e');
@@ -688,6 +714,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+
+
   Future<void> _saveAsDefaultRoutine(BuildContext context, AppUser? user) async {
     if (user == null || !user.hasDeptScope) return;
     final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
@@ -708,18 +736,67 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         return;
       }
 
-      final currentDefaultDocs = await FirebaseFirestore.instance.collection(defaultPath).get();
-      final deleteBatch = FirebaseFirestore.instance.batch();
-      for (var doc in currentDefaultDocs.docs) {
-        deleteBatch.delete(doc.reference);
-      }
-      await deleteBatch.commit();
+      final sundayDate = _getSundayOfWeek(_selectedDate);
+      final saturdayDate = sundayDate.add(const Duration(days: 6));
+      final normSun = DateTime(sundayDate.year, sundayDate.month, sundayDate.day);
+      final normSat = DateTime(saturdayDate.year, saturdayDate.month, saturdayDate.day);
 
-      final writeBatch = FirebaseFirestore.instance.batch();
+      // Filter classes for active week and de-duplicate unique slots
+      final Map<String, Map<String, dynamic>> uniqueActiveWeekDocs = {};
+
       for (var doc in activeDocs.docs) {
         final data = doc.data();
+        DateTime? clsDate;
+        if (data['scheduledDate'] != null) {
+          if (data['scheduledDate'] is Timestamp) {
+            clsDate = (data['scheduledDate'] as Timestamp).toDate();
+          } else if (data['scheduledDate'] is String) {
+            clsDate = DateTime.tryParse(data['scheduledDate']);
+          }
+        }
+
+        bool isCurrentWeek = true;
+        if (clsDate != null) {
+          final normCls = DateTime(clsDate.year, clsDate.month, clsDate.day);
+          isCurrentWeek = (normCls.isAtSameMomentAs(normSun) || normCls.isAfter(normSun)) &&
+                          (normCls.isAtSameMomentAs(normSat) || normCls.isBefore(normSat));
+        }
+
+        if (isCurrentWeek) {
+          final dayOfWeek = (data['dayOfWeek'] ?? '').toString().trim();
+          final startSlot = data['startSlot'] ?? 1;
+          final subject = (data['subject'] ?? '').toString().trim();
+          final group = (data['group'] ?? '').toString().trim();
+          final teacher = (data['teacher'] ?? '').toString().trim();
+          final room = (data['room'] ?? '').toString().trim();
+
+          final key = '${dayOfWeek}_${startSlot}_${subject}_${group}_${teacher}_${room}';
+          uniqueActiveWeekDocs[key] = data;
+        }
+      }
+
+      if (uniqueActiveWeekDocs.isEmpty) {
+        if (context.mounted) {
+          InAppNotification.show(
+            context,
+            title: 'No Routine for Active Week',
+            message: 'No class entries found for the selected week.',
+            accentColor: Colors.amberAccent,
+            icon: Icons.info_outline_rounded,
+          );
+        }
+        return;
+      }
+
+      final currentDefaultDocs = await FirebaseFirestore.instance.collection(defaultPath).get();
+      final batch = FirebaseFirestore.instance.batch();
+      for (var doc in currentDefaultDocs.docs) {
+        batch.delete(doc.reference);
+      }
+
+      for (var data in uniqueActiveWeekDocs.values) {
         final newRef = FirebaseFirestore.instance.collection(defaultPath).doc();
-        writeBatch.set(newRef, {
+        batch.set(newRef, {
           'subject': data['subject'] ?? '',
           'subname': data['subname'] ?? '',
           'room': data['room'] ?? '',
@@ -733,13 +810,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           'lastUpdatedDate': FieldValue.serverTimestamp(),
         });
       }
-      await writeBatch.commit();
+      await batch.commit();
 
       if (context.mounted) {
         InAppNotification.show(
           context,
           title: 'Default Routine Saved',
-          message: 'Saved ${activeDocs.docs.length} class slot(s) as your master Default Routine!',
+          message: 'Saved ${uniqueActiveWeekDocs.length} unique class slot(s) for the active week as your Default Routine template!',
           accentColor: Colors.greenAccent,
           icon: Icons.bookmark_added_rounded,
         );
@@ -760,7 +837,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Future<void> _showApplyDefaultRoutineDialog(BuildContext context, AppUser? user) async {
     if (user == null || !user.hasDeptScope) return;
     final defaultPath = deptBatchCol(user.department, user.batch, 'default_schedule');
-    final selectedDay = _getDayOfWeekName(_selectedDate);
+    final initialDay = _getDayOfWeekName(_selectedDate);
 
     try {
       final defaultDocs = await FirebaseFirestore.instance.collection(defaultPath).get();
@@ -777,66 +854,168 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         return;
       }
 
-      final int dayItemCount = defaultDocs.docs
-          .where((d) => (d.data()['dayOfWeek'] ?? '').toString().trim().toLowerCase() == selectedDay.toLowerCase())
-          .length;
+      final daysList = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      String chosenDay = daysList.contains(initialDay) ? initialDay : 'Sunday';
 
       if (!context.mounted) return;
 
       await showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.backgroundTop,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: AppColors.glassCardBorder),
-          ),
-          title: Text(
-            'Apply Default Routine',
-            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Choose how you want to apply your saved Default Routine template:',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        builder: (ctx) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            final int dayItemCount = defaultDocs.docs
+                .where((d) => (d.data()['dayOfWeek'] ?? '').toString().trim().toLowerCase() == chosenDay.toLowerCase())
+                .length;
+
+            return AlertDialog(
+              backgroundColor: AppColors.backgroundTop,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: AppColors.glassCardBorder),
               ),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.today_rounded, color: Colors.blueAccent),
-                title: Text('Apply for $selectedDay only',
-                    style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: Text('Replaces $selectedDay\'s active classes ($dayItemCount slot(s) in template)',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await _applyDefaultRoutine(context, user, targetDay: selectedDay);
-                },
+              title: Row(
+                children: [
+                  Icon(Icons.published_with_changes_rounded, color: AppColors.primary, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Apply Default Routine',
+                    style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
               ),
-              const Divider(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.calendar_month_rounded, color: Colors.greenAccent),
-                title: Text('Apply Entire Default Week',
-                    style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: Text('Replaces active routine for ALL days (${defaultDocs.docs.length} total slot(s))',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await _applyDefaultRoutine(context, user, targetDay: null);
-                },
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Choose a day or apply the template to the entire week:',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'SELECT TARGET DAY',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.glassCardColor,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.glassCardBorder),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: chosenDay,
+                          isExpanded: true,
+                          dropdownColor: AppColors.backgroundTop,
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                          items: daysList.map((day) {
+                            final count = defaultDocs.docs
+                                .where((d) => (d.data()['dayOfWeek'] ?? '').toString().trim().toLowerCase() == day.toLowerCase())
+                                .length;
+                            return DropdownMenuItem<String>(
+                              value: day,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(day),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '$count slot(s)',
+                                      style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() {
+                                chosenDay = val;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.18)),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blueAccent.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.today_rounded, color: Colors.blueAccent, size: 20),
+                        ),
+                        title: Text('Apply for $chosenDay only',
+                            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+                        subtitle: Text('Replaces $chosenDay\'s active classes ($dayItemCount slot(s) in template)',
+                            style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          await _applyDefaultRoutine(context, user, targetDay: chosenDay);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E676).withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF00E676).withOpacity(0.18)),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00E676).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.calendar_month_rounded, color: Color(0xFF00E676), size: 20),
+                        ),
+                        title: Text('Apply Entire Default Week',
+                            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+                        subtitle: Text('Replaces active routine for ALL days (${defaultDocs.docs.length} total slot(s))',
+                            style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          await _applyDefaultRoutine(context, user, targetDay: null);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                ),
+              ],
+            );
+          },
         ),
       );
     } catch (e) {
@@ -852,6 +1031,37 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
+  DateTime _getDateTimeForDay(DateTime sundayDate, String dayName) {
+    int daysOffset = 0;
+    switch (dayName.trim().toLowerCase()) {
+      case 'sunday':
+        daysOffset = 0;
+        break;
+      case 'monday':
+        daysOffset = 1;
+        break;
+      case 'tuesday':
+        daysOffset = 2;
+        break;
+      case 'wednesday':
+        daysOffset = 3;
+        break;
+      case 'thursday':
+        daysOffset = 4;
+        break;
+      case 'friday':
+        daysOffset = 5;
+        break;
+      case 'saturday':
+        daysOffset = 6;
+        break;
+      default:
+        daysOffset = 0;
+    }
+    final target = sundayDate.add(Duration(days: daysOffset));
+    return DateTime(target.year, target.month, target.day);
+  }
+
   Future<void> _applyDefaultRoutine(BuildContext context, AppUser user, {String? targetDay}) async {
     final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
     final defaultPath = deptBatchCol(user.department, user.batch, 'default_schedule');
@@ -860,14 +1070,34 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final defaultSnap = await FirebaseFirestore.instance.collection(defaultPath).get();
       final activeSnap = await FirebaseFirestore.instance.collection(schedulePath).get();
 
+      final sundayDate = _getSundayOfWeek(_selectedDate);
+      final normSun = DateTime(sundayDate.year, sundayDate.month, sundayDate.day);
+      final normSat = DateTime(sundayDate.year, sundayDate.month, sundayDate.day + 6, 23, 59, 59);
+
       final batch = FirebaseFirestore.instance.batch();
 
       if (targetDay != null && targetDay.isNotEmpty) {
         final targetDayLower = targetDay.trim().toLowerCase();
+        final targetDate = _getDateTimeForDay(sundayDate, targetDay);
 
         for (var doc in activeSnap.docs) {
-          final day = (doc.data()['dayOfWeek'] ?? '').toString().trim().toLowerCase();
-          if (day == targetDayLower) {
+          final data = doc.data();
+          DateTime? clsDate;
+          if (data['scheduledDate'] != null) {
+            if (data['scheduledDate'] is Timestamp) {
+              clsDate = (data['scheduledDate'] as Timestamp).toDate();
+            } else if (data['scheduledDate'] is String) {
+              clsDate = DateTime.tryParse(data['scheduledDate']);
+            }
+          }
+
+          final day = (data['dayOfWeek'] ?? '').toString().trim().toLowerCase();
+          bool isSameTargetDay = day == targetDayLower;
+          bool isInTargetWeek = clsDate == null ||
+              (clsDate.isAfter(normSun.subtract(const Duration(seconds: 1))) &&
+               clsDate.isBefore(normSat.add(const Duration(seconds: 1))));
+
+          if (isSameTargetDay && isInTargetWeek) {
             batch.delete(doc.reference);
           }
         }
@@ -888,6 +1118,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               'span': data['span'] ?? 1,
               'group': data['group'] ?? '',
               'status': 'upcoming',
+              'scheduledDate': Timestamp.fromDate(targetDate),
               'lastUpdatedDate': FieldValue.serverTimestamp(),
             });
           }
@@ -899,30 +1130,50 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           InAppNotification.show(
             context,
             title: 'Day Routine Applied',
-            message: 'Default routine applied successfully for $targetDay!',
+            message: 'Applied default routine for $targetDay (${DateFormat('d MMM').format(targetDate)})!',
             accentColor: Colors.blueAccent,
             icon: Icons.today_rounded,
           );
         }
       } else {
         for (var doc in activeSnap.docs) {
-          batch.delete(doc.reference);
+          final data = doc.data();
+          DateTime? clsDate;
+          if (data['scheduledDate'] != null) {
+            if (data['scheduledDate'] is Timestamp) {
+              clsDate = (data['scheduledDate'] as Timestamp).toDate();
+            } else if (data['scheduledDate'] is String) {
+              clsDate = DateTime.tryParse(data['scheduledDate']);
+            }
+          }
+
+          bool isInActiveWeek = clsDate == null ||
+              (clsDate.isAfter(normSun.subtract(const Duration(seconds: 1))) &&
+               clsDate.isBefore(normSat.add(const Duration(seconds: 1))));
+
+          if (isInActiveWeek) {
+            batch.delete(doc.reference);
+          }
         }
 
         for (var doc in defaultSnap.docs) {
           final data = doc.data();
+          final dayStr = (data['dayOfWeek'] ?? '').toString().trim();
+          final dayDate = _getDateTimeForDay(sundayDate, dayStr);
           final newRef = FirebaseFirestore.instance.collection(schedulePath).doc();
+
           batch.set(newRef, {
             'subject': data['subject'] ?? '',
             'subname': data['subname'] ?? '',
             'room': data['room'] ?? '',
             'teacher': data['teacher'] ?? '',
             'time': data['time'] ?? '',
-            'dayOfWeek': data['dayOfWeek'] ?? '',
+            'dayOfWeek': dayStr,
             'startSlot': data['startSlot'] ?? 1,
             'span': data['span'] ?? 1,
             'group': data['group'] ?? '',
             'status': 'upcoming',
+            'scheduledDate': Timestamp.fromDate(dayDate),
             'lastUpdatedDate': FieldValue.serverTimestamp(),
           });
         }
@@ -932,8 +1183,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         if (context.mounted) {
           InAppNotification.show(
             context,
-            title: 'Full Routine Applied',
-            message: 'Entire default weekly routine applied successfully!',
+            title: 'Week Routine Applied',
+            message: 'Applied default routine for week of ${DateFormat('d MMM').format(sundayDate)}!',
             accentColor: Colors.greenAccent,
             icon: Icons.published_with_changes_rounded,
           );
@@ -957,36 +1208,47 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     required String title,
     required String subtitle,
     required IconData icon,
-    required Color accentColor,
+    Color? accentColor,
+    bool isDestructive = false,
   }) {
+    final effectiveColor = isDestructive
+        ? const Color(0xFFFF453A)
+        : (accentColor ?? AppColors.primary);
+
     return PopupMenuItem<String>(
       value: value,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: accentColor.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: accentColor.withOpacity(0.18)),
+          color: isDestructive
+              ? const Color(0xFFFF453A).withOpacity(0.08)
+              : effectiveColor.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDestructive
+                ? const Color(0xFFFF453A).withOpacity(0.28)
+                : effectiveColor.withOpacity(0.18),
+            width: 1,
+          ),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: accentColor.withOpacity(0.35)),
+                color: effectiveColor.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(8),
                 boxShadow: [
                   BoxShadow(
-                    color: accentColor.withOpacity(0.2),
+                    color: effectiveColor.withOpacity(0.12),
                     blurRadius: 6,
                   ),
                 ],
               ),
-              child: Icon(icon, color: accentColor, size: 15),
+              child: Icon(icon, color: effectiveColor, size: 15),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -995,18 +1257,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   Text(
                     title,
                     style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
+                      color: isDestructive
+                          ? const Color(0xFFFF453A)
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),
                   ),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: AppColors.textSecondary.withOpacity(0.8),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary.withOpacity(0.75),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ],
@@ -1014,7 +1278,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             ),
             Icon(
               Icons.chevron_right_rounded,
-              color: accentColor.withOpacity(0.5),
+              color: effectiveColor.withOpacity(0.4),
               size: 15,
             ),
           ],
@@ -1186,49 +1450,43 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   title: 'Edit Routine Details',
                                   subtitle: 'University & Level/Term metadata',
                                   icon: Icons.edit_note_rounded,
-                                  accentColor: const Color(0xFF00E5FF),
                                 ),
                                 _buildDynamicMenuItem(
                                   value: 'edit_slots',
                                   title: 'Edit Time Slots',
                                   subtitle: 'Durations, breaks & custom slots',
                                   icon: Icons.schedule_rounded,
-                                  accentColor: const Color(0xFFB388FF),
                                 ),
                                 _buildDynamicMenuItem(
                                   value: 'add_class',
                                   title: 'Add New Class',
                                   subtitle: 'Schedule a new class slot',
                                   icon: Icons.add_circle_outline_rounded,
-                                  accentColor: const Color(0xFF00E676),
                                 ),
                                 _buildDynamicMenuItem(
                                   value: 'save_default',
                                   title: 'Save as Default Routine',
                                   subtitle: 'Save active schedule as master template',
                                   icon: Icons.bookmark_added_rounded,
-                                  accentColor: const Color(0xFFFFD600),
                                 ),
                                 _buildDynamicMenuItem(
                                   value: 'apply_default',
                                   title: 'Apply Default Routine...',
                                   subtitle: 'Restore template for day or full week',
                                   icon: Icons.published_with_changes_rounded,
-                                  accentColor: const Color(0xFF40C4FF),
                                 ),
                                 _buildDynamicMenuItem(
                                   value: 'copy_prev_week',
                                   title: 'Copy from Previous Week',
                                   subtitle: 'Duplicate last week\'s schedule',
                                   icon: Icons.content_copy_rounded,
-                                  accentColor: const Color(0xFFFF4081),
                                 ),
                                 _buildDynamicMenuItem(
                                   value: 'clear_data',
                                   title: 'Reset Routine Data',
                                   subtitle: 'Wipe all routine schedule entries',
                                   icon: Icons.delete_forever_rounded,
-                                  accentColor: const Color(0xFFFF1744),
+                                  isDestructive: true,
                                 ),
                               ],
                             ),
@@ -1239,7 +1497,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           builder: (context, constraints) {
                             final double availableHeight = constraints.maxHeight;
                             final double calendarHeight = _isCalendarExpanded ? 340 : 54;
-                            final double tableHeight = (availableHeight - calendarHeight - 8 - 80).clamp(380.0, 1000.0);
+                            final double tableHeight = (availableHeight - calendarHeight - 8 - 80).clamp(425.0, 1000.0);
 
                             return SingleChildScrollView(
                               child: Padding(

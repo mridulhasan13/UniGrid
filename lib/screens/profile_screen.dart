@@ -52,11 +52,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadNotificationSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final bool rVal = prefs.getBool('notif_routine') ?? true;
+    final bool cVal = prefs.getBool('notif_chat') ?? true;
+    final bool aVal = prefs.getBool('notif_alerts') ?? true;
+
+    // Ensure preferences are saved as active
+    await prefs.setBool('notif_routine', rVal);
+    await prefs.setBool('notif_chat', cVal);
+    await prefs.setBool('notif_alerts', aVal);
+
+    final user = Provider.of<AppUser?>(context, listen: false);
+    if (user != null) {
+      FirebaseFirestore.instance.collection('users').doc(user.id).set({
+        'notifRoutine': rVal,
+        'notifChat': cVal,
+        'notifAlerts': aVal,
+      }, SetOptions(merge: true));
+
+      if (rVal) {
+        RoutineReminderService.syncRoutineReminders(user);
+      }
+    }
+
     if (mounted) {
       setState(() {
-        _notifRoutine = prefs.getBool('notif_routine') ?? true;
-        _notifChat = prefs.getBool('notif_chat') ?? true;
-        _notifAlerts = prefs.getBool('notif_alerts') ?? true;
+        _notifRoutine = rVal;
+        _notifChat = cVal;
+        _notifAlerts = aVal;
       });
     }
   }

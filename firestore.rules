@@ -18,17 +18,22 @@ service cloud.firestore {
     function isApprovedUser() {
       return isAuthenticated() && (
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isCR == true ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
         isRootAdmin(request.auth)
       );
     }
     
     function belongsToScope(dept, batch) {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == dept &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.batch == batch;
+      return isRootAdmin(request.auth) || (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == dept &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.batch == batch
+      );
     }
     
     function isCR(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data.isCR == true ||
+             get(/databases/$(database)/documents/users/$(userId)).data.isAdmin == true ||
              isRootAdmin(request.auth);
     }
 

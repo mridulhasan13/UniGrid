@@ -14,6 +14,83 @@ import '../screens/schedule_builder_screen.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 
+final Set<String> _autoPopulatedWeeks = {};
+
+DateTime _getDateTimeForDayHelper(DateTime sundayDate, String dayName) {
+  int daysOffset = 0;
+  switch (dayName.trim().toLowerCase()) {
+    case 'sunday':
+      daysOffset = 0;
+      break;
+    case 'monday':
+      daysOffset = 1;
+      break;
+    case 'tuesday':
+      daysOffset = 2;
+      break;
+    case 'wednesday':
+      daysOffset = 3;
+      break;
+    case 'thursday':
+      daysOffset = 4;
+      break;
+    case 'friday':
+      daysOffset = 5;
+      break;
+    case 'saturday':
+      daysOffset = 6;
+      break;
+    default:
+      daysOffset = 0;
+  }
+  final target = sundayDate.add(Duration(days: daysOffset));
+  return DateTime(target.year, target.month, target.day);
+}
+
+Future<void> _checkAndAutoPopulateWeek({
+  required AppUser user,
+  required DateTime sundayDate,
+}) async {
+  final weekKey = '${user.department}_${user.batch}_${sundayDate.year}_${sundayDate.month}_${sundayDate.day}';
+  if (_autoPopulatedWeeks.contains(weekKey)) return;
+  _autoPopulatedWeeks.add(weekKey);
+
+  final defaultPath = deptBatchCol(user.department, user.batch, 'default_schedule');
+  final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
+
+  try {
+    final defaultSnap = await FirebaseFirestore.instance.collection(defaultPath).get();
+    if (defaultSnap.docs.isEmpty) return;
+
+    final batch = FirebaseFirestore.instance.batch();
+    for (var doc in defaultSnap.docs) {
+      final data = doc.data();
+      final dayStr = (data['dayOfWeek'] ?? '').toString().trim();
+      final dayDate = _getDateTimeForDayHelper(sundayDate, dayStr);
+      final newRef = FirebaseFirestore.instance.collection(schedulePath).doc();
+
+      batch.set(newRef, {
+        'subject': data['subject'] ?? '',
+        'subname': data['subname'] ?? '',
+        'room': data['room'] ?? '',
+        'teacher': data['teacher'] ?? '',
+        'time': data['time'] ?? '',
+        'dayOfWeek': dayStr,
+        'startSlot': data['startSlot'] ?? 1,
+        'span': data['span'] ?? 1,
+        'group': data['group'] ?? '',
+        'status': 'upcoming',
+        'scheduledDate': Timestamp.fromDate(dayDate),
+        'lastUpdatedDate': FieldValue.serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
+  } catch (e) {
+    debugPrint('Auto populate error: $e');
+  }
+}
+
 class WeeklyRoutineTable extends StatelessWidget {
   final Map<String, dynamic>? customSlots;
   final String university;
@@ -175,6 +252,10 @@ class WeeklyRoutineTable extends StatelessWidget {
               return true;
             })
             .toList();
+
+        if (rawClasses.isEmpty && user != null && user.hasDeptScope) {
+          _checkAndAutoPopulateWeek(user: user, sundayDate: sundayDate);
+        }
 
         // De-duplicate classes to prevent "barcode" layout if database has duplicate records
         final Map<String, ClassSchedule> uniqueClasses = {};
@@ -392,10 +473,13 @@ class WeeklyRoutineTable extends StatelessWidget {
                 onDateTap: onDateTap,
               ),
               const SizedBox(height: 6),
-              SizedBox(
-                height: 358,
-                width: isMobile ? 920 : double.infinity,
-                child: tableGridContent,
+              Flexible(
+                fit: FlexFit.loose,
+                child: SizedBox(
+                  height: 358,
+                  width: isMobile ? 920 : double.infinity,
+                  child: tableGridContent,
+                ),
               ),
             ],
           ),
