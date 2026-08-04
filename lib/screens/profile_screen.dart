@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -69,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'notifAlerts': aVal,
       }, SetOptions(merge: true));
 
-      if (rVal) {
+      if (rVal && !kIsWeb) {
         RoutineReminderService.syncRoutineReminders(user);
       }
     }
@@ -101,7 +102,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         debugPrint('Failed to sync notification pref to Firestore: $e');
       });
 
-      if (key == 'notif_routine') {
+      if (key == 'notif_routine' && !kIsWeb) {
         RoutineReminderService.syncRoutineReminders(user);
       }
     }

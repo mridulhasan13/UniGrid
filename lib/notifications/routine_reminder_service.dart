@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,7 +17,9 @@ class RoutineReminderService {
   static String? _lastSyncedUserId;
 
   /// Synchronizes class reminder notifications with current user preferences.
+  /// No-op on web — timers and local notifications are not supported on the web platform.
   static Future<void> syncRoutineReminders(AppUser? user) async {
+    if (kIsWeb) return;
     if (user == null || !user.hasDeptScope) {
       _reminderTimer?.cancel();
       _reminderTimer = null;
@@ -94,12 +97,16 @@ class RoutineReminderService {
             );
 
             // 2. In-App Glassmorphic Overlay Banner (if app is open)
-            InAppNotification.showGlobal(
-              title: titleText,
-              message: bodyText,
-              icon: Icons.schedule_rounded,
-              accentColor: const Color(0xFF3B82F6),
-            );
+            try {
+              InAppNotification.showGlobal(
+                title: titleText,
+                message: bodyText,
+                icon: Icons.schedule_rounded,
+                accentColor: const Color(0xFF3B82F6),
+              );
+            } catch (e) {
+              debugPrint('[RoutineReminder] Could not show in-app banner: $e');
+            }
           }
         }
       }
