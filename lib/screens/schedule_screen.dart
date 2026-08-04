@@ -952,6 +952,77 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
+  PopupMenuItem<String> _buildDynamicMenuItem({
+    required String value,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: accentColor.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: accentColor.withOpacity(0.18)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: accentColor.withOpacity(0.35)),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentColor.withOpacity(0.2),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+              child: Icon(icon, color: accentColor, size: 15),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: AppColors.textSecondary.withOpacity(0.8),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: accentColor.withOpacity(0.5),
+              size: 15,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Provider.of<ThemeService>(context); // Listen to global theme updates
@@ -1052,8 +1123,34 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           ),
                           if (isCR)
                             PopupMenuButton<String>(
-                              icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
-                              color: AppColors.backgroundTop,
+                              tooltip: 'Routine Options',
+                              elevation: 16,
+                              shadowColor: AppColors.primary.withOpacity(0.4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
+                                    color: AppColors.primary.withOpacity(0.35),
+                                    width: 1.5),
+                              ),
+                              color: AppColors.backgroundTop.withOpacity(0.96),
+                              icon: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: AppColors.primary.withOpacity(0.35)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withOpacity(0.2),
+                                      blurRadius: 8,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(Icons.tune_rounded,
+                                    color: AppColors.primary, size: 18),
+                              ),
                               onSelected: (value) {
                                 if (value == 'edit_meta') {
                                   _showEditMetadataDialog(
@@ -1084,52 +1181,54 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                 }
                               },
                               itemBuilder: (context) => [
-                                PopupMenuItem(
+                                _buildDynamicMenuItem(
                                   value: 'edit_meta',
-                                  child: Text('Edit Routine Details',
-                                      style: TextStyle(color: AppColors.textPrimary)),
+                                  title: 'Edit Routine Details',
+                                  subtitle: 'University & Level/Term metadata',
+                                  icon: Icons.edit_note_rounded,
+                                  accentColor: const Color(0xFF00E5FF),
                                 ),
-                                PopupMenuItem(
+                                _buildDynamicMenuItem(
                                   value: 'edit_slots',
-                                  child: Text('Edit Time Slots',
-                                      style: TextStyle(color: AppColors.textPrimary)),
+                                  title: 'Edit Time Slots',
+                                  subtitle: 'Durations, breaks & custom slots',
+                                  icon: Icons.schedule_rounded,
+                                  accentColor: const Color(0xFFB388FF),
                                 ),
-                                PopupMenuItem(
+                                _buildDynamicMenuItem(
                                   value: 'add_class',
-                                  child: Text('Add New Class',
-                                      style: TextStyle(color: AppColors.textPrimary)),
+                                  title: 'Add New Class',
+                                  subtitle: 'Schedule a new class slot',
+                                  icon: Icons.add_circle_outline_rounded,
+                                  accentColor: const Color(0xFF00E676),
                                 ),
-                                PopupMenuItem(
+                                _buildDynamicMenuItem(
                                   value: 'save_default',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.bookmark_added_rounded, color: Colors.greenAccent, size: 18),
-                                      SizedBox(width: 8),
-                                      Text('Save as Default Routine',
-                                          style: TextStyle(color: AppColors.textPrimary)),
-                                    ],
-                                  ),
+                                  title: 'Save as Default Routine',
+                                  subtitle: 'Save active schedule as master template',
+                                  icon: Icons.bookmark_added_rounded,
+                                  accentColor: const Color(0xFFFFD600),
                                 ),
-                                PopupMenuItem(
+                                _buildDynamicMenuItem(
                                   value: 'apply_default',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.published_with_changes_rounded, color: Colors.blueAccent, size: 18),
-                                      SizedBox(width: 8),
-                                      Text('Apply Default Routine...',
-                                          style: TextStyle(color: AppColors.textPrimary)),
-                                    ],
-                                  ),
+                                  title: 'Apply Default Routine...',
+                                  subtitle: 'Restore template for day or full week',
+                                  icon: Icons.published_with_changes_rounded,
+                                  accentColor: const Color(0xFF40C4FF),
                                 ),
-                                PopupMenuItem(
+                                _buildDynamicMenuItem(
                                   value: 'copy_prev_week',
-                                  child: Text('Copy from Previous Week',
-                                      style: TextStyle(color: AppColors.textPrimary)),
+                                  title: 'Copy from Previous Week',
+                                  subtitle: 'Duplicate last week\'s schedule',
+                                  icon: Icons.content_copy_rounded,
+                                  accentColor: const Color(0xFFFF4081),
                                 ),
-                                const PopupMenuItem(
+                                _buildDynamicMenuItem(
                                   value: 'clear_data',
-                                  child: Text('Reset Routine Data',
-                                      style: TextStyle(color: Colors.redAccent)),
+                                  title: 'Reset Routine Data',
+                                  subtitle: 'Wipe all routine schedule entries',
+                                  icon: Icons.delete_forever_rounded,
+                                  accentColor: const Color(0xFFFF1744),
                                 ),
                               ],
                             ),
