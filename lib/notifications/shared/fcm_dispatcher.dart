@@ -2,20 +2,23 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:http/http.dart' as http;
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// FcmDispatcher
 ///
 /// Single-responsibility HTTP sender.  Takes a list of FCM tokens + payload,
-/// POSTs to the Netlify proxy (which auto-builds the correct per-platform
-/// FCM payload), and cleans up dead tokens from Firestore.
+/// POSTs to the Netlify proxy first, and if that fails on native platforms,
+/// falls back to a direct FCM HTTP v1 call using the bundled service account.
+///
+/// Delivery strategy (2-step):
+///   Step 1 — Netlify serverless proxy (free tier, 125k/mo)
+///   Step 2 — Direct FCM HTTP v1 via service account (native only, fallback)
 ///
 /// • Web tokens → Netlify builds webpush payload (shown once by Service Worker)
-/// • Native tokens → Netlify builds notification+android+apns payload
-///
-/// Fallback: if Netlify is unreachable on native, nothing fails — the error is
-/// logged and the send is skipped (native apps also have FCMService as backup).
+/// • Native tokens → Netlify or direct FCM builds notification+android+apns payload
 /// ─────────────────────────────────────────────────────────────────────────────
 class FcmDispatcher {
   FcmDispatcher._();
@@ -70,12 +73,16 @@ class FcmDispatcher {
       return;
     }
 
+    final List<String> finalTokens = targets.toList();
+
+    // ── Step 1: Netlify free serverless proxy ────────────────────────────────
+    bool netlifySucceeded = false;
     try {
       final response = await http.post(
         Uri.parse(_netlifyUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'tokens': targets.toList(),
+          'tokens': finalTokens,
           'title': title,
           'bodyText': body,
           'senderUserId': senderUserId,
@@ -86,17 +93,125 @@ class FcmDispatcher {
 
       if (response.statusCode == 200) {
         debugPrint(
-          '[FcmDispatcher] ✓ Sent "$title" to ${targets.length} token(s)',
+          '[FcmDispatcher] ✓ Sent "$title" to ${finalTokens.length} token(s) via Netlify',
         );
         _handleDeadTokens(response.body);
+        netlifySucceeded = true;
       } else {
         debugPrint(
           '[FcmDispatcher] Netlify returned ${response.statusCode}: ${response.body}',
         );
       }
     } catch (e) {
-      debugPrint('[FcmDispatcher] Dispatch error: $e');
+      debugPrint('[FcmDispatcher] Netlify unavailable ($e) — trying native fallback');
     }
+
+    // ── Step 2: Native fallback — direct FCM HTTP v1 via service account ─────
+    // Only runs on Android/iOS when Netlify failed; rootBundle is unavailable on web.
+    if (!netlifySucceeded && !kIsWeb) {
+      await _sendDirectNative(
+        tokens: finalTokens,
+        title: title,
+        body: body,
+        senderUserId: senderUserId,
+        messageId: messageId,
+      );
+    }
+  }
+
+  // ─── Direct FCM HTTP v1 (native fallback) ────────────────────────────────
+
+  static Future<void> _sendDirectNative({
+    required List<String> tokens,
+    required String title,
+    required String body,
+    required String senderUserId,
+    required String messageId,
+  }) async {
+    try {
+      final jsonString = await rootBundle.loadString('assets/service_account.json');
+      final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
+      final projectId = jsonMap['project_id'] as String?;
+      if (projectId == null || projectId.isEmpty) {
+        debugPrint('[FcmDispatcher] service_account.json missing project_id');
+        return;
+      }
+
+      final accessToken = await _getAccessToken(jsonString);
+      final endpoint =
+          'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
+
+      for (final token in tokens) {
+        try {
+          final response = await http.post(
+            Uri.parse(endpoint),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $accessToken',
+            },
+            body: jsonEncode({
+              'message': {
+                'token': token,
+                'notification': {'title': title, 'body': body},
+                'data': {
+                  'title': title,
+                  'body': body,
+                  'senderUserId': senderUserId,
+                  'messageId': messageId,
+                },
+                'android': {
+                  'priority': 'high',
+                  'notification': {
+                    'title': title,
+                    'body': body,
+                    'sound': 'default',
+                    'channel_id': 'unigrid_notifications',
+                    'tag': messageId,
+                    'icon': '@mipmap/ic_launcher',
+                    'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+                  },
+                },
+                'apns': {
+                  'payload': {
+                    'aps': {
+                      'alert': {'title': title, 'body': body},
+                      'sound': 'default',
+                    },
+                  },
+                },
+              },
+            }),
+          );
+
+          if (response.statusCode == 200) {
+            debugPrint('[FcmDispatcher] ✓ Direct FCM fallback OK: ${token.substring(0, 15)}...');
+          } else if (response.statusCode == 404 ||
+              response.body.contains('UNREGISTERED') ||
+              response.body.contains('NOT_FOUND')) {
+            debugPrint('[FcmDispatcher] Dead token (direct fallback), removing...');
+            _removeToken(token);
+          } else {
+            debugPrint('[FcmDispatcher] Direct FCM failed: ${response.statusCode} ${response.body}');
+          }
+        } catch (e) {
+          debugPrint('[FcmDispatcher] Direct FCM send error for token: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('[FcmDispatcher] _sendDirectNative error: $e');
+    }
+  }
+
+  // ─── OAuth2 access token from service account JSON ───────────────────────
+
+  static Future<String> _getAccessToken(String serviceAccountJson) async {
+    final accountCredentials =
+        auth.ServiceAccountCredentials.fromJson(serviceAccountJson);
+    final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+    final client = await auth.clientViaServiceAccount(accountCredentials, scopes);
+    final accessToken = client.credentials.accessToken.data;
+    client.close();
+    return accessToken;
   }
 
   // ─── Dead-token cleanup ───────────────────────────────────────────────────

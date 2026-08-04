@@ -43,8 +43,8 @@ void main() async {
   // Register background FCM handler BEFORE anything else
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Initialize notifications asynchronously in the background so they do not block first paint
-  FCMService.initialize().catchError((e) {
+  // Initialize FCM (awaited so the token is saved to Firestore before anything else runs)
+  await FCMService.initialize().catchError((e) {
     debugPrint('Failed to initialize FCM: $e');
   });
 
