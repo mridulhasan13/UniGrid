@@ -254,7 +254,13 @@ class WeeklyRoutineTable extends StatelessWidget {
             .toList();
 
         if (rawClasses.isEmpty && user != null && user.hasDeptScope) {
-          _checkAndAutoPopulateWeek(user: user, sundayDate: sundayDate);
+          final weekKey = '${user.department}_${user.batch}_${sundayDate.year}_${sundayDate.month}_${sundayDate.day}';
+          if (!_autoPopulatedWeeks.contains(weekKey)) {
+            _autoPopulatedWeeks.add(weekKey);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _checkAndAutoPopulateWeek(user: user, sundayDate: sundayDate);
+            });
+          }
         }
 
         // De-duplicate classes to prevent "barcode" layout if database has duplicate records

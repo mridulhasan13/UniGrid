@@ -27,6 +27,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   DateTime _selectedDate = DateTime.now();
   DateTime _focusedMonth = DateTime.now();
   bool _isCalendarExpanded = false;
+  String? _checkedUserIdForWeek;
 
   @override
   void initState() {
@@ -1295,11 +1296,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final isRootAdmin = user != null && authService.isRootAdmin(user.email);
     final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
 
-    // Run auto-reset once per build session when user is available
+    // Run auto-reset once per week/user selection when user is available
     if (user != null && user.hasDeptScope) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkAndAutoResetStatuses(user);
-      });
+      final weekKey = '${user.id}_${_selectedDate.year}_${_selectedDate.month}_${_selectedDate.day}';
+      if (_checkedUserIdForWeek != weekKey) {
+        _checkedUserIdForWeek = weekKey;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkAndAutoResetStatuses(user);
+        });
+      }
     }
 
     // If no dept scope, show setup needed
