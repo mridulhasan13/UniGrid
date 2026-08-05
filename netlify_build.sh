@@ -6,21 +6,22 @@ FLUTTER_VERSION="3.44.0"
 
 echo "=== Starting Netlify Build Pipeline ==="
 
-# 1. Restore the git-ignored service_account.json from environment variables (if provided)
+# 1. Restore service_account.json from env var OR use repo's existing assets/service_account.json
 if [ -n "$SERVICE_ACCOUNT_JSON" ]; then
   echo "Recreating assets/service_account.json from Netlify environment variable..."
   mkdir -p assets
   echo "$SERVICE_ACCOUNT_JSON" > assets/service_account.json
-  echo "✅ service_account.json restored successfully."
-
-  # Also write to netlify/functions/ so send-notification.js can read it from disk
-  # at Lambda runtime (avoids the 4KB AWS Lambda env var size limit)
   mkdir -p netlify/functions
   echo "$SERVICE_ACCOUNT_JSON" > netlify/functions/service_account.json
-  echo "✅ netlify/functions/service_account.json written for runtime use."
+  echo "✅ service_account.json restored from environment variable."
+elif [ -f "assets/service_account.json" ] && [ -s "assets/service_account.json" ] && [ "$(cat assets/service_account.json)" != "{}" ]; then
+  echo "✅ Using existing repository assets/service_account.json..."
+  mkdir -p netlify/functions
+  cp assets/service_account.json netlify/functions/service_account.json
+  echo "✅ Copied service_account.json to netlify/functions/."
 else
-  echo "⚠️ Warning: SERVICE_ACCOUNT_JSON environment variable is not defined."
-  echo "Creating empty placeholder JSONs to prevent build errors..."
+  echo "⚠️ Warning: SERVICE_ACCOUNT_JSON environment variable is not defined and no local service_account.json found."
+  echo "Creating empty placeholder JSONs..."
   mkdir -p assets
   echo "{}" > assets/service_account.json
   mkdir -p netlify/functions
