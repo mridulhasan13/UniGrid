@@ -2195,7 +2195,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ],
                       ),
                       child: (_isSending || _isUploadingFiles)
-                          ? const Center(
+                          ? Center(
                               child: SizedBox(
                                 width: 20,
                                 height: 20,

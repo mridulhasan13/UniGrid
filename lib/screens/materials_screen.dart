@@ -172,6 +172,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                 );
               }).toList(),
             ),
+          ),
           // Search Bar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
