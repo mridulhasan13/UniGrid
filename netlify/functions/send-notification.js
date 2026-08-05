@@ -241,15 +241,30 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'title' and 'bodyText' are required" }) };
   }
 
-  // Require service_account.json directly so Netlify's bundler bundles it into the function zip.
+  // Load credentials from environment variable first, then fallback to local bundled file
   let serviceAccount;
-  try {
-    serviceAccount = require("./service_account.json");
-    if (!serviceAccount.private_key || !serviceAccount.client_email) {
-      return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: "service_account.json is missing required fields (placeholder?)" }) };
-    }
-  } catch (err) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: "Could not load service_account.json: " + err.message }) };
+  if (process.env.SERVICE_ACCOUNT_JSON) {
+    try {
+      serviceAccount = typeof process.env.SERVICE_ACCOUNT_JSON === "string"
+        ? JSON.parse(process.env.SERVICE_ACCOUNT_JSON)
+        : process.env.SERVICE_ACCOUNT_JSON;
+    } catch (e) {}
+  }
+
+  if (!serviceAccount || !serviceAccount.private_key) {
+    try {
+      serviceAccount = require("./service_account.json");
+    } catch (err) {}
+  }
+
+  if (!serviceAccount || !serviceAccount.private_key || !serviceAccount.client_email) {
+    return {
+      statusCode: 500,
+      headers: CORS,
+      body: JSON.stringify({
+        error: "service_account.json is missing required fields. Please set SERVICE_ACCOUNT_JSON in Netlify site environment variables."
+      })
+    };
   }
 
   let accessToken;
