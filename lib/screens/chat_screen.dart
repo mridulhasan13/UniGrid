@@ -722,6 +722,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
   final List<PlatformFile> _selectedFiles = [];
   bool _isUploadingFiles = false;
+  final Set<String> _pendingSeenDocIds = {};
 
   String get _chatPath {
     final user = Provider.of<AppUser?>(context, listen: false);
@@ -916,9 +917,15 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _markAsSeen(_ChatMsg msg, String userId) async {
     if (msg.authorId == userId) return;
     if (msg.seenBy.contains(userId)) return;
-    await _firestore.collection(_chatPath).doc(msg.docId).update({
-      'seenBy': FieldValue.arrayUnion([userId]),
-    });
+    if (_pendingSeenDocIds.contains(msg.docId)) return;
+    _pendingSeenDocIds.add(msg.docId);
+    try {
+      await _firestore.collection(_chatPath).doc(msg.docId).update({
+        'seenBy': FieldValue.arrayUnion([userId]),
+      });
+    } catch (e) {
+      _pendingSeenDocIds.remove(msg.docId);
+    }
   }
 
   // ---- SHOW SEEN BY ----
@@ -2188,13 +2195,15 @@ class _ChatScreenState extends State<ChatScreen> {
                         ],
                       ),
                       child: (_isSending || _isUploadingFiles)
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(AppColors.onPrimary),
+                          ? const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(AppColors.onPrimary),
+                                ),
                               ),
                             )
                           : Icon(
@@ -2240,9 +2249,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     child: file.bytes != null
                         ? Image.memory(file.bytes!, fit: BoxFit.cover)
-                        : Center(
-                            child: Icon(Icons.insert_drive_file,
-                                color: AppColors.textSecondary)),
+                        : (file.path != null && !kIsWeb
+                            ? Image.file(File(file.path!), fit: BoxFit.cover)
+                            : Center(
+                                child: Icon(Icons.insert_drive_file,
+                                    color: AppColors.textSecondary))),
                   ),
                 ),
                 Positioned(

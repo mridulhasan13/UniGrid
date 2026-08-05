@@ -1301,9 +1301,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final isRootAdmin = user != null && authService.isRootAdmin(user.email);
     final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
 
-    // Run auto-reset once per week/user selection when user is available
+    // Run auto-reset once per week/user when user is available.
+    // Key is based on the current WEEK (its Sunday), not the selected calendar date,
+    // so navigating to different days doesn't re-trigger the reset check.
     if (user != null && user.hasDeptScope) {
-      final weekKey = '${user.id}_${_selectedDate.year}_${_selectedDate.month}_${_selectedDate.day}';
+      final nowSunday = _normalizeStartOfWeek(DateTime.now());
+      final weekKey = '${user.id}_${nowSunday.year}_${nowSunday.month}_${nowSunday.day}';
       if (_checkedUserIdForWeek != weekKey) {
         _checkedUserIdForWeek = weekKey;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2095,17 +2098,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget _buildDateClassesList(
       AppUser? user, Map<String, dynamic>? customSlots) {
     final String dayOfWeekName = _getDayOfWeekName(_selectedDate);
-    final String dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final authService = Provider.of<AuthService>(context, listen: false);
     final isRootAdmin = user != null && authService.isRootAdmin(user.email);
     final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
 
+    // Status is written directly to the schedule collection (no override layer).
+    // This keeps the day-list view consistent with the weekly table tap.
     final schedulePath = user != null && user.hasDeptScope
         ? deptBatchCol(user.department, user.batch, 'schedule')
         : 'schedule';
-    final overridesPath = user != null && user.hasDeptScope
-        ? deptBatchCol(user.department, user.batch, 'schedule_overrides')
-        : 'schedule_overrides';
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection(schedulePath)
@@ -2159,141 +2161,135 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           );
         }
 
-        return StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection(overridesPath)
-              .doc(dateStr)
-              .snapshots(),
-          builder: (context, overrideSnap) {
-            final Map<String, dynamic> overrides =
-                overrideSnap.hasData && overrideSnap.data!.exists
-                    ? overrideSnap.data!.data() as Map<String, dynamic>
-                    : {};
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: rawClasses.length,
+          itemBuilder: (context, i) {
+            final cls = rawClasses[i];
+            final String status = cls.status.trim().toLowerCase();
 
-            return ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: rawClasses.length,
-              itemBuilder: (context, i) {
-                final cls = rawClasses[i];
-                String displayStatus = cls.status;
-                bool isOverridden = false;
-                if (overrides.containsKey(cls.id) && overrides[cls.id] is Map) {
-                  final overrideData = overrides[cls.id] as Map;
-                  if (overrideData.containsKey('status')) {
-                    displayStatus = overrideData['status'] as String;
-                    isOverridden = true;
-                  }
-                }
+            Color badgeBgColor;
+            Color badgeTextColor;
+            String badgeText;
 
-                Color badgeBgColor;
-                Color badgeTextColor;
-                String badgeText;
+            switch (status) {
+              case 'upcoming':
+                badgeBgColor = Colors.blue.withOpacity(0.15);
+                badgeTextColor = Colors.blueAccent;
+                badgeText = 'Upcoming';
+                break;
+              case 'completed':
+                badgeBgColor = Colors.green.withOpacity(0.15);
+                badgeTextColor = Colors.greenAccent;
+                badgeText = 'Completed';
+                break;
+              case 'cancelled':
+              case 'no_class':
+              case 'no class':
+                badgeBgColor = Colors.amber.withOpacity(0.15);
+                badgeTextColor = Colors.amberAccent;
+                badgeText = 'No Class';
+                break;
+              default:
+                badgeBgColor = AppColors.textPrimary.withOpacity(0.08);
+                badgeTextColor = AppColors.textSecondary;
+                badgeText = cls.status;
+            }
 
-                switch (displayStatus.trim().toLowerCase()) {
-                  case 'upcoming':
-                    badgeBgColor = Colors.blue.withOpacity(0.15);
-                    badgeTextColor = Colors.blueAccent;
-                    badgeText = 'Upcoming';
-                    break;
-                  case 'completed':
-                    badgeBgColor = Colors.green.withOpacity(0.15);
-                    badgeTextColor = Colors.greenAccent;
-                    badgeText = 'Completed';
-                    break;
-                  case 'cancelled':
-                  case 'no_class':
-                  case 'no class':
-                    badgeBgColor = Colors.amber.withOpacity(0.15);
-                    badgeTextColor = Colors.amberAccent;
-                    badgeText = 'No Class';
-                    break;
-                  default:
-                    badgeBgColor = AppColors.textPrimary.withOpacity(0.08);
-                    badgeTextColor = AppColors.textSecondary;
-                    badgeText = displayStatus;
-                }
-
-                return Card(
-                  color: AppColors.textPrimary.withOpacity(0.03),
-                  margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(color: AppColors.textPrimary.withOpacity(0.06)),
-                  ),
-                  child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    title: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            cls.subject,
-                            style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: badgeBgColor,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                                color: badgeTextColor.withOpacity(0.3)),
-                          ),
-                          child: Text(
-                            badgeText,
-                            style: TextStyle(
-                                color: badgeTextColor,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        if (isOverridden) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.purple.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                  color: Colors.purpleAccent.withOpacity(0.3)),
-                            ),
-                            child: const Text(
-                              'FIXED',
-                              style: TextStyle(
-                                  color: Colors.purpleAccent,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ]
-                      ],
+            return Card(
+              color: AppColors.textPrimary.withOpacity(0.03),
+              margin: const EdgeInsets.only(bottom: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: AppColors.textPrimary.withOpacity(0.06)),
+              ),
+              child: ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        cls.subject,
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13),
+                      ),
                     ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: badgeBgColor,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: badgeTextColor.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: TextStyle(
+                            color: badgeTextColor,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (cls.subname.isNotEmpty)
+                        Text(
+                          cls.subname,
+                          style: TextStyle(
+                              color: AppColors.textSecondary, fontSize: 12),
+                        ),
+                      const SizedBox(height: 4),
+                      Row(
                         children: [
-                          if (cls.subname.isNotEmpty)
-                            Text(
-                              cls.subname,
+                          Icon(Icons.access_time_rounded,
+                              color: AppColors.textSecondary, size: 12),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '${cls.time} (Slot ${cls.startSlot})',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                  color: AppColors.textSecondary, fontSize: 12),
+                                  color: AppColors.textSecondary, fontSize: 11),
                             ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(Icons.access_time_rounded,
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(Icons.room_rounded,
+                              color: AppColors.textSecondary, size: 12),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              cls.room,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: AppColors.textSecondary, fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (cls.teacher.isNotEmpty ||
+                          cls.group.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            if (cls.teacher.isNotEmpty) ...[
+                              Icon(Icons.person_outline_rounded,
                                   color: AppColors.textSecondary, size: 12),
                               const SizedBox(width: 4),
                               Flexible(
                                 child: Text(
-                                  '${cls.time} (Slot ${cls.startSlot})',
+                                  cls.teacher,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -2301,12 +2297,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Icon(Icons.room_rounded,
+                            ],
+                            if (cls.group.isNotEmpty) ...[
+                              Icon(Icons.group_outlined,
                                   color: AppColors.textSecondary, size: 12),
                               const SizedBox(width: 4),
                               Flexible(
                                 child: Text(
-                                  cls.room,
+                                  cls.group,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -2314,64 +2312,26 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                 ),
                               ),
                             ],
-                          ),
-                          if (cls.teacher.isNotEmpty ||
-                              cls.group.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                if (cls.teacher.isNotEmpty) ...[
-                                  Icon(Icons.person_outline_rounded,
-                                      color: AppColors.textSecondary, size: 12),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      cls.teacher,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                          color: AppColors.textSecondary, fontSize: 11),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                ],
-                                if (cls.group.isNotEmpty) ...[
-                                  Icon(Icons.group_outlined,
-                                      color: AppColors.textSecondary, size: 12),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      cls.group,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                          color: AppColors.textSecondary, fontSize: 11),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ]
-                        ],
-                      ),
-                    ),
-                    trailing: isCR
-                        ? Icon(Icons.edit_calendar_rounded,
-                            color: AppColors.textSecondary, size: 20)
-                        : null,
-                    onTap: isCR
-                        ? () => _showOverrideStatusDialog(
-                            context,
-                            user,
-                            overridesPath,
-                            dateStr,
-                            cls.id,
-                            cls.subject,
-                            displayStatus)
-                        : null,
+                          ],
+                        ),
+                      ]
+                    ],
                   ),
-                );
-              },
+                ),
+                trailing: isCR
+                    ? Icon(Icons.edit_calendar_rounded,
+                        color: AppColors.textSecondary, size: 20)
+                    : null,
+                onTap: isCR
+                    ? () => _showOverrideStatusDialog(
+                        context,
+                        user,
+                        schedulePath,
+                        cls.id,
+                        cls.subject,
+                        cls.status)
+                    : null,
+              ),
             );
           },
         );
@@ -2379,22 +2339,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+  // Writes status directly to the schedule doc — same source as the weekly table.
+  // Removes the schedule_overrides layer so counts in the registry are always correct.
   Future<void> _showOverrideStatusDialog(
       BuildContext context,
       AppUser? user,
-      String overridesPath,
-      String dateStr,
+      String schedulePath,
       String classId,
       String subject,
       String currentStatus) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.backgroundTop,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          'Fix Class Status - $subject',
+          'Update Class Status',
           style: TextStyle(
               color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
         ),
@@ -2403,83 +2363,42 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Set date override status for this class on $dateStr.',
+              subject,
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 20),
-            _buildDialogStatusOption(ctx, overridesPath, dateStr, classId,
+            _buildDialogStatusOption(ctx, schedulePath, classId,
                 'Upcoming', 'upcoming', Colors.blueAccent),
             const SizedBox(height: 10),
-            _buildDialogStatusOption(ctx, overridesPath, dateStr, classId,
+            _buildDialogStatusOption(ctx, schedulePath, classId,
                 'Completed', 'completed', Colors.greenAccent),
             const SizedBox(height: 10),
-            _buildDialogStatusOption(ctx, overridesPath, dateStr, classId,
+            _buildDialogStatusOption(ctx, schedulePath, classId,
                 'No Class / Cancelled', 'cancelled', Colors.amberAccent),
-            const SizedBox(height: 20),
-            Divider(color: AppColors.textPrimary.withOpacity(0.08)),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () async {
-                try {
-                  await FirebaseFirestore.instance
-                      .collection(overridesPath)
-                      .doc(dateStr)
-                      .set({
-                    classId: FieldValue.delete(),
-                  }, SetOptions(merge: true));
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  InAppNotification.show(
-                    context,
-                    title: 'Schedule Reset',
-                    message: 'Reset to weekly default status.',
-                    accentColor: Colors.green,
-                    icon: Icons.refresh_rounded,
-                  );
-                } catch (e) {
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  InAppNotification.show(
-                    context,
-                    title: 'Reset Failed',
-                    message: 'Reset failed: $e',
-                    accentColor: Colors.redAccent,
-                    icon: Icons.error_outline_rounded,
-                  );
-                }
-              },
-              child: Text(
-                'Reset to Weekly Default',
-                style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
-              ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDialogStatusOption(BuildContext dialogCtx, String overridesPath,
-      String dateStr, String classId, String label, String value, Color color) {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
+  // Directly updates the class status in the schedule collection.
+  Widget _buildDialogStatusOption(BuildContext dialogCtx, String schedulePath,
+      String classId, String label, String value, Color color) {
     return ElevatedButton(
       onPressed: () async {
         try {
           await FirebaseFirestore.instance
-              .collection(overridesPath)
-              .doc(dateStr)
-              .set({
-            classId: {
-              'status': value,
-              'updatedAt': FieldValue.serverTimestamp(),
-            }
-          }, SetOptions(merge: true));
+              .collection(schedulePath)
+              .doc(classId)
+              .update({
+            'status': value,
+            'lastUpdatedDate': FieldValue.serverTimestamp(),
+          });
           if (dialogCtx.mounted) Navigator.pop(dialogCtx);
           InAppNotification.show(
             context,
-            title: 'Schedule Updated',
-            message: 'Successfully set class to "$label" for $dateStr.',
+            title: 'Status Updated',
+            message: 'Class set to "$label".',
             accentColor: AppColors.primary,
             icon: Icons.edit_calendar_rounded,
           );
@@ -2487,8 +2406,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           if (dialogCtx.mounted) Navigator.pop(dialogCtx);
           InAppNotification.show(
             context,
-            title: 'Override Failed',
-            message: 'Override failed: $e',
+            title: 'Update Failed',
+            message: 'Failed to update status: $e',
             accentColor: Colors.redAccent,
             icon: Icons.error_outline_rounded,
           );

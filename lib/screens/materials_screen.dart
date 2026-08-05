@@ -30,6 +30,8 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
   String _selectedType = 'Notes';
   final List<String> _types = ['Notes', 'Books', 'Videos', 'Others'];
   String? _selectedSubject;
+  String _searchQuery = '';
+  final TextEditingController _searchCtrl = TextEditingController();
 
   String _getSubjectFolderName(StudyMaterial material) {
     final code = material.subjectCode.trim();
@@ -43,6 +45,12 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     } else {
       return 'Uncategorized';
     }
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -164,6 +172,52 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                 );
               }).toList(),
             ),
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.glassCardColor.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primary.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: TextField(
+                controller: _searchCtrl,
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                onChanged: (val) {
+                  setState(() {
+                    _searchQuery = val.trim().toLowerCase();
+                  });
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search title, subject, teacher, or file...',
+                  hintStyle: TextStyle(
+                    color: AppColors.textSecondary.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                  prefixIcon: Icon(Icons.search_rounded,
+                      color: AppColors.primary.withOpacity(0.7), size: 18),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear_rounded,
+                              color: AppColors.textSecondary, size: 16),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
           ),
 
           // Materials List
@@ -173,7 +227,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                   .collection(
                       deptBatchCol(user.department, user.batch, 'materials'))
                   .where('type', isEqualTo: _selectedType)
-                  .limit(30)
+                  .limit(200)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError)
@@ -186,10 +240,28 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                   );
                 }
 
-                final materials = snapshot.data!.docs
+                var materials = snapshot.data!.docs
                     .map((doc) => StudyMaterial.fromMap(
                         doc.data() as Map<String, dynamic>, doc.id))
                     .toList();
+
+                // Apply search filter if query is present
+                if (_searchQuery.isNotEmpty) {
+                  materials = materials.where((m) {
+                    final title = m.title.toLowerCase();
+                    final subject = m.subject.toLowerCase();
+                    final code = m.subjectCode.toLowerCase();
+                    final teacher = m.teacherName.toLowerCase();
+                    final fileName = (m.fileName ?? '').toLowerCase();
+                    final ext = m.extension.toLowerCase();
+                    return title.contains(_searchQuery) ||
+                        subject.contains(_searchQuery) ||
+                        code.contains(_searchQuery) ||
+                        teacher.contains(_searchQuery) ||
+                        fileName.contains(_searchQuery) ||
+                        ext.contains(_searchQuery);
+                  }).toList();
+                }
 
                 // Sort automatically: newest first (timestamp descending), nulls last
                 materials.sort((a, b) {
@@ -202,8 +274,14 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                 });
 
                 if (materials.isEmpty) {
-                  return const Center(
-                      child: Text('No materials found in this category.'));
+                  return Center(
+                    child: Text(
+                      _searchQuery.isNotEmpty
+                          ? 'No materials found matching "$_searchQuery".'
+                          : 'No materials found in this category.',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                  );
                 }
 
                 // Group materials by subject
@@ -467,11 +545,11 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                                     ],
                                   ],
                                 ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (material.fileUrl != null)
-                                      IconButton(
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (material.fileUrl != null && material.fileUrl!.isNotEmpty)
+                                        IconButton(
                                         icon: Icon(Icons.remove_red_eye,
                                             color: AppColors.primary),
                                         onPressed: () {

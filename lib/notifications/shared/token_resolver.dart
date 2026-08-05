@@ -74,42 +74,35 @@ class TokenResolver {
 
   // ─── Internals ────────────────────────────────────────────────────────────
 
-  static bool _isWebToken(String t) => !t.contains(':APA91b') && t.length >= 140;
-
   static List<String> _extractCategory(
     Map<String, dynamic>? data,
     String categoryField,
   ) {
     if (data == null) return [];
     final Set<String> tokens = {};
-    final bool isWebCategory = categoryField == 'webTokens';
 
-    // 1. Primary: check explicit category array (trust the platform-saved tokens)
+    // 1. Check explicit category array (webTokens or nativeTokens)
     if (data[categoryField] is List) {
       for (final t in data[categoryField] as List) {
-        if (t is String && t.isNotEmpty) {
-          tokens.add(t);
+        if (t is String && t.trim().isNotEmpty) {
+          tokens.add(t.trim());
         }
       }
     }
 
-    // 2. Fallback: if category array is empty, check legacy fcmTokens/fcmToken with heuristic
-    if (tokens.isEmpty) {
-      if (data['fcmTokens'] is List) {
-        for (final t in data['fcmTokens'] as List) {
-          if (t is String && t.isNotEmpty) {
-            if (isWebCategory ? _isWebToken(t) : !_isWebToken(t)) {
-              tokens.add(t);
-            }
-          }
+    // 2. Check general fcmTokens array
+    if (data['fcmTokens'] is List) {
+      for (final t in data['fcmTokens'] as List) {
+        if (t is String && t.trim().isNotEmpty) {
+          tokens.add(t.trim());
         }
       }
-      final single = data['fcmToken'];
-      if (single is String && single.isNotEmpty) {
-        if (isWebCategory ? _isWebToken(single) : !_isWebToken(single)) {
-          tokens.add(single);
-        }
-      }
+    }
+
+    // 3. Fallback: check single fcmToken string
+    final single = data['fcmToken'];
+    if (single is String && single.trim().isNotEmpty) {
+      tokens.add(single.trim());
     }
 
     return tokens.toList();

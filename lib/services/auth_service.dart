@@ -21,6 +21,11 @@ class AuthService {
   StreamSubscription? _rootAdminsSubscription;
   List<Map<String, dynamic>> _rootAdmins = [];
 
+  // Track the last dept/batch used to init the theme listener so we only
+  // restart it when the user's scope actually changes (Bug #3 guard).
+  String? _lastThemeDept;
+  String? _lastThemeBatch;
+
   final _sessionInitCompleter = Completer<void>();
 
   AuthService() {
@@ -51,10 +56,12 @@ class AuthService {
         } else {
           FCMService.saveTokenForUser(firebaseUser.uid);
         }
-        ThemeService.instance.initGlobalThemeListener();
-        _initRootAdminListener();
-      } else {
-        ThemeService.instance.initGlobalThemeListener();
+        // NOTE: ThemeService listener is initialized in _startFirestoreListener
+        // once the user's dept/batch is known — calling it here without those params
+        // would subscribe to the wrong doc and trigger a full MaterialApp rebuild.
+        // _initRootAdminListener() is already called once in the constructor; calling
+        // it again here on every authStateChanges event would tear down and restart
+        // the root_admins stream unnecessarily (Bug #2 + Bug #3 guard).
       }
       _startFirestoreListener(
         firebaseUser?.uid,
@@ -77,15 +84,35 @@ class AuthService {
     _rootAdminsSubscription?.cancel();
     _rootAdminsSubscription = _firestore.collection('root_admins').snapshots().listen(
       (snapshot) {
-        _rootAdmins = snapshot.docs.map((doc) => doc.data()).toList();
-        final current = _auth.currentUser;
-        if (current != null) {
-          _startFirestoreListener(
-            current.uid,
-            current.email,
-            displayName: current.displayName,
-            photoUrl: current.photoURL,
-          );
+        final newAdmins = snapshot.docs.map((doc) => doc.data()).toList();
+
+        // Compare the set of admin emails — only restart the user listener if
+        // the root_admins collection actually changed. Restarting unconditionally
+        // would cancel+recreate the user Firestore stream on every snapshot event,
+        // emitting a new AppUser and causing AuthWrapper to rebuild (Bug #2 guard).
+        final prevEmails = _rootAdmins
+            .map((a) =>
+                (a['email'] ?? a['Email'])?.toString().trim().toLowerCase() ?? '')
+            .toSet();
+        final newEmails = newAdmins
+            .map((a) =>
+                (a['email'] ?? a['Email'])?.toString().trim().toLowerCase() ?? '')
+            .toSet();
+
+        _rootAdmins = newAdmins;
+
+        if (!prevEmails.containsAll(newEmails) ||
+            !newEmails.containsAll(prevEmails)) {
+          // Root admin roster actually changed — re-evaluate the current user.
+          final current = _auth.currentUser;
+          if (current != null) {
+            _startFirestoreListener(
+              current.uid,
+              current.email,
+              displayName: current.displayName,
+              photoUrl: current.photoURL,
+            );
+          }
         }
       },
       onError: (e) {
@@ -214,10 +241,19 @@ class AuthService {
           final appUser = AppUser.fromMap(data, doc.id);
           _userController.add(appUser);
           if (appUser.hasDeptScope) {
-            ThemeService.instance.initGlobalThemeListener(
-              department: appUser.department,
-              batch: appUser.batch,
-            );
+            // Only restart the Firestore theme listener when the user's dept/batch
+            // actually changes. Restarting on every snapshot would cancel+recreate
+            // the theme subscription and fire notifyListeners(), triggering a full
+            // MaterialApp rebuild via Consumer<ThemeService> (Bug #3 guard).
+            if (appUser.department != _lastThemeDept ||
+                appUser.batch != _lastThemeBatch) {
+              _lastThemeDept = appUser.department;
+              _lastThemeBatch = appUser.batch;
+              ThemeService.instance.initGlobalThemeListener(
+                department: appUser.department,
+                batch: appUser.batch,
+              );
+            }
           }
         } else {
           // Create a new user document

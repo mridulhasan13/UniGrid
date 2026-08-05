@@ -94,7 +94,7 @@ class HomeScreen extends StatelessWidget {
             stream: FirebaseFirestore.instance
                 .collection(announcementsPath)
                 .orderBy('timestamp', descending: true)
-                .limit(30)
+                .limit(100)
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
@@ -483,7 +483,7 @@ class _AnnouncementCard extends StatelessWidget {
     if (announcement.fileUrl != null || announcement.fileName != null) {
       return GestureDetector(
         onTap: () {
-          if (announcement.fileUrl == null) {
+          if (announcement.fileUrl == null || announcement.fileUrl!.isEmpty) {
             InAppNotification.show(
               context,
               title: 'File Uploading',

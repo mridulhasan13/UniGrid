@@ -23,10 +23,14 @@ class ConnectivityService extends ChangeNotifier {
       }
     });
 
-    // Check immediately on start
+    // Check immediately on start — only notify if the value actually changed
+    // to avoid spurious rebuilds triggered on every page load.
     Connectivity().checkConnectivity().then((results) {
-      _isConnected = results.any((r) => r != ConnectivityResult.none);
-      notifyListeners();
+      final connected = results.any((r) => r != ConnectivityResult.none);
+      if (connected != _isConnected) {
+        _isConnected = connected;
+        notifyListeners();
+      }
     });
   }
 

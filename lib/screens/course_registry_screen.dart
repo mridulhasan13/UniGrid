@@ -917,67 +917,92 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                 return false;
                               }).toList();
 
-                              // Group parallel lab/class slots by (dayOfWeek, startSlot, scheduledDate)
-                              // Each parallel group in the same slot counts as 1 class session (with merged slot span count)
-                              final Map<String, List<ClassSchedule>> slotGroups = {};
-                              for (var s in courseSchedules) {
-                                final day = s.dayOfWeek.trim().toLowerCase();
-                                final slot = s.startSlot;
-                                final dateKey = s.scheduledDate != null
-                                    ? '${s.scheduledDate!.year}_${s.scheduledDate!.month}_${s.scheduledDate!.day}'
-                                    : 'recurring';
-                                final groupKey = '${day}_${slot}_$dateKey';
+                              // ─── Class Counting ───────────────────────────
+                              // RULES:
+                              //   • Lab course       → span is session duration, always counts as 1
+                              //   • Normal class     → span = number of class periods
+                              //                        (span 1 → 1,  span 2 → 2,  span 3 → 3)
+                              //   • Parallel groups  → each sub-group (Gr A, Gr B) counts as 1 each
+                              //
+                              // A single entry with a group label (e.g. 'Gr: A') is NOT
+                              // parallel — it is one normal/lab class with a label.
+                              // A slot group is parallel only when it has multiple entries
+                              // at the exact same (day, slot, date).
 
-                                slotGroups.putIfAbsent(groupKey, () => []).add(s);
-                              }
+                              // Detect if the course is a lab
+                              final bool courseIsLab =
+                                  course.courseName.trim().toLowerCase().contains('lab') ||
+                                  course.courseCode.trim().toLowerCase().contains('lab');
 
                               int totalClasses = 0;
                               int completedClasses = 0;
                               int cancelledClasses = 0;
                               int upcomingClasses = 0;
 
+                              // Group entries by (day, slot, date).
+                              // Dated entries use their actual date as the key — entries
+                              // sharing the same date+slot are genuinely parallel (Gr A + Gr B).
+                              // Recurring (undated) entries share the same base key so that
+                              // recurring parallel groups are still detected correctly.
+                              final Map<String, List<ClassSchedule>> slotGroups = {};
+                              for (var s in courseSchedules) {
+                                final day = s.dayOfWeek.trim().toLowerCase();
+                                final slot = s.startSlot;
+                                final String dateKey = s.scheduledDate != null
+                                    ? '${s.scheduledDate!.year}_${s.scheduledDate!.month}_${s.scheduledDate!.day}'
+                                    : 'recurring';
+                                final groupKey = '${day}_${slot}_$dateKey';
+                                slotGroups.putIfAbsent(groupKey, () => []).add(s);
+                              }
+
                               for (var entry in slotGroups.entries) {
                                 final list = entry.value;
                                 if (list.isEmpty) continue;
 
-                                // Check if this class uses the parallel structure (group split / parallel option)
-                                bool isParallel = list.length > 1 ||
-                                    list.any((s) =>
-                                        s.group.trim().isNotEmpty &&
-                                        s.group.trim().toLowerCase() != 'none');
+                                // A slot group is truly parallel ONLY when there are
+                                // multiple entries sharing the exact same (day, slot, date)
+                                // — e.g. Group A and Group B scheduled simultaneously.
+                                final bool isTrulyParallel = list.length > 1;
 
-                                // Calculate class count weight:
-                                // - When parallel option is used: each parallel class = 1 class
-                                // - When regular double/triple slot is used (non-parallel): count = merged slots (span)
-                                int classWeight = 1;
-                                if (!isParallel) {
+                                if (isTrulyParallel) {
+                                  // Parallel groups: each sub-entry (Gr A, Gr B …) = 1 class.
+                                  // Example: Gr A completed + Gr B cancelled → 1 completed + 1 cancelled.
                                   for (var s in list) {
-                                    if (s.span > classWeight) {
-                                      classWeight = s.span;
+                                    final stat = s.status.trim().toLowerCase();
+                                    totalClasses += 1;
+                                    if (stat == 'completed') {
+                                      completedClasses += 1;
+                                    } else if (stat == 'cancelled' ||
+                                        stat == 'no class' ||
+                                        stat == 'no_class') {
+                                      cancelledClasses += 1;
+                                    } else {
+                                      upcomingClasses += 1;
                                     }
                                   }
-                                }
-
-                                // Determine overall status for this time slot session
-                                bool isCompleted = list.any((s) =>
-                                    s.status.trim().toLowerCase() == 'completed');
-                                bool isCancelled = !isCompleted &&
-                                    list.any((s) {
-                                      final stat = s.status.trim().toLowerCase();
-                                      return stat == 'cancelled' ||
-                                          stat == 'no class' ||
-                                          stat == 'no_class';
-                                    });
-
-                                if (isCompleted) {
-                                  completedClasses += classWeight;
-                                } else if (isCancelled) {
-                                  cancelledClasses += classWeight;
                                 } else {
-                                  upcomingClasses += classWeight;
+                                  // Single entry (with or without a group label).
+                                  final s = list.first;
+                                  final stat = s.status.trim().toLowerCase();
+
+                                  // Lab → 1 session regardless of how many slots it fills.
+                                  // Normal class → span IS the class count
+                                  //   (2-slot merged theory class = 2 classes).
+                                  final int weight = courseIsLab ? 1 : (s.span > 0 ? s.span : 1);
+
+                                  totalClasses += weight;
+                                  if (stat == 'completed') {
+                                    completedClasses += weight;
+                                  } else if (stat == 'cancelled' ||
+                                      stat == 'no class' ||
+                                      stat == 'no_class') {
+                                    cancelledClasses += weight;
+                                  } else {
+                                    upcomingClasses += weight;
+                                  }
                                 }
-                                totalClasses += classWeight;
                               }
+
 
                               return GlassCard(
                                 margin: const EdgeInsets.only(bottom: 12),

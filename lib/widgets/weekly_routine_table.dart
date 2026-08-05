@@ -788,7 +788,8 @@ class WeeklyRoutineTable extends StatelessWidget {
         const Color(0xFF2196F3).withOpacity(0.15),
         const Color(0xFF0D47A1).withOpacity(0.25),
       ];
-    } else if (status == 'no class') {
+    } else if (status == 'no class' || status == 'no_class') {
+      // Both underscore and space variants are treated as 'No Class'
       mainThemeColor = const Color(0xFFFFD600); // Vibrant Yellow
       gradientColors = [
         const Color(0xFFFFD600).withOpacity(0.15),
@@ -842,7 +843,7 @@ class WeeklyRoutineTable extends StatelessWidget {
             ),
             if (stackedCount < 3) SizedBox(height: isCompact ? 1 : 2),
             Text(
-              status == 'no class'
+              (status == 'no class' || status == 'no_class')
                   ? 'NO CLASS'
                   : (status == 'cancelled'
                       ? 'CANCELLED'
@@ -1054,7 +1055,7 @@ class WeeklyRoutineTable extends StatelessWidget {
       BuildContext parentContext, BuildContext sheetContext, ClassSchedule cls) async {
     final user = Provider.of<AppUser?>(parentContext, listen: false);
     final confirm = await showDialog<bool>(
-      context: sheetContext,
+      context: parentContext,
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: AppColors.backgroundTop,
         shape: RoundedRectangleBorder(
