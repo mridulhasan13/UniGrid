@@ -91,7 +91,7 @@ class FcmDispatcher {
         }),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && !response.body.trim().toLowerCase().startsWith('<!doctype')) {
         debugPrint(
           '[FcmDispatcher] ✓ Sent "$title" to ${finalTokens.length} token(s) via Netlify',
         );
@@ -99,7 +99,7 @@ class FcmDispatcher {
         netlifySucceeded = true;
       } else {
         debugPrint(
-          '[FcmDispatcher] Netlify returned ${response.statusCode}: ${response.body}',
+          '[FcmDispatcher] Netlify returned status ${response.statusCode} (HTML/Non-JSON response)',
         );
       }
     } catch (e) {

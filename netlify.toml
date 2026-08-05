@@ -6,6 +6,12 @@
   publish = "build/web"
   functions = "netlify/functions"
 
+# Exclude Netlify Functions from SPA catch-all redirect
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
 # Direct URL rewrites for Single Page App (SPA) routing.
 # This prevents 404 errors when reloading pages or navigating directly to routes.
 [[redirects]]

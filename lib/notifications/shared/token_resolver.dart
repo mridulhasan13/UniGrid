@@ -81,7 +81,7 @@ class TokenResolver {
     if (data == null) return [];
     final Set<String> tokens = {};
 
-    // 1. Check explicit category array (webTokens or nativeTokens)
+    // 1. Primary: check explicit category array (webTokens or nativeTokens)
     if (data[categoryField] is List) {
       for (final t in data[categoryField] as List) {
         if (t is String && t.trim().isNotEmpty) {
@@ -90,19 +90,19 @@ class TokenResolver {
       }
     }
 
-    // 2. Check general fcmTokens array
-    if (data['fcmTokens'] is List) {
-      for (final t in data['fcmTokens'] as List) {
-        if (t is String && t.trim().isNotEmpty) {
-          tokens.add(t.trim());
+    // 2. Secondary fallback: check general fcmTokens & fcmToken only if explicit array was empty
+    if (tokens.isEmpty) {
+      if (data['fcmTokens'] is List) {
+        for (final t in data['fcmTokens'] as List) {
+          if (t is String && t.trim().isNotEmpty) {
+            tokens.add(t.trim());
+          }
         }
       }
-    }
-
-    // 3. Fallback: check single fcmToken string
-    final single = data['fcmToken'];
-    if (single is String && single.trim().isNotEmpty) {
-      tokens.add(single.trim());
+      final single = data['fcmToken'];
+      if (single is String && single.trim().isNotEmpty) {
+        tokens.add(single.trim());
+      }
     }
 
     return tokens.toList();
