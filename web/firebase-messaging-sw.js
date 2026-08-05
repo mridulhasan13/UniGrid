@@ -4,15 +4,17 @@
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
 
-// Initialize Firebase in the Service Worker
+// Initialize Firebase in the Service Worker with exact dept-ipe credentials
 firebase.initializeApp({
-  apiKey: "AIzaSy...", // auto-loaded by FCM SDK from options
-  projectId: "unigrid-f5979",
-  messagingSenderId: "1071295244583",
-  appId: "1:1071295244583:web:...",
+  apiKey: "AIzaSyAKJPM0bF7HtrLMaq95cKTTM0HF4NrxgfE",
+  projectId: "dept-ipe",
+  messagingSenderId: "113354293876",
+  appId: "1:113354293876:web:751f8f635f4ca6f79f0721",
+  authDomain: "dept-ipe.firebaseapp.com",
+  storageBucket: "dept-ipe.firebasestorage.app",
 });
 
-// Force immediate activation of updated Service Worker (purges old cached SW in Samsung Internet)
+// Force immediate activation of updated Service Worker (purges old cached SW)
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -28,10 +30,27 @@ const messaging = firebase.messaging();
 // unfocused, minimized, or backgrounded.
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message received:', JSON.stringify(payload));
-  // WebPush notifications configured with `webpush.notification` in FCM HTTP v1
-  // are automatically displayed by the browser's native Push engine.
-  // We log the payload here for background data sync and do NOT call
-  // self.registration.showNotification to prevent duplicate system popups.
+
+  const notificationTitle =
+      (payload.notification && payload.notification.title) ||
+      (payload.data && payload.data.title) ||
+      'UniGrid Notification';
+
+  const notificationBody =
+      (payload.notification && payload.notification.body) ||
+      (payload.data && payload.data.body) ||
+      '';
+
+  const notificationOptions = {
+    body: notificationBody,
+    icon: 'https://unigrid.netlify.app/icons/Icon-maskable-192.png',
+    badge: 'https://unigrid.netlify.app/icons/Icon-maskable-192.png',
+    tag: (payload.data && payload.data.messageId) || 'unigrid-notification',
+    renotify: true,
+    data: payload.data || {},
+  };
+
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 // ─── Notification click → focus or open tab ───────────────────────────────────
