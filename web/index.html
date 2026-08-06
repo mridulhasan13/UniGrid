@@ -363,6 +363,94 @@
       }
     });
 
+    // ════════════════════════════════════════════════════════════════════════
+    // Automatic Live Build Cache Purger & Auto-Updater System
+    // Ensures users always receive the latest deployment without manual cache clearing
+    // ════════════════════════════════════════════════════════════════════════
+    var CURRENT_APP_VERSION = '20260806_v12';
+
+    function _purgeBrowserCacheAndReload(newVersion) {
+      console.log('[UniGrid Auto-Purger] Upgrading build version to:', newVersion);
+      if (localStorage.getItem('unigrid_purging') === '1') return; // Prevent infinite reload loop
+      localStorage.setItem('unigrid_purging', '1');
+
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          return Promise.all(names.map(function(name) { return caches.delete(name); }));
+        }).then(function() {
+          _finishPurgeAndReload(newVersion);
+        }).catch(function() {
+          _finishPurgeAndReload(newVersion);
+        });
+      } else {
+        _finishPurgeAndReload(newVersion);
+      }
+    }
+
+    function _finishPurgeAndReload(newVersion) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            var swUrl = registrations[i].active?.scriptURL || registrations[i].installing?.scriptURL || '';
+            if (swUrl.includes('flutter_service_worker')) {
+              registrations[i].unregister();
+            }
+          }
+        });
+      }
+      localStorage.setItem('unigrid_app_version', newVersion);
+      localStorage.setItem('unigrid_last_cache_clear', Date.now().toString());
+      setTimeout(function() {
+        localStorage.removeItem('unigrid_purging');
+        window.location.reload(true);
+      }, 200);
+    }
+
+    // Check version and 5-day cache timer immediately on page load
+    (function _checkImmediateVersionAndTimer() {
+      var savedVersion = localStorage.getItem('unigrid_app_version');
+      var lastClearTime = parseInt(localStorage.getItem('unigrid_last_cache_clear') || '0', 10);
+      var FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000; // 5 days (432,000,000 ms)
+      var isExpiredFiveDays = (Date.now() - lastClearTime) > FIVE_DAYS_MS;
+
+      if ((savedVersion && savedVersion !== CURRENT_APP_VERSION) || isExpiredFiveDays) {
+        if (isExpiredFiveDays) {
+          console.log('[UniGrid Auto-Purger] 5 days elapsed since last cache clear. Purging cache...');
+        }
+        _purgeBrowserCacheAndReload(CURRENT_APP_VERSION);
+      } else {
+        localStorage.setItem('unigrid_app_version', CURRENT_APP_VERSION);
+        if (!lastClearTime) {
+          localStorage.setItem('unigrid_last_cache_clear', Date.now().toString());
+        }
+        localStorage.removeItem('unigrid_purging');
+      }
+    })();
+
+    // Background Live Deployment Checker — automatically detects new deployment when tab is re-focused
+    function _checkLiveDeploymentUpdate() {
+      fetch('/version.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          var liveBuildNumber = data.build_number || data.version;
+          var storedLiveBuild = localStorage.getItem('unigrid_live_build');
+          if (storedLiveBuild && storedLiveBuild !== String(liveBuildNumber)) {
+            console.log('[UniGrid Live Deploy] New version detected live! Purging cache...');
+            localStorage.setItem('unigrid_live_build', String(liveBuildNumber));
+            _purgeBrowserCacheAndReload(CURRENT_APP_VERSION + '_' + liveBuildNumber);
+          } else if (liveBuildNumber) {
+            localStorage.setItem('unigrid_live_build', String(liveBuildNumber));
+          }
+        })
+        .catch(function(err) { /* silent catch for offline/error */ });
+    }
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') {
+        _checkLiveDeploymentUpdate();
+      }
+    });
+
     window.addEventListener('load', function(ev) {
       // Unregister only Flutter's own service worker (flutter_service_worker.js)
       // to ensure fresh loading. We deliberately PRESERVE firebase-messaging-sw.js
@@ -376,7 +464,7 @@
             }
           }
         });
-        navigator.serviceWorker.register('/firebase-messaging-sw.js?v=20260806_v10')
+        navigator.serviceWorker.register('/firebase-messaging-sw.js?v=' + CURRENT_APP_VERSION)
           .then(function(reg) {
             console.log('[UniGrid] FCM Service Worker registered with scope:', reg.scope);
           })

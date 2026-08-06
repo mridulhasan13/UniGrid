@@ -19,7 +19,7 @@
   to = "/index.html"
   status = 200
 
-# index.html must NEVER be cached — this ensures browsers always load the latest app version
+# index.html & version.json must NEVER be cached — ensures users always load the latest app version
 [[headers]]
   for = "/index.html"
   [headers.values]
@@ -27,9 +27,21 @@
     Pragma = "no-cache"
     Expires = "0"
 
-# Service Worker must NEVER be cached — browsers must always fetch the latest version
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"
+
+# Service Workers must NEVER be cached — browsers must always fetch the latest version
 [[headers]]
   for = "/firebase-messaging-sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/flutter_service_worker.js"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
