@@ -61,7 +61,7 @@ Below is a detailed breakdown of the purpose and responsibility of every file in
   * **Responsibilities:**
     * Initializes Firebase services natively based on platform metadata.
     * Sets up structural dependency providers (`AppUser?`, `ThemeService`, `ConnectivityService`).
-    * Wraps the root MaterialApp in a series of global middlewares (`NetworkAwareWrapper`, `VersionAwareWrapper`) to keep the app responsive to network changes and OTA update requirements.
+    * Wraps the root MaterialApp in global middleware (`NetworkAwareWrapper`) to keep the app responsive to network changes.
 
 * **[`lib/firebase_options.dart`](file:///b:/UniGrid/lib/firebase_options.dart)**
   * **Role:** Platform-aware Firebase metadata configurations.
@@ -227,13 +227,6 @@ Houses global modular user interface components and critical navigation security
 * **[`lib/widgets/network_aware_wrapper.dart`](file:///b:/UniGrid/lib/widgets/network_aware_wrapper.dart)**
   * **Role:** Offline overlay shield.
   * **Responsibilities:** Listens to connectivity streams and overlays a beautiful dark blur warning when connection is lost, blocking interactions until connectivity returns.
-
-* **[`lib/widgets/version_aware_wrapper.dart`](file:///b:/UniGrid/lib/widgets/version_aware_wrapper.dart)**
-  * **Role:** Over-the-Air updater orchestrator.
-  * **Responsibilities:** 
-    * Listens dynamically to `/admin_settings/app_update` records.
-    * Displays un-dismissible blur screen for **Forced Updates** or slides down a premium card banner for **Optional Updates**.
-    * Performs programmatic downloads and triggers APK package installations natively.
 
 * **[`lib/widgets/weekly_routine_table.dart`](file:///b:/UniGrid/lib/widgets/weekly_routine_table.dart)**
   * **Role:** Dynamic schedule calendar grid.

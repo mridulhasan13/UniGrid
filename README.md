@@ -56,60 +56,7 @@ To ensure links and PDFs open perfectly across different operating systems:
 * **Android 11 and above:** Added an explicit `<queries>` tag to `AndroidManifest.xml` containing `http` and `https` intents. This lets Flutter's `url_launcher` search the system package manager and open the default mobile browser without runtime restrictions.
 * **iOS Configs:** Added detailed usage description keys in `Info.plist` (such as `NSPhotoLibraryUsageDescription` and `UISupportsDocumentBrowser`) so that iOS grants direct sandbox permissions to access the local file explorer and photo gallery without crashing.
 
-### Live Firestore-Driven OTA Updates
-The app leverages the `ota_update` and `package_info_plus` packages combined with Cloud Firestore dynamic document stream listening:
-1. On app start, a background listener retrieves the update configuration from `admin_settings/app_update`.
-2. The current device `buildNumber` is retrieved from platform packages and compared with `latestBuildNumber` from Firestore.
-3. If an update is available:
-   - **Forced:** Mounts an un-dismissible glass-morphic layout with a full-screen image-blur and a download trigger.
-   - **Optional:** Mounts a sliding `TweenAnimationBuilder` notification card that stays active unless dismissed.
-4. Tapping update runs `OtaUpdate().execute()` pointing to the hosted binary. Events are tracked (`OtaStatus.DOWNLOADING`) to paint a detailed progress indicator, before transitioning to `OtaStatus.INSTALLING` to trigger the system APK package manager.
-
 ### Transaction-Safe Administrative Data Wiping
-To clean up database tables cleanly, the administrative console in `cr_panel_screen.dart` utilizes standard Firestore transaction batches (`WriteBatch`):
-* Deletes all department `announcements` documents.
-* Deletes all department `chat_messages` documents.
-* Wipes global private `conversations` documents.
-The entire deletion process is structured within an atomic Firestore batch operation (`batch.commit()`) to prevent partial failures or orphaned database records, wrapped in a strict validation check restricting execution exclusively to users with department-level scope (`hasDeptScope` authorization).
-
----
-
-## OTA Update Deployment Guide
-
-To deploy a new OTA (Over-the-Air) version update of the UniGrid App to your users, follow these step-by-step instructions:
-
-### 1. Build the Release APK
-In your terminal, build the production release APK from the project root:
-```bash
-flutter build apk --release
-```
-This compiles the application and outputs the production APK at:
-`build/app/outputs/flutter-apk/app-release.apk`
-
-### 2. Host the APK on Dropbox (Direct Download Link)
-For dynamic in-app updating via the `ota_update` plugin, the app needs a direct binary file stream download link.
-* > [!WARNING]
-  > **Do not use Google Drive:** Google Drive shows an intermediary HTML page saying *"Google Drive can't scan this file for viruses"* for files of this size, which breaks the programmatic background stream parser of `OtaUpdate`.
-* **Use Dropbox:** 
-  1. Upload the built `app-release.apk` file to a Dropbox folder.
-  2. Create a sharing link for the file. The generated sharing link will look like:
-     `https://www.dropbox.com/scl/fi/abc123xyz/app-release.apk?rlkey=key123&dl=0`
-  3. **Convert to a direct download link:** Change the `dl=0` at the very end of the sharing link to **`dl=1`**:
-     `https://www.dropbox.com/scl/fi/abc123xyz/app-release.apk?rlkey=key123&dl=1`
-     *(This forces the server to return the raw binary application/vnd.android.package-archive stream instead of HTML wrapper pages).*
-
-### 3. Update the Firestore Cloud Registry
-Go to your Firebase Console and update the single update configuration document located at:
-**Collection:** `admin_settings`  
-**Document:** `app_update`
-
-Set/update the following fields:
-* `latestBuildNumber` (`Number`): The integer build number of the new release (e.g., `2`, which must be greater than the user's current build number defined in `pubspec.yaml`).
-* `latestVersion` (`String`): The human-readable version name (e.g., `"1.0.1"`).
-* `downloadUrl` (`String`): The converted Dropbox direct link ending in `?dl=1`.
-* `forceUpdate` (`Boolean`): Set to `true` to block the app interface and force an immediate update, or `false` to display a dismissible top sliding banner that can be updated later.
-
-Once updated, all running app instances will reactively receive the config and prompt users to update instantly!
 
 ---
 

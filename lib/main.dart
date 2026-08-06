@@ -22,7 +22,6 @@ import 'widgets/network_aware_wrapper.dart';
 import 'package:flutter/foundation.dart';
 
 import 'widgets/dept_setup_guard.dart';
-import 'widgets/version_aware_wrapper.dart';
 import 'widgets/unigrid_loader.dart';
 
 import 'notifications/in_app_notification.dart';
@@ -120,9 +119,7 @@ class MyApp extends StatelessWidget {
             ),
           ),
           home: const NetworkAwareWrapper(
-            child: VersionAwareWrapper(
-              child: AuthWrapper(),
-            ),
+            child: AuthWrapper(),
           ),
         );
       }),

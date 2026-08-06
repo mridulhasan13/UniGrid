@@ -15,7 +15,6 @@ import '../widgets/glass_card.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/floating_app_bar.dart';
 import '../widgets/unigrid_loader.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
