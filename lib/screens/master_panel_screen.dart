@@ -150,12 +150,19 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
             child: GlassCard(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: TextField(
-                style: TextStyle(color: AppColors.textPrimary),
+                textAlignVertical: TextAlignVertical.center,
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
+                  isDense: true,
                   hintText: 'Search any user information...',
-                  hintStyle: TextStyle(color: AppColors.textSecondary),
+                  hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   border: InputBorder.none,
-                  icon: Icon(Icons.search, color: AppColors.textSecondary),
+                  prefixIcon: Icon(Icons.search, color: AppColors.textSecondary, size: 18),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 onChanged: (value) {
                   setState(() {

@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/unigrid_loader.dart';
 import '../utils/constants.dart';
 import 'file_viewer_screen.dart';
@@ -310,6 +311,27 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                 onSendPressed: _handleSendPressed,
                 onAttachmentPressed: _handleAttachmentPressed,
                 onEndReached: _handleEndReached,
+                textMessageBuilder: (message, {required messageWidth, required showName}) {
+                  final isMe = message.author.id == currentChatUser.id;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    child: LinkifiedText(
+                      message.text,
+                      selectable: true,
+                      style: TextStyle(
+                        color: isMe ? Colors.white : AppColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                      linkStyle: TextStyle(
+                        color: isMe ? Colors.cyanAccent : AppColors.primary,
+                        decoration: TextDecoration.underline,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
+                  );
+                },
                 onMessageTap: (context, message) {
                   if (message is types.ImageMessage) {
                     Navigator.push(

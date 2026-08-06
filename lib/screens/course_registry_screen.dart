@@ -11,6 +11,7 @@ import '../services/supabase_storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/unigrid_loader.dart';
 import 'file_viewer_screen.dart';
 import '../notifications/in_app_notification.dart';
@@ -1080,8 +1081,9 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
+                                          LinkifiedText(
                                             course.courseName,
+                                            selectable: true,
                                             style: TextStyle(
                                               color: AppColors.textPrimary,
                                               fontWeight: FontWeight.bold,
@@ -1096,8 +1098,9 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                                   color: AppColors.textSecondary),
                                               const SizedBox(width: 4),
                                               Expanded(
-                                                child: Text(
+                                                child: LinkifiedText(
                                                   course.teacherName,
+                                                  selectable: true,
                                                   style: TextStyle(
                                                     color: AppColors.textSecondary,
                                                     fontSize: 12,

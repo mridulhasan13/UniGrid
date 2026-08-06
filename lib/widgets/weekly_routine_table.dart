@@ -8,6 +8,7 @@ import '../models/models.dart';
 import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../utils/schedule_constants.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/unigrid_loader.dart';
 import '../notifications/in_app_notification.dart';
 import '../screens/schedule_builder_screen.dart';
@@ -486,7 +487,7 @@ class WeeklyRoutineTable extends StatelessWidget {
               Flexible(
                 fit: FlexFit.loose,
                 child: SizedBox(
-                  height: 358,
+                  height: 384,
                   width: isMobile ? 920 : double.infinity,
                   child: tableGridContent,
                 ),
@@ -495,14 +496,16 @@ class WeeklyRoutineTable extends StatelessWidget {
           ),
         );
 
-        final Widget tableCard = ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: useBlur
-              ? BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: cardContainer,
-                )
-              : cardContainer,
+        final Widget tableCard = RepaintBoundary(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: useBlur
+                ? BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: cardContainer,
+                  )
+                : cardContainer,
+          ),
         );
 
         return Stack(
@@ -530,13 +533,18 @@ class WeeklyRoutineTable extends StatelessWidget {
                 padding: const EdgeInsets.all(6.0),
                 child: InteractiveViewer(
                   minScale: 0.3,
-                  maxScale: 2.5,
+                  maxScale: 5.0,
+                  scaleFactor: 800.0,
+                  trackpadScrollCausesScale: true,
+                  clipBehavior: Clip.hardEdge,
                   constrained: !isMobile, // Allows panning horizontally & vertically to scroll when not constrained
-                  boundaryMargin: const EdgeInsets.all(100), // Gives scroll limits buffer
-                  child: SizedBox(
-                    width: isMobile ? 920 : null,
-                    height: isMobile ? 416 : null,
-                    child: tableCard,
+                  boundaryMargin: const EdgeInsets.all(300), // Gives scroll limits buffer
+                  child: RepaintBoundary(
+                    child: SizedBox(
+                      width: isMobile ? 920 : null,
+                      height: isMobile ? 448 : null,
+                      child: tableCard,
+                    ),
                   ),
                 ),
               ),
@@ -830,7 +838,7 @@ class WeeklyRoutineTable extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            LinkifiedText(
               cls.teacher.isEmpty ? cls.room : '${cls.room}  •  ${cls.teacher}',
               textAlign: TextAlign.center,
               maxLines: 1,
@@ -842,7 +850,7 @@ class WeeklyRoutineTable extends StatelessWidget {
               ),
             ),
             if (stackedCount < 3) SizedBox(height: isCompact ? 1 : 2),
-            Text(
+            LinkifiedText(
               (status == 'no class' || status == 'no_class')
                   ? 'NO CLASS'
                   : (status == 'cancelled'

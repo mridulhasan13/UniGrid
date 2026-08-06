@@ -50,11 +50,18 @@ class _UserSelectionScreenState extends State<UserSelectionScreen> {
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: TextField(
-                  style: TextStyle(color: AppColors.textPrimary),
+                  textAlignVertical: TextAlignVertical.center,
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                   decoration: InputDecoration(
+                    isDense: true,
                     hintText: 'Search by name or email...',
-                    hintStyle: TextStyle(color: AppColors.textSecondary),
-                    prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                    hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    prefixIcon: Icon(Icons.search, color: AppColors.textSecondary, size: 18),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     filled: true,
                     fillColor: AppColors.textPrimary.withOpacity(0.1),
                     border: OutlineInputBorder(

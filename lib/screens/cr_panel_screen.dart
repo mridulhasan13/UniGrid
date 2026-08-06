@@ -1119,11 +1119,17 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           child: TextField(
-                            style: TextStyle(color: AppColors.textPrimary),
+                            textAlignVertical: TextAlignVertical.center,
+                            style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                             decoration: InputDecoration(
+                              isDense: true,
                               hintText: 'Search members...',
-                              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
-                              prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 13),
+                              prefixIcon: Icon(Icons.search, color: AppColors.textSecondary, size: 18),
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 38,
+                                minHeight: 38,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(color: AppColors.glassCardBorder),
@@ -1132,7 +1138,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(color: AppColors.glassCardBorder.withOpacity(0.5)),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 10),
                             ),
                             onChanged: (val) {
                               setState(() {

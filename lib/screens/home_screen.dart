@@ -10,6 +10,7 @@ import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
 import '../services/supabase_storage_service.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/unigrid_loader.dart';
 import '../widgets/floating_app_bar.dart';
 import 'file_viewer_screen.dart';
@@ -417,8 +418,9 @@ class _AnnouncementCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8.0),
-                  Text(
+                  LinkifiedText(
                     announcement.title,
+                    selectable: true,
                     style: TextStyle(
                       color: isCardLight ? Colors.black : AppColors.textPrimary,
                       fontSize: 20,
@@ -428,8 +430,9 @@ class _AnnouncementCard extends StatelessWidget {
                   if (announcement.details != null &&
                       announcement.details!.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    Text(
+                    LinkifiedText(
                       announcement.details!,
+                      selectable: true,
                       style: TextStyle(
                         color: isCardLight ? Colors.black.withOpacity(0.6) : AppColors.textSecondary,
                         fontSize: 12,
@@ -439,8 +442,9 @@ class _AnnouncementCard extends StatelessWidget {
                   ],
                   if (announcement.content.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text(
+                    LinkifiedText(
                       announcement.content,
+                      selectable: true,
                       style: TextStyle(
                         color: isCardLight ? Colors.black.withOpacity(0.85) : AppColors.textPrimary.withOpacity(0.9),
                         fontSize: 14,

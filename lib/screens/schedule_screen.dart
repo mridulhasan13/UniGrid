@@ -1510,7 +1510,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           builder: (context, constraints) {
                             final double availableHeight = constraints.maxHeight;
                             final double calendarHeight = _isCalendarExpanded ? 340 : 54;
-                            final double tableHeight = (availableHeight - calendarHeight - 8 - 80).clamp(425.0, 1000.0);
+                            final double tableHeight = (availableHeight - calendarHeight - 8 - 80).clamp(465.0, 1000.0);
 
                             return SingleChildScrollView(
                               child: Padding(

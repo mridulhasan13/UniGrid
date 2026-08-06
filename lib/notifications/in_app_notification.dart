@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../utils/constants.dart';
+import '../widgets/linkified_text.dart';
 
 /// Global navigator key to trigger notifications from anywhere (e.g. FCM background listeners).
 final GlobalKey<NavigatorState> globalNavigatorKey =
@@ -275,7 +276,7 @@ class _InAppNotificationWidgetState extends State<_InAppNotificationWidget>
                                   Row(
                                     children: [
                                       Expanded(
-                                        child: Text(
+                                        child: LinkifiedText(
                                           widget.title,
                                           style: const TextStyle(
                                             color: AppColors.textPrimary,
@@ -299,7 +300,7 @@ class _InAppNotificationWidgetState extends State<_InAppNotificationWidget>
                                     ],
                                   ),
                                   const SizedBox(height: 3),
-                                  Text(
+                                  LinkifiedText(
                                     widget.message,
                                     style: TextStyle(
                                       color: AppColors.textSecondary

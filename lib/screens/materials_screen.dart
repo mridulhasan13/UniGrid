@@ -13,6 +13,7 @@ import '../notifications/fcm_service.dart';
 import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/unigrid_loader.dart';
 import '../widgets/floating_app_bar.dart';
 import '../services/auth_service.dart';
@@ -186,36 +187,60 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                   width: 1,
                 ),
               ),
-              child: TextField(
-                controller: _searchCtrl,
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                onChanged: (val) {
-                  setState(() {
-                    _searchQuery = val.trim().toLowerCase();
-                  });
-                },
-                decoration: InputDecoration(
-                  hintText: 'Search title, subject, teacher, or file...',
-                  hintStyle: TextStyle(
-                    color: AppColors.textSecondary.withOpacity(0.6),
-                    fontSize: 12,
+              child: Center(
+                child: TextField(
+                  controller: _searchCtrl,
+                  textAlignVertical: TextAlignVertical.center,
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val.trim().toLowerCase();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Search title, subject, teacher, or file...',
+                    hintStyle: TextStyle(
+                      color: AppColors.textSecondary.withOpacity(0.6),
+                      fontSize: 12.5,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      color: AppColors.primary.withOpacity(0.7),
+                      size: 18,
+                    ),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 38,
+                      minHeight: 40,
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 36,
+                              minHeight: 40,
+                            ),
+                            icon: Icon(Icons.clear_rounded,
+                                color: AppColors.textSecondary, size: 16),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    suffixIconConstraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 40,
+                    ),
+                    border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  prefixIcon: Icon(Icons.search_rounded,
-                      color: AppColors.primary.withOpacity(0.7), size: 18),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear_rounded,
-                              color: AppColors.textSecondary, size: 16),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            setState(() {
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
@@ -516,10 +541,11 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                                 },
                                 leading:
                                     _getMaterialIcon(material.extension, material.type),
-                                title: Text(material.title,
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary)),
+                                title: LinkifiedText(material.title,
+                                     selectable: true,
+                                     style: TextStyle(
+                                         fontWeight: FontWeight.bold,
+                                         color: AppColors.textPrimary)),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [

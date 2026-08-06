@@ -13,6 +13,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/models.dart';
 import 'file_viewer_screen.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/unigrid_loader.dart';
 import '../services/theme_service.dart';
 import '../utils/constants.dart';
@@ -565,17 +566,29 @@ class _MessageBubble extends StatelessWidget {
             _buildImageContent(context),
             if (message.text.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(
+              LinkifiedText(
                 message.text,
+                selectable: true,
                 style: TextStyle(
                     color: textColor, fontSize: 14, height: 1.4),
+                linkStyle: TextStyle(
+                    color: isOwn ? Colors.cyanAccent : AppColors.primary,
+                    decoration: TextDecoration.underline,
+                    fontSize: 14,
+                    height: 1.4),
               ),
             ],
           ] else
-            Text(
+            LinkifiedText(
               message.text,
+              selectable: true,
               style: TextStyle(
                   color: textColor, fontSize: 14, height: 1.4),
+              linkStyle: TextStyle(
+                  color: isOwn ? Colors.cyanAccent : AppColors.primary,
+                  decoration: TextDecoration.underline,
+                  fontSize: 14,
+                  height: 1.4),
             ),
           // Timestamp + edited tag
           const SizedBox(height: 5),

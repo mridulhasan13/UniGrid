@@ -12,6 +12,7 @@ import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../utils/constants.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/floating_app_bar.dart';
 import '../widgets/unigrid_loader.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -1992,9 +1993,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-              Text(
+              LinkifiedText(
                 'Hey there! I’m Mridul, a visual storyteller, handwriting artist, and designer disguised as an engineering student. My journey is fueled by a love for aesthetics and structure, bridging the gap between the meticulous world of engineering and the fluid world of graphic design and calligraphy.\n\n'
                 'From running leadership initiatives in science and photography to digitalizing ideas into clean, striking graphics, I thrive on turning creative visions into reality.',
+                selectable: true,
                 style: TextStyle(
                     color: AppColors.textPrimary.withOpacity(0.7),
                     fontSize: 12.5,
