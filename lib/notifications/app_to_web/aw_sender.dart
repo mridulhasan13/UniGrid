@@ -20,19 +20,20 @@ class AWSender {
     required String messageId,
   }) async {
     final tokens = await TokenResolver.getWebTokensForUser(recipientId);
-    if (tokens.isEmpty) {
+    final webTokens = tokens.where(TokenResolver.isWebToken).toSet().toList();
+    if (webTokens.isEmpty) {
       debugPrint('[AWSender] No web tokens for recipient $recipientId');
       return;
     }
     await FcmDispatcher.dispatch(
-      tokens: tokens,
+      tokens: webTokens,
       title: title,
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
       targetPlatform: 'web',
     );
-    debugPrint('[AWSender] Private → ${tokens.length} web token(s)');
+    debugPrint('[AWSender] Private → ${webTokens.length} web token(s)');
   }
 
   // ─── Broadcast (Dept + Batch) ────────────────────────────────────────────
@@ -52,18 +53,19 @@ class AWSender {
       adminsOnly: adminsOnly,
       excludeUserId: senderUserId,
     );
-    if (tokens.isEmpty) {
+    final webTokens = tokens.where(TokenResolver.isWebToken).toSet().toList();
+    if (webTokens.isEmpty) {
       debugPrint('[AWSender] No web tokens in $department-$batch');
       return;
     }
     await FcmDispatcher.dispatch(
-      tokens: tokens,
+      tokens: webTokens,
       title: title,
       body: body,
       senderUserId: senderUserId,
       messageId: messageId,
       targetPlatform: 'web',
     );
-    debugPrint('[AWSender] Broadcast → ${tokens.length} web token(s)');
+    debugPrint('[AWSender] Broadcast → ${webTokens.length} web token(s)');
   }
 }

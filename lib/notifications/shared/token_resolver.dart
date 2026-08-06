@@ -72,6 +72,22 @@ class TokenResolver {
     );
   }
 
+  static bool isWebToken(String token) {
+    return token.startsWith('http') ||
+        token.contains('fcm.googleapis.com') ||
+        token.length >= 100;
+  }
+
+  static bool _matchesCategory(String token, String categoryField) {
+    final isWeb = isWebToken(token);
+    if (categoryField == 'webTokens') {
+      return isWeb;
+    } else if (categoryField == 'nativeTokens') {
+      return !isWeb;
+    }
+    return true;
+  }
+
   // ─── Internals ────────────────────────────────────────────────────────────
 
   static List<String> _extractCategory(
@@ -85,7 +101,10 @@ class TokenResolver {
     if (data[categoryField] is List) {
       for (final t in data[categoryField] as List) {
         if (t is String && t.trim().isNotEmpty) {
-          tokens.add(t.trim());
+          final str = t.trim();
+          if (_matchesCategory(str, categoryField)) {
+            tokens.add(str);
+          }
         }
       }
     }
@@ -95,13 +114,19 @@ class TokenResolver {
       if (data['fcmTokens'] is List) {
         for (final t in data['fcmTokens'] as List) {
           if (t is String && t.trim().isNotEmpty) {
-            tokens.add(t.trim());
+            final str = t.trim();
+            if (_matchesCategory(str, categoryField)) {
+              tokens.add(str);
+            }
           }
         }
       }
       final single = data['fcmToken'];
       if (single is String && single.trim().isNotEmpty) {
-        tokens.add(single.trim());
+        final str = single.trim();
+        if (_matchesCategory(str, categoryField)) {
+          tokens.add(str);
+        }
       }
     }
 
