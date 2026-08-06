@@ -33,7 +33,7 @@ class WWReceiver {
           'ww_${DateTime.now().millisecondsSinceEpoch}';
 
       // ── Duplicate guard ──────────────────────────────────────────────────
-      if (DuplicateGuard.checkAndMark('ww_$msgId')) return;
+      if (DuplicateGuard.checkAndMark(msgId) || DuplicateGuard.checkAndMark('ww_$msgId')) return;
 
       // ── Self-notification guard ──────────────────────────────────────────
       final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';

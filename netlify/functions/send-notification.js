@@ -25,7 +25,11 @@ const CORS = {
 // Native tokens are shorter.  Most reliable check is length (web tokens ≥ 140).
 function isWebToken(token) {
   if (!token || typeof token !== "string") return false;
-  return token.startsWith("http") || token.includes("fcm.googleapis.com");
+  return (
+    token.startsWith("http") ||
+    token.includes("fcm.googleapis.com") ||
+    token.length >= 100
+  );
 }
 
 // ─── Base64Url Helper ────────────────────────────────────────────────────────
@@ -281,7 +285,9 @@ exports.handler = async (event) => {
   const deadTokens = [];
   const extraData = { url, route };
 
-  for (const token of tokens) {
+  const uniqueTokens = [...new Set(tokens.filter((t) => typeof t === "string" && t.trim().length > 0))];
+
+  for (const token of uniqueTokens) {
     const res = await sendSingleFCM(projectId, accessToken, token, title, bodyText, senderUserId, messageId, targetPlatform, extraData);
     if (res.status === 200) {
       sentCount++;

@@ -31,22 +31,22 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message received:', JSON.stringify(payload));
 
-  // Samsung Internet and some Chromium browsers automatically display notifications
-  // when `payload.notification` is present in the WebPush payload.
-  // Returning early here prevents Samsung Internet from showing a second duplicate popup.
-  if (payload.notification) {
+  // Chromium, Safari, Firefox, and Samsung Internet automatically display notifications
+  // when `payload.notification` or `payload.webpush.notification` is present in the WebPush payload.
+  // Returning early here prevents browsers from showing a second duplicate popup.
+  if (payload.notification || (payload.webpush && payload.webpush.notification)) {
     console.log('[SW] Notification block present — handled automatically by browser native engine.');
     return;
   }
 
-  const notificationTitle = (payload.data && payload.data.title) || 'UniGrid Notification';
-  const notificationBody = (payload.data && payload.data.body) || '';
+  const notificationTitle = (payload.data && payload.data.title) || (payload.notification && payload.notification.title) || 'UniGrid Notification';
+  const notificationBody = (payload.data && payload.data.body) || (payload.notification && payload.notification.body) || '';
 
   const notificationOptions = {
     body: notificationBody,
     icon: 'https://unigrid.netlify.app/icons/Icon-maskable-192.png',
     badge: 'https://unigrid.netlify.app/icons/Icon-maskable-192.png',
-    tag: (payload.data && payload.data.messageId) || 'unigrid-notification',
+    tag: (payload.data && payload.data.messageId) || (payload.notification && payload.notification.tag) || 'unigrid-notification',
     renotify: false,
     data: payload.data || {},
   };

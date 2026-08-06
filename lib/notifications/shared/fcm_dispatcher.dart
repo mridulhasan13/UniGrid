@@ -141,7 +141,7 @@ class FcmDispatcher {
       final endpoint =
           'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
 
-      for (final token in tokens) {
+      for (final token in tokens.toSet()) {
         try {
           final response = await http.post(
             Uri.parse(endpoint),
