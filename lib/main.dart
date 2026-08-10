@@ -28,35 +28,36 @@ import 'notifications/in_app_notification.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
 
-  // Initialize Supabase (used for file/media storage)
-  await Supabase.initialize(
-    url: SupabaseConfig.url,
-    anonKey: SupabaseConfig.anonKey,
-  );
+  // Initialize Firebase and Supabase concurrently for ultra-fast startup
+  await Future.wait([
+    Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ),
+    Supabase.initialize(
+      url: SupabaseConfig.url,
+      anonKey: SupabaseConfig.anonKey,
+    ),
+  ]);
 
-  // Register background FCM handler BEFORE anything else
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-  // Initialize FCM (awaited so the token is saved to Firestore before anything else runs)
-  await FCMService.initialize().catchError((e) {
-    debugPrint('Failed to initialize FCM: $e');
-  });
-
-  // Initialize 4-path notification system (web→web, web→app, app→web, app→app)
-  await NotificationCoordinator.init();
-
-  // Load theme settings dynamically before app start
-  await ThemeService.instance.init();
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
 
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: !kIsWeb,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
+
+  // Asynchronous non-blocking background initialization
+  FCMService.initialize().catchError((e) {
+    debugPrint('FCM init notice: $e');
+  });
+  NotificationCoordinator.init().catchError((e) {
+    debugPrint('NotificationCoordinator init notice: $e');
+  });
+  ThemeService.instance.init();
+
   runApp(const MyApp());
 }
 
@@ -155,6 +156,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isRestoringSession) {
+      return const Scaffold(
+        body: Center(
+          child: UniGridLoader(
+            title: 'Loading UniGrid...',
+            subtitle: 'Restoring your session...',
+            showBackground: false,
+          ),
+        ),
+      );
+    }
+
     final user = Provider.of<AppUser?>(context);
     final firebaseUser = FirebaseAuth.instance.currentUser;
 
