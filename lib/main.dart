@@ -137,6 +137,7 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _isRestoringSession = true;
+  bool _hasStoredSession = false;
 
   @override
   void initState() {
@@ -146,6 +147,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _initSessionCheck() async {
     final authService = Provider.of<AuthService>(context, listen: false);
+    final hasSession = await authService.hasActiveStoredSession();
+    if (mounted) {
+      setState(() {
+        _hasStoredSession = hasSession;
+      });
+    }
     await authService.waitForSessionInit();
     if (mounted) {
       setState(() {
@@ -156,7 +163,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isRestoringSession) {
+    final user = Provider.of<AppUser?>(context);
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+
+    if (_isRestoringSession || (_hasStoredSession && firebaseUser == null && user == null)) {
       return const Scaffold(
         body: Center(
           child: UniGridLoader(
@@ -167,9 +177,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
         ),
       );
     }
-
-    final user = Provider.of<AppUser?>(context);
-    final firebaseUser = FirebaseAuth.instance.currentUser;
 
     // 1. Truly logged out (no Firebase Auth session and no AppUser profile)
     if (firebaseUser == null && user == null) {

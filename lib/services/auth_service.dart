@@ -540,6 +540,20 @@ class AuthService {
     }
   }
 
+  Future<bool> hasActiveStoredSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = prefs.getInt('auth_session_timestamp');
+      if (timestamp != null) {
+        final loginTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+        return DateTime.now().difference(loginTime).inHours < 72;
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Error checking stored session: $e');
+    }
+    return false;
+  }
+
   Future<void> _clearSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
