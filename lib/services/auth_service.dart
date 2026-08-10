@@ -555,15 +555,13 @@ class AuthService {
 
   Future<void> _initSession() async {
     try {
-      // On web, Firebase Auth restores its session asynchronously from indexedDB.
-      // _auth.currentUser is null immediately at startup even if the user IS logged in.
-      // Wait up to 2.5 seconds for Firebase to finish its own restoration before we act.
-      if (kIsWeb && _auth.currentUser == null) {
+      // Wait up to 1200ms for Firebase to finish restoring its session from disk/storage before we act.
+      if (_auth.currentUser == null) {
         try {
           await _auth
               .authStateChanges()
               .first
-              .timeout(const Duration(milliseconds: 800));
+              .timeout(const Duration(milliseconds: 1200));
         } catch (_) {
           // Timed out or no user restored — continue with session logic below.
         }
