@@ -20,7 +20,7 @@ class AWSender {
     required String messageId,
   }) async {
     final tokens = await TokenResolver.getWebTokensForUser(recipientId);
-    final webTokens = tokens.where(TokenResolver.isWebToken).toSet().toList();
+    final webTokens = tokens.where((t) => t.trim().isNotEmpty).toSet().toList();
     if (webTokens.isEmpty) {
       debugPrint('[AWSender] No web tokens for recipient $recipientId');
       return;
@@ -53,7 +53,7 @@ class AWSender {
       adminsOnly: adminsOnly,
       excludeUserId: senderUserId,
     );
-    final webTokens = tokens.where(TokenResolver.isWebToken).toSet().toList();
+    final webTokens = tokens.where((t) => t.trim().isNotEmpty).toSet().toList();
     if (webTokens.isEmpty) {
       debugPrint('[AWSender] No web tokens in $department-$batch');
       return;

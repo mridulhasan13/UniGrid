@@ -73,23 +73,10 @@ class TokenResolver {
   }
 
   static bool isWebToken(String token) {
-    final lower = token.trim().toLowerCase();
-    return lower.startsWith('http://') ||
-        lower.startsWith('https://') ||
-        lower.contains('fcm.googleapis.com') ||
-        lower.contains('push.services') ||
-        lower.contains('web.push');
+    if (token.trim().isEmpty) return false;
+    return true; // Any valid token retrieved from webTokens array
   }
 
-  static bool _matchesCategory(String token, String categoryField) {
-    final isWeb = isWebToken(token);
-    if (categoryField == 'webTokens') {
-      return isWeb;
-    } else if (categoryField == 'nativeTokens') {
-      return !isWeb;
-    }
-    return true;
-  }
 
   // ─── Internals ────────────────────────────────────────────────────────────
 
