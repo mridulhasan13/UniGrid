@@ -1200,14 +1200,15 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          LinkifiedText(
+                                          Text(
                                             course.courseName,
-                                            selectable: true,
                                             style: TextStyle(
                                               color: AppColors.textPrimary,
                                               fontWeight: FontWeight.bold,
                                               fontSize: 15,
                                             ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                           const SizedBox(height: 6),
                                           Row(
@@ -1217,41 +1218,43 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                                   color: AppColors.textSecondary),
                                               const SizedBox(width: 4),
                                               Expanded(
-                                                child: LinkifiedText(
-                                                  course.teacherName,
-                                                  selectable: true,
+                                                child: Text(
+                                                  course.teacherName.isEmpty ? 'Teacher TBD' : course.teacherName,
                                                   style: TextStyle(
                                                     color: AppColors.textSecondary,
-                                                    fontSize: 12,
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.w500,
                                                   ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.primary
-                                                      .withOpacity(0.12),
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                  border: Border.all(
-                                                      color: AppColors.primary
-                                                          .withOpacity(0.3)),
-                                                ),
-                                                child: Text(
-                                                  course.teacherShort,
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF00FF87),
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 10,
+                                              if (course.teacherShort.isNotEmpty) ...[
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.primary
+                                                        .withOpacity(0.12),
+                                                    borderRadius:
+                                                        BorderRadius.circular(6),
+                                                    border: Border.all(
+                                                        color: AppColors.primary
+                                                            .withOpacity(0.3)),
+                                                  ),
+                                                  child: Text(
+                                                    course.teacherShort,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF00FF87),
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 10,
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
+                                              ],
                                             ],
                                           ),
                                           if (_selectedLevelTermFilter ==
