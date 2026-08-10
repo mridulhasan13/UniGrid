@@ -65,6 +65,18 @@ Future<void> _checkAndAutoPopulateWeek({
     final defaultSnap = await FirebaseFirestore.instance.collection(defaultPath).get();
     if (defaultSnap.docs.isEmpty) return;
 
+    // Guard against race with _checkAndAutoResetStatuses in schedule_screen:
+    // if that function already wrote classes for this week, skip to avoid duplicates.
+    final normSun = DateTime(sundayDate.year, sundayDate.month, sundayDate.day);
+    final normSat = DateTime(sundayDate.year, sundayDate.month, sundayDate.day + 6, 23, 59, 59);
+    final existingCheck = await FirebaseFirestore.instance
+        .collection(schedulePath)
+        .where('scheduledDate', isGreaterThanOrEqualTo: Timestamp.fromDate(normSun))
+        .where('scheduledDate', isLessThanOrEqualTo: Timestamp.fromDate(normSat))
+        .limit(1)
+        .get();
+    if (existingCheck.docs.isNotEmpty) return;
+
     final batch = FirebaseFirestore.instance.batch();
     for (var doc in defaultSnap.docs) {
       final data = doc.data();
@@ -210,22 +222,40 @@ class WeeklyRoutineTable extends StatelessWidget {
     final schedulePath = user != null && user.hasDeptScope
         ? deptBatchCol(user.department, user.batch, 'schedule')
         : 'schedule';
+    final metaPath = user != null && user.hasDeptScope
+        ? deptBatchCol(user.department, user.batch, 'routine_metadata')
+        : 'routine_metadata';
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection(schedulePath).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Error loading schedule: ${snapshot.error}',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection(metaPath).doc('day_statuses').snapshots(),
+      builder: (context, dayStatusesSnap) {
+        final Map<String, String> dayStatusesMap = {};
+        if (dayStatusesSnap.hasData && dayStatusesSnap.data!.exists) {
+          final data = dayStatusesSnap.data!.data() as Map<String, dynamic>?;
+          if (data != null) {
+            data.forEach((key, value) {
+              if (value is String && value.isNotEmpty) {
+                dayStatusesMap[key] = value.toLowerCase();
+              }
+            });
+          }
         }
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection(schedulePath).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Error loading schedule: ${snapshot.error}',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }
 
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(
@@ -364,48 +394,126 @@ class WeeklyRoutineTable extends StatelessWidget {
                         final idx = entry.key;
                         final day = entry.value;
                         final formattedDate = _getDateForDay(sundayDate, day);
+                        final dayDate = _getDateTimeForDay(sundayDate, day);
+                        final dayKey = '${dayDate.year}_${dayDate.month}_${dayDate.day}';
+
+                        String? activeStatus = dayStatusesMap[dayKey];
+                        if (activeStatus == null || activeStatus.isEmpty) {
+                          for (var c in rawClasses) {
+                            if (c.dayOfWeek == day && c.scheduledDate != null) {
+                              final sDate = c.scheduledDate!;
+                              if (sDate.year == dayDate.year &&
+                                  sDate.month == dayDate.month &&
+                                  sDate.day == dayDate.day) {
+                                final st = c.status.trim().toLowerCase();
+                                if (st == 'auto' || st == 'boycott') {
+                                  activeStatus = st;
+                                  break;
+                                }
+                              }
+                            }
+                          }
+                        }
+
+                        final bool isAuto = activeStatus == 'auto';
+                        final bool isBoycott = activeStatus == 'boycott';
+
+                        Color borderColor = AppColors.primary.withOpacity(0.2);
+                        List<Color> bgColors = [
+                          AppColors.primary.withOpacity(0.15),
+                          AppColors.secondary.withOpacity(0.04)
+                        ];
+
+                        if (isAuto) {
+                          borderColor = Colors.cyanAccent.withOpacity(0.7);
+                          bgColors = [
+                            Colors.cyan.withOpacity(0.35),
+                            Colors.cyan.withOpacity(0.12)
+                          ];
+                        } else if (isBoycott) {
+                          borderColor = Colors.redAccent.withOpacity(0.7);
+                          bgColors = [
+                            Colors.red.withOpacity(0.35),
+                            Colors.red.withOpacity(0.12)
+                          ];
+                        }
+
                         return Expanded(
                           child: Padding(
                             padding:
                                 EdgeInsets.only(bottom: idx == 4 ? 0.0 : 4.0),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    AppColors.primary.withOpacity(0.15),
-                                    AppColors.secondary.withOpacity(0.04)
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                border: Border.all(
-                                    color: AppColors.primary.withOpacity(0.2)),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  _showDayStatusDialog(context, user, day, dayDate, activeStatus);
+                                },
                                 borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      day.toUpperCase(),
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          fontSize: 7.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.textPrimary,
-                                          letterSpacing: 0.2),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: bgColors,
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      formattedDate,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          fontSize: 6.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimary.withOpacity(0.7),
-                                          letterSpacing: 0.1),
+                                    border: Border.all(
+                                        color: borderColor,
+                                        width: (isAuto || isBoycott) ? 1.5 : 1.0),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          day.toUpperCase(),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              fontSize: 7.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: isAuto
+                                                  ? Colors.cyanAccent
+                                                  : (isBoycott
+                                                      ? Colors.redAccent
+                                                      : AppColors.textPrimary),
+                                              letterSpacing: 0.2),
+                                        ),
+                                        const SizedBox(height: 1),
+                                        Text(
+                                          formattedDate,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              fontSize: 6.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textPrimary
+                                                  .withOpacity(0.7),
+                                              letterSpacing: 0.1),
+                                        ),
+                                        if (isAuto || isBoycott) ...[
+                                          const SizedBox(height: 1),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 3, vertical: 0.5),
+                                            decoration: BoxDecoration(
+                                              color: isAuto
+                                                  ? Colors.cyanAccent
+                                                  : Colors.redAccent,
+                                              borderRadius:
+                                                  BorderRadius.circular(2),
+                                            ),
+                                            child: Text(
+                                              isAuto ? 'AUTO' : 'BOYCOTT',
+                                              style: const TextStyle(
+                                                color: Colors.black,
+                                                fontSize: 5.5,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -423,7 +531,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                       children: [
                         // Periods 1 & 2 Block
                         _buildPeriodGroupColumn(
-                            context, [colFlex[1], colFlex[2]], 0, classes, sundayDate),
+                            context, [colFlex[1], colFlex[2]], 0, classes, sundayDate, dayStatusesMap),
                         const SizedBox(width: 4),
                         // Tea Break Box
                         Expanded(
@@ -435,7 +543,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                             context,
                             [colFlex[4], colFlex[5], colFlex[6], colFlex[7]],
                             1,
-                            classes, sundayDate),
+                            classes, sundayDate, dayStatusesMap),
                         const SizedBox(width: 4),
                         // Lunch Break Box
                         Expanded(
@@ -447,7 +555,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                             context,
                             [colFlex[9], colFlex[10], colFlex[11], colFlex[12]],
                             2,
-                            classes, sundayDate),
+                            classes, sundayDate, dayStatusesMap),
                       ],
                     ),
                   )
@@ -553,7 +661,9 @@ class WeeklyRoutineTable extends StatelessWidget {
         );
       },
     );
-  }
+  },
+);
+}
 
   Widget _buildTimeHeader(
       List<Map<String, dynamic>> slotsList, int slotNum, String defaultRange) {
@@ -646,8 +756,13 @@ class WeeklyRoutineTable extends StatelessWidget {
     );
   }
 
-  Widget _buildPeriodGroupColumn(BuildContext context, List<int> flexWeights,
-      int groupIdx, List<ClassSchedule> allClasses, DateTime sundayDate) {
+  Widget _buildPeriodGroupColumn(
+      BuildContext context,
+      List<int> flexWeights,
+      int groupIdx,
+      List<ClassSchedule> allClasses,
+      DateTime sundayDate,
+      Map<String, String> dayStatusesMap) {
     int columnSumFlex = flexWeights.reduce((a, b) => a + b);
     return Expanded(
       flex: columnSumFlex,
@@ -655,6 +770,8 @@ class WeeklyRoutineTable extends StatelessWidget {
         children: List.generate(ScheduleConstants.days.length, (rowIdx) {
           final day = ScheduleConstants.days[rowIdx];
           final dayDate = _getDateTimeForDay(sundayDate, day);
+          final dayKey = '${dayDate.year}_${dayDate.month}_${dayDate.day}';
+
           final dayClasses = allClasses.where((c) {
             if (c.dayOfWeek != day) return false;
             if (c.scheduledDate != null) {
@@ -665,6 +782,27 @@ class WeeklyRoutineTable extends StatelessWidget {
             }
             return true;
           }).toList();
+
+          String? overrideStatus = dayStatusesMap[dayKey];
+          if (overrideStatus == null || overrideStatus.isEmpty) {
+            for (var c in dayClasses) {
+              final st = c.status.trim().toLowerCase();
+              if (st == 'auto' || st == 'boycott') {
+                overrideStatus = st;
+                break;
+              }
+            }
+          }
+
+          if (overrideStatus == 'auto' || overrideStatus == 'boycott') {
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: rowIdx == 4 ? 0.0 : 4.0),
+                child: _buildDayOverrideCard(overrideStatus!, groupIdx),
+              ),
+            );
+          }
+
           return Expanded(
             child: Padding(
               padding: EdgeInsets.only(bottom: rowIdx == 4 ? 0.0 : 4.0),
@@ -677,6 +815,339 @@ class WeeklyRoutineTable extends StatelessWidget {
         }),
       ),
     );
+  }
+
+  Widget _buildDayOverrideCard(String status, int groupIdx) {
+    final bool isAuto = status == 'auto';
+    final Color themeColor = isAuto ? Colors.cyanAccent : Colors.redAccent;
+    final String displayText = isAuto ? 'AUTO' : 'BOYCOTT';
+    final List<Color> bgGradient = isAuto
+        ? [
+            const Color(0xFF003840).withOpacity(0.9),
+            const Color(0xFF001F24).withOpacity(0.9),
+          ]
+        : [
+            const Color(0xFF40000D).withOpacity(0.9),
+            const Color(0xFF240005).withOpacity(0.9),
+          ];
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: bgGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: themeColor.withOpacity(0.5), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: themeColor.withOpacity(0.15),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: Text(
+        displayText,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: themeColor,
+          fontWeight: FontWeight.bold,
+          fontSize: 10.5,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDayStatusDialog(
+    BuildContext context,
+    AppUser? user,
+    String day,
+    DateTime dayDate,
+    String? currentStatus,
+  ) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isRootAdmin = user != null && authService.isRootAdmin(user.email);
+    final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
+    final formattedDate = DateFormat('EEEE, d MMMM').format(dayDate);
+
+    if (!isCR) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.backgroundTop,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            day,
+            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            currentStatus == 'auto' || currentStatus == 'boycott'
+                ? 'This day is marked as ${currentStatus!.toUpperCase()} by the CR.\nAll classes for this day are uncounted.'
+                : 'Only Class Representatives (CRs) can set Auto or Boycott status for schedule days.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.backgroundTop,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AppColors.glassCardBorder),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              formattedDate,
+              style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Set Day Status (Classes will be uncounted)',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildDayOptionButton(
+              context: ctx,
+              title: 'Auto Class',
+              subtitle: 'Mark entire day as Auto. All classes uncounted.',
+              icon: Icons.smart_button_rounded,
+              color: Colors.cyanAccent,
+              isSelected: currentStatus == 'auto',
+              onTap: () {
+                Navigator.pop(ctx);
+                _updateDayStatus(context, user, day, dayDate, 'auto');
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildDayOptionButton(
+              context: ctx,
+              title: 'Boycott Day',
+              subtitle: 'Mark entire day as Boycott. All classes uncounted.',
+              icon: Icons.block_rounded,
+              color: Colors.redAccent,
+              isSelected: currentStatus == 'boycott',
+              onTap: () {
+                Navigator.pop(ctx);
+                _updateDayStatus(context, user, day, dayDate, 'boycott');
+              },
+            ),
+            if (currentStatus == 'auto' || currentStatus == 'boycott') ...[
+              const SizedBox(height: 12),
+              Divider(color: AppColors.glassCardBorder),
+              const SizedBox(height: 4),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _updateDayStatus(context, user, day, dayDate, 'normal');
+                },
+                icon: const Icon(Icons.refresh_rounded, color: Colors.amberAccent, size: 16),
+                label: const Text(
+                  'Restore Normal Routine',
+                  style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDayOptionButton({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(isSelected ? 0.22 : 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withOpacity(isSelected ? 0.8 : 0.3),
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'ACTIVE',
+                              style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: color.withOpacity(0.6), size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateDayStatus(
+    BuildContext context,
+    AppUser? user,
+    String day,
+    DateTime dayDate,
+    String newStatus,
+  ) async {
+    if (user == null || !user.hasDeptScope) return;
+
+    final metaPath = deptBatchCol(user.department, user.batch, 'routine_metadata');
+    final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
+    final docKey = '${dayDate.year}_${dayDate.month}_${dayDate.day}';
+
+    try {
+      final dayStatusRef = FirebaseFirestore.instance.collection(metaPath).doc('day_statuses');
+      if (newStatus == 'normal') {
+        await dayStatusRef.set({
+          docKey: FieldValue.delete(),
+        }, SetOptions(merge: true));
+      } else {
+        await dayStatusRef.set({
+          docKey: newStatus,
+        }, SetOptions(merge: true));
+      }
+
+      final scheduleDocs = await FirebaseFirestore.instance
+          .collection(schedulePath)
+          .where('dayOfWeek', isEqualTo: day)
+          .get();
+
+      if (scheduleDocs.docs.isNotEmpty) {
+        final batch = FirebaseFirestore.instance.batch();
+        for (var doc in scheduleDocs.docs) {
+          final data = doc.data();
+          DateTime? clsDate;
+          if (data['scheduledDate'] != null) {
+            if (data['scheduledDate'] is Timestamp) {
+              clsDate = (data['scheduledDate'] as Timestamp).toDate();
+            } else if (data['scheduledDate'] is String) {
+              clsDate = DateTime.tryParse(data['scheduledDate']);
+            }
+          }
+
+          bool isTargetDay = clsDate == null ||
+              (clsDate.year == dayDate.year &&
+               clsDate.month == dayDate.month &&
+               clsDate.day == dayDate.day);
+
+          if (isTargetDay) {
+            batch.update(doc.reference, {
+              'status': newStatus == 'normal' ? 'upcoming' : newStatus,
+              'lastUpdatedDate': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+        await batch.commit();
+      }
+
+      if (context.mounted) {
+        final String label = newStatus == 'auto'
+            ? 'Auto Day'
+            : (newStatus == 'boycott' ? 'Boycott Day' : 'Normal Routine');
+        InAppNotification.show(
+          context,
+          title: '$day Status Updated',
+          message: '$day is now set to "$label". Classes are ${newStatus == 'normal' ? 'restored' : 'uncounted'}.',
+          accentColor: newStatus == 'auto'
+              ? Colors.cyanAccent
+              : (newStatus == 'boycott' ? Colors.redAccent : Colors.greenAccent),
+          icon: newStatus == 'auto'
+              ? Icons.smart_button_rounded
+              : (newStatus == 'boycott' ? Icons.block_rounded : Icons.check_circle_outline_rounded),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Update Failed',
+          message: 'Failed to update day status: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
   }
 
   List<Widget> _getDynamicRowData(BuildContext context, String day,

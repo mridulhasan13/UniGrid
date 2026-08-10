@@ -102,8 +102,36 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       future:
                           _firestore.collection('users').doc(otherUserId).get(),
                       builder: (context, userSnapshot) {
-                        if (!userSnapshot.hasData)
-                          return const SizedBox.shrink();
+                        if (!userSnapshot.hasData ||
+                            userSnapshot.connectionState ==
+                                ConnectionState.waiting) {
+                          return ListTile(
+                            leading: CircleAvatar(
+                              radius: 25,
+                              backgroundColor:
+                                  AppColors.textPrimary.withOpacity(0.08),
+                              child: Icon(Icons.person,
+                                  color: AppColors.textSecondary, size: 20),
+                            ),
+                            title: Container(
+                              width: 100,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: AppColors.textPrimary.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            subtitle: Container(
+                              width: 160,
+                              height: 10,
+                              margin: const EdgeInsets.only(top: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.textPrimary.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          );
+                        }
 
                         final userData =
                             userSnapshot.data!.data() as Map<String, dynamic>?;
@@ -192,16 +220,49 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     return ListTile(
       leading: Stack(
         children: [
-          CircleAvatar(
-            radius: 25,
-            backgroundImage: user.photoUrl.startsWith('data:image')
-                ? MemoryImage(base64Decode(user.photoUrl.split(',').last))
-                : ((user.photoUrl.isNotEmpty && (!kIsWeb || user.photoUrl.contains('supabase')))
-                    ? NetworkImage(user.photoUrl)
-                    : null) as ImageProvider?,
-            child: (user.photoUrl.isEmpty || (kIsWeb && !user.photoUrl.contains('supabase') && !user.photoUrl.startsWith('data:image')))
-                ? Text(user.name.isNotEmpty ? user.name[0] : 'U')
-                : null,
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withOpacity(0.2),
+            ),
+            child: ClipOval(
+              child: user.photoUrl.startsWith('data:image')
+                  ? Image.memory(
+                      base64Decode(user.photoUrl.split(',').last),
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                    )
+                  : (user.photoUrl.isNotEmpty
+                      ? Image.network(
+                          user.photoUrl,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Text(
+                                user.name.isNotEmpty ? user.name[0] : 'U',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            );
+                          },
+                        )
+                      : Center(
+                          child: Text(
+                            user.name.isNotEmpty ? user.name[0] : 'U',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )),
+            ),
           ),
           if (user.isCR) // Example badge
             Positioned(

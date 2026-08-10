@@ -15,6 +15,7 @@ import '../widgets/unigrid_loader.dart';
 import '../widgets/floating_app_bar.dart';
 import 'file_viewer_screen.dart';
 import '../notifications/in_app_notification.dart';
+import '../widgets/general_announcements_manager.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -38,11 +39,7 @@ class HomeScreen extends StatelessWidget {
                   ? '${deptFullName(user.department)} — Batch ${user.batch}'
                   : null,
               actions: [
-                IconButton(
-                  icon: Icon(Icons.logout_rounded, color: AppColors.textSecondary),
-                  onPressed: () => context.read<AuthService>().signOut(),
-                  tooltip: 'Logout',
-                ),
+                GeneralNotificationBell(user: user),
               ],
             ),
             Expanded(
@@ -112,7 +109,8 @@ class HomeScreen extends StatelessWidget {
               final announcements = snapshot.data!.docs
                   .map((doc) => Announcement.fromMap(
                       doc.data() as Map<String, dynamic>, doc.id))
-                  .toList();
+                  .toList()
+                ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
               if (announcements.isEmpty) {
                 return Center(

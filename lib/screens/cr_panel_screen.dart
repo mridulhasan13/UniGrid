@@ -961,12 +961,12 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                 horizontal: 24, vertical: 4),
                             leading: CircleAvatar(
                               backgroundImage:
-                                  (photoUrl != null && photoUrl.isNotEmpty && (!kIsWeb || photoUrl.contains('supabase')))
+                                  (photoUrl != null && photoUrl.isNotEmpty)
                                       ? NetworkImage(photoUrl)
                                       : null,
                               backgroundColor:
                                   AppColors.primary.withOpacity(0.2),
-                              child: (photoUrl == null || photoUrl.isEmpty || (kIsWeb && !photoUrl.contains('supabase')))
+                              child: (photoUrl == null || photoUrl.isEmpty)
                                   ? Text(
                                       name.isNotEmpty
                                           ? name[0].toUpperCase()
@@ -1176,11 +1176,11 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                             child: ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                               leading: CircleAvatar(
-                                backgroundImage: (photoUrl != null && photoUrl.isNotEmpty && (!kIsWeb || photoUrl.contains('supabase')))
+                                backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
                                     ? NetworkImage(photoUrl)
                                     : null,
                                 backgroundColor: AppColors.primary.withOpacity(0.2),
-                                child: (photoUrl == null || photoUrl.isEmpty || (kIsWeb && !photoUrl.contains('supabase')))
+                                child: (photoUrl == null || photoUrl.isEmpty)
                                     ? Text(
                                         name.isNotEmpty
                                             ? name[0].toUpperCase()
@@ -1359,13 +1359,13 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                         horizontal: 24, vertical: 4),
                                     leading: CircleAvatar(
                                       backgroundImage: (photoUrl != null &&
-                                              photoUrl.isNotEmpty && (!kIsWeb || photoUrl.contains('supabase')))
+                                              photoUrl.isNotEmpty)
                                           ? NetworkImage(photoUrl)
                                           : null,
                                       backgroundColor:
                                           Colors.amber.withOpacity(0.2),
                                       child: (photoUrl == null ||
-                                              photoUrl.isEmpty || (kIsWeb && !photoUrl.contains('supabase')))
+                                              photoUrl.isEmpty)
                                           ? Text(
                                               name.isNotEmpty
                                                   ? name[0].toUpperCase()

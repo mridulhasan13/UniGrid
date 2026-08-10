@@ -603,14 +603,57 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
         return Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
-            title: const Text('Course & Teacher Info'),
+            automaticallyImplyLeading: false,
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => Navigator.pop(context),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.textPrimary.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.glassCardBorder),
+                    ),
+                    child: Icon(Icons.arrow_back_rounded,
+                        color: AppColors.textPrimary, size: 18),
+                  ),
+                ),
+              ),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.menu_book_rounded,
+                    color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Course & Teacher Info',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: Colors.transparent,
             elevation: 0,
             flexibleSpace: ClipRRect(
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                 child: Container(
-                  color: AppColors.backgroundTop.withOpacity(0.5),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundTop.withOpacity(0.75),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: AppColors.primary.withOpacity(0.2),
+                        width: 1.0,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -627,57 +670,97 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                   padding: const EdgeInsets.all(16),
                   child: GlassCard(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                        horizontal: 16, vertical: 14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          university,
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
                         Row(
                           children: [
-                            Text(
-                              'Active Session: ',
-                              style: TextStyle(
-                                  color: AppColors.textSecondary, fontSize: 12),
-                            ),
-                            Text(
-                              activeLevelTerm,
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                            Icon(Icons.account_balance_rounded,
+                                color: AppColors.primary, size: 16),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                university,
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.3,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        Divider(color: AppColors.glassCardBorder, height: 20),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                    color: AppColors.primary.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.school_rounded,
+                                      color: AppColors.primary, size: 12),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Active Session:',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    activeLevelTerm,
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Divider(color: AppColors.glassCardBorder, height: 1),
+                        const SizedBox(height: 10),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Filter Term:',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            Row(
+                              children: [
+                                Icon(Icons.filter_list_rounded,
+                                    color: AppColors.textSecondary, size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Filter Term:',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                             Container(
-                              height: 38,
+                              height: 36,
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 12),
                               decoration: BoxDecoration(
                                 color: AppColors.textPrimary.withOpacity(0.04),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppColors.glassCardBorder),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppColors.glassCardBorder),
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
@@ -685,7 +768,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                   dropdownColor: AppColors.backgroundTop,
                                   style: TextStyle(
                                       color: AppColors.textPrimary,
-                                      fontSize: 13,
+                                      fontSize: 12.5,
                                       fontWeight: FontWeight.bold),
                                   onChanged: (val) {
                                     if (val != null) {
@@ -925,34 +1008,59 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                               //                        (span 1 → 1,  span 2 → 2,  span 3 → 3)
                               //   • Parallel groups  → each sub-group (Gr A, Gr B) counts as 1 each
                               //
-                              // A single entry with a group label (e.g. 'Gr: A') is NOT
-                              // parallel — it is one normal/lab class with a label.
-                              // A slot group is parallel only when it has multiple entries
-                              // at the exact same (day, slot, date).
+                              // De-duplicate first: the same recurring class slot appears as
+                              // one Firestore document per week (from copy/auto-reset). We must
+                              // collapse entries that share the same logical identity
+                              // (dayOfWeek + startSlot + subject + group + teacher) so they are
+                              // only counted once.
 
                               // Detect if the course is a lab
                               final bool courseIsLab =
                                   course.courseName.trim().toLowerCase().contains('lab') ||
                                   course.courseCode.trim().toLowerCase().contains('lab');
 
+                              // ── Step 1: De-duplicate recurring slots ──────
+                              // Group all matching schedule entries by their logical identity.
+                              // For each unique logical slot, keep the MOST RECENT dated entry
+                              // (or any entry if none are dated) to get the latest status.
+                              final Map<String, ClassSchedule> dedupedSlots = {};
+                              for (var s in courseSchedules) {
+                                final identityKey =
+                                    '${s.dayOfWeek.trim().toLowerCase()}_'
+                                    '${s.startSlot}_'
+                                    '${s.subject.trim().toLowerCase()}_'
+                                    '${s.group.trim().toLowerCase()}_'
+                                    '${s.teacher.trim().toLowerCase()}';
+
+                                if (!dedupedSlots.containsKey(identityKey)) {
+                                  dedupedSlots[identityKey] = s;
+                                } else {
+                                  // Keep the entry with the most recent scheduledDate
+                                  final existing = dedupedSlots[identityKey]!;
+                                  final existingDate = existing.scheduledDate;
+                                  final newDate = s.scheduledDate;
+                                  if (newDate != null &&
+                                      (existingDate == null ||
+                                          newDate.isAfter(existingDate))) {
+                                    dedupedSlots[identityKey] = s;
+                                  }
+                                }
+                              }
+
+                              // ── Step 2: Count from de-duplicated slots ────
+                              // Within the de-duplicated set, detect truly parallel
+                              // groups (same day + slot but different group labels).
                               int totalClasses = 0;
                               int completedClasses = 0;
                               int cancelledClasses = 0;
                               int upcomingClasses = 0;
 
-                              // Group entries by (day, slot, date).
-                              // Dated entries use their actual date as the key — entries
-                              // sharing the same date+slot are genuinely parallel (Gr A + Gr B).
-                              // Recurring (undated) entries share the same base key so that
-                              // recurring parallel groups are still detected correctly.
+                              // Group de-duplicated entries by (day, slot) to detect parallels.
                               final Map<String, List<ClassSchedule>> slotGroups = {};
-                              for (var s in courseSchedules) {
+                              for (var s in dedupedSlots.values) {
                                 final day = s.dayOfWeek.trim().toLowerCase();
                                 final slot = s.startSlot;
-                                final String dateKey = s.scheduledDate != null
-                                    ? '${s.scheduledDate!.year}_${s.scheduledDate!.month}_${s.scheduledDate!.day}'
-                                    : 'recurring';
-                                final groupKey = '${day}_${slot}_$dateKey';
+                                final groupKey = '${day}_$slot';
                                 slotGroups.putIfAbsent(groupKey, () => []).add(s);
                               }
 
@@ -961,7 +1069,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                 if (list.isEmpty) continue;
 
                                 // A slot group is truly parallel ONLY when there are
-                                // multiple entries sharing the exact same (day, slot, date)
+                                // multiple entries sharing the exact same (day, slot)
                                 // — e.g. Group A and Group B scheduled simultaneously.
                                 final bool isTrulyParallel = list.length > 1;
 
@@ -970,12 +1078,16 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                   // Example: Gr A completed + Gr B cancelled → 1 completed + 1 cancelled.
                                   for (var s in list) {
                                     final stat = s.status.trim().toLowerCase();
+                                    if (stat == 'auto' ||
+                                        stat == 'boycott' ||
+                                        stat == 'no class' ||
+                                        stat == 'no_class') {
+                                      continue; // No Class, Auto, and Boycott are uncounted!
+                                    }
                                     totalClasses += 1;
                                     if (stat == 'completed') {
                                       completedClasses += 1;
-                                    } else if (stat == 'cancelled' ||
-                                        stat == 'no class' ||
-                                        stat == 'no_class') {
+                                    } else if (stat == 'cancelled') {
                                       cancelledClasses += 1;
                                     } else {
                                       upcomingClasses += 1;
@@ -986,6 +1098,13 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                   final s = list.first;
                                   final stat = s.status.trim().toLowerCase();
 
+                                  if (stat == 'auto' ||
+                                      stat == 'boycott' ||
+                                      stat == 'no class' ||
+                                      stat == 'no_class') {
+                                    continue; // No Class, Auto, and Boycott are uncounted!
+                                  }
+
                                   // Lab → 1 session regardless of how many slots it fills.
                                   // Normal class → span IS the class count
                                   //   (2-slot merged theory class = 2 classes).
@@ -994,9 +1113,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                   totalClasses += weight;
                                   if (stat == 'completed') {
                                     completedClasses += weight;
-                                  } else if (stat == 'cancelled' ||
-                                      stat == 'no class' ||
-                                      stat == 'no_class') {
+                                  } else if (stat == 'cancelled') {
                                     cancelledClasses += weight;
                                   } else {
                                     upcomingClasses += weight;

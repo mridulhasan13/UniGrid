@@ -8,6 +8,7 @@ import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../widgets/linkified_text.dart';
@@ -53,7 +54,20 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   }
 
   void _handleSendPressed(types.PartialText message) async {
-    final user = Provider.of<AppUser?>(context, listen: false);
+    AppUser? user = Provider.of<AppUser?>(context, listen: false);
+    if (user == null) {
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null) {
+        try {
+          final doc = await _firestore.collection('users').doc(fbUser.uid).get();
+          if (doc.exists && doc.data() != null) {
+            user = AppUser.fromMap(doc.data()!, doc.id);
+          }
+        } catch (e) {
+          debugPrint('Error resolving AppUser fallback in private chat: $e');
+        }
+      }
+    }
     if (user == null) return;
 
     final timestamp = FieldValue.serverTimestamp();
@@ -70,28 +84,37 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       'type': 'text',
     };
 
+    final conversationId = _getConversationId(user.id, widget.recipient.id);
     final conversationRef =
-        _firestore.collection('conversations').doc(_conversationId);
+        _firestore.collection('conversations').doc(conversationId);
 
-     // Write message
-    await conversationRef.collection('messages').add(textMessage);
-    FCMService.sendPrivateNotification(
-      recipientId: widget.recipient.id,
-      title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
-      body: message.text,
-      senderUserId: user.id,
-      messageId: textMessage['id'] as String?,
-    );
-
-
-    // Update conversation metadata for Inbox sorting
+    // 1. Update conversation metadata for Inbox sorting FIRST (ensures participants exist)
     await conversationRef.set({
       'participants': [user.id, widget.recipient.id],
       'lastMessage': message.text,
       'lastMessageTime': timestamp,
       'lastMessageSenderId': user.id,
       'unreadCount_${widget.recipient.id}': FieldValue.increment(1),
+      'readStatus': {
+        user.id: true,
+        widget.recipient.id: false,
+      },
     }, SetOptions(merge: true));
+
+    // 2. Write message into subcollection SECOND
+    await conversationRef.collection('messages').add(textMessage);
+
+    try {
+      FCMService.sendPrivateNotification(
+        recipientId: widget.recipient.id,
+        title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
+        body: message.text,
+        senderUserId: user.id,
+        messageId: textMessage['id'] as String?,
+      );
+    } catch (e) {
+      debugPrint('[PrivateChatScreen] Error sending push notification: $e');
+    }
   }
 
   void _handleAttachmentPressed() async {
@@ -182,6 +205,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
         ),
       );
 
+    final conversationId = _getConversationId(appUser.id, widget.recipient.id);
+
     final currentChatUser = types.User(
       id: appUser.id,
       firstName:
@@ -194,19 +219,53 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundImage: widget.recipient.photoUrl.startsWith('data:image')
-                  ? MemoryImage(
-                      base64Decode(widget.recipient.photoUrl.split(',').last))
-                  : ((widget.recipient.photoUrl.isNotEmpty && (!kIsWeb || widget.recipient.photoUrl.contains('supabase')))
-                      ? NetworkImage(widget.recipient.photoUrl)
-                      : null) as ImageProvider?,
-              child: (widget.recipient.photoUrl.isEmpty || (kIsWeb && !widget.recipient.photoUrl.contains('supabase') && !widget.recipient.photoUrl.startsWith('data:image')))
-                  ? Text(widget.recipient.name.isNotEmpty
-                      ? widget.recipient.name[0]
-                      : 'U')
-                  : null,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withOpacity(0.2),
+              ),
+              child: ClipOval(
+                child: widget.recipient.photoUrl.startsWith('data:image')
+                    ? Image.memory(
+                        base64Decode(widget.recipient.photoUrl.split(',').last),
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.cover,
+                      )
+                    : (widget.recipient.photoUrl.isNotEmpty
+                        ? Image.network(
+                            widget.recipient.photoUrl,
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Text(
+                                  widget.recipient.name.isNotEmpty
+                                      ? widget.recipient.name[0]
+                                      : 'U',
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : Center(
+                            child: Text(
+                              widget.recipient.name.isNotEmpty
+                                  ? widget.recipient.name[0]
+                                  : 'U',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          )),
+              ),
             ),
             const SizedBox(width: 12),
             Flexible(
@@ -237,9 +296,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
           child: StreamBuilder<QuerySnapshot>(
             stream: _firestore
                 .collection('conversations')
-                .doc(_conversationId)
+                .doc(conversationId)
                 .collection('messages')
-                .orderBy('createdAt', descending: true)
+                .orderBy('preciseTime', descending: true)
                 .limit(_messageLimit)
                 .snapshots(),
             builder: (context, snapshot) {
@@ -455,14 +514,42 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                           radius: 16, child: Text(user.firstName?[0] ?? 'U'));
                     }
                   }
-                  return CircleAvatar(
-                    radius: 16,
-                    backgroundImage: (user.imageUrl != null && (!kIsWeb || user.imageUrl!.contains('supabase')))
-                        ? NetworkImage(user.imageUrl!)
-                        : null,
-                    child: (user.imageUrl == null || (kIsWeb && !user.imageUrl!.contains('supabase')))
-                        ? Text(user.firstName?[0] ?? 'U')
-                        : null,
+                  return Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.primary.withOpacity(0.2),
+                    ),
+                    child: ClipOval(
+                      child: user.imageUrl != null && user.imageUrl!.isNotEmpty
+                          ? Image.network(
+                              user.imageUrl!,
+                              width: 32,
+                              height: 32,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Text(
+                                    user.firstName?[0] ?? 'U',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : Center(
+                              child: Text(
+                                user.firstName?[0] ?? 'U',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                    ),
                   );
                 },
               );

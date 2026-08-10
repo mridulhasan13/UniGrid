@@ -160,7 +160,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Base64 vs Network Image Loader
   ImageProvider? _getProfileImage(String photoUrl) {
     if (photoUrl.isEmpty) return null;
-    if (kIsWeb && !photoUrl.contains('supabase')) return null;
     if (photoUrl.startsWith('data:image')) {
       try {
         final base64String = photoUrl.split(',').last;

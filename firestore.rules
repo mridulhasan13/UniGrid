@@ -118,5 +118,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAuthenticated() && isRootAdmin(request.auth);
     }
+    
+    // General / Global announcements (University-wide notices)
+    match /general_announcements/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
   }
 }

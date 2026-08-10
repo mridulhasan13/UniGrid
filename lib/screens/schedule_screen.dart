@@ -638,7 +638,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   Future<void> _showResetConfirmationDialog(
       BuildContext context, AppUser? user) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final schedulePath = user != null && user.hasDeptScope
         ? deptBatchCol(user.department, user.batch, 'schedule')
         : 'schedule';
@@ -688,6 +687,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
                 await FirebaseFirestore.instance
                     .collection(metaPath)
+                    .doc('day_statuses')
+                    .delete();
+
+                await FirebaseFirestore.instance
+                    .collection(metaPath)
                     .doc('info')
                     .set({
                   'university': 'Bangladesh University of Textiles',
@@ -720,7 +724,204 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+  Future<void> _showDeleteWeekDialog(BuildContext context, AppUser? user) async {
+    if (user == null || !user.hasDeptScope) return;
+    final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
 
+    final rawSunday = _getSundayOfWeek(_selectedDate);
+    final targetSunday = DateTime(rawSunday.year, rawSunday.month, rawSunday.day);
+    final targetSaturday = targetSunday.add(const Duration(days: 6));
+    final String weekLabel =
+        '${DateFormat('d MMM').format(targetSunday)} – ${DateFormat('d MMM yyyy').format(targetSaturday)}';
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.backgroundTop,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: const Color(0xFFFF453A).withOpacity(0.35)),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF453A).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.delete_sweep_rounded,
+                  color: Color(0xFFFF453A), size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Delete Week Schedule',
+                style: TextStyle(
+                    color: Color(0xFFFF453A),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF453A).withOpacity(0.07),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: const Color(0xFFFF453A).withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.date_range_rounded,
+                      color: Color(0xFFFF453A), size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      weekLabel,
+                      style: const TextStyle(
+                        color: Color(0xFFFF453A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'All scheduled classes for this week will be permanently deleted. '  
+              'This does NOT affect the default routine template or any other weeks.',
+              style: TextStyle(
+                  color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+            ),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFFF453A),
+            ),
+            child: const Text('Delete Week',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final normSun = targetSunday;
+      final normSat = DateTime(
+          targetSaturday.year, targetSaturday.month, targetSaturday.day,
+          23, 59, 59);
+
+      // Only delete documents where scheduledDate is explicitly set within
+      // the target week range. Documents with null scheduledDate appear in
+      // every week — do NOT touch them here or the whole routine gets wiped.
+      final allDocs = await FirebaseFirestore.instance
+          .collection(schedulePath)
+          .get();
+
+      final batch = FirebaseFirestore.instance.batch();
+      int deletedCount = 0;
+
+      for (var doc in allDocs.docs) {
+        final data = doc.data();
+        final rawDate = data['scheduledDate'];
+
+        // Skip null-dated docs — they are not week-specific.
+        if (rawDate == null) continue;
+
+        DateTime? clsDate;
+        if (rawDate is Timestamp) {
+          clsDate = rawDate.toDate();
+        } else if (rawDate is String) {
+          clsDate = DateTime.tryParse(rawDate);
+        }
+
+        if (clsDate != null) {
+          final normalized =
+              DateTime(clsDate.year, clsDate.month, clsDate.day);
+          final isInWeek =
+              (normalized.isAtSameMomentAs(normSun) ||
+                  normalized.isAfter(normSun)) &&
+              (normalized.isAtSameMomentAs(normSat) ||
+                  normalized.isBefore(normSat));
+          if (isInWeek) {
+            batch.delete(doc.reference);
+            deletedCount++;
+          }
+        }
+      }
+
+      if (deletedCount == 0) {
+        if (context.mounted) {
+          InAppNotification.show(
+            context,
+            title: 'Nothing to Delete',
+            message: 'No dated classes found for the week of $weekLabel.',
+            accentColor: Colors.amberAccent,
+            icon: Icons.info_outline_rounded,
+          );
+        }
+        return;
+      }
+
+      await batch.commit();
+
+      // Clear day statuses (Auto / Boycott) for the 7 days of the target week
+      final metaPath = user != null && user.hasDeptScope
+          ? deptBatchCol(user.department, user.batch, 'routine_metadata')
+          : 'routine_metadata';
+      final Map<String, dynamic> statusDeletions = {};
+      for (int i = 0; i < 7; i++) {
+        final d = normSun.add(Duration(days: i));
+        final key = '${d.year}_${d.month}_${d.day}';
+        statusDeletions[key] = FieldValue.delete();
+      }
+      await FirebaseFirestore.instance
+          .collection(metaPath)
+          .doc('day_statuses')
+          .set(statusDeletions, SetOptions(merge: true));
+
+      if (context.mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Week Deleted',
+          message: 'Deleted schedule & day statuses for $weekLabel.',
+          accentColor: Colors.redAccent,
+          icon: Icons.delete_sweep_rounded,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Delete Failed',
+          message: 'Failed to delete week schedule: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
+  }
 
   Future<void> _saveAsDefaultRoutine(BuildContext context, AppUser? user) async {
     if (user == null || !user.hasDeptScope) return;
@@ -1453,6 +1654,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   _showApplyDefaultRoutineDialog(context, user);
                                 } else if (value == 'copy_prev_week') {
                                   _copyFromPreviousWeek(context, user);
+                                } else if (value == 'delete_week') {
+                                  _showDeleteWeekDialog(context, user);
                                 } else if (value == 'clear_data') {
                                   _showResetConfirmationDialog(context, user);
                                 }
@@ -1493,6 +1696,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   title: 'Copy from Previous Week',
                                   subtitle: 'Duplicate last week\'s schedule',
                                   icon: Icons.content_copy_rounded,
+                                ),
+                                _buildDynamicMenuItem(
+                                  value: 'delete_week',
+                                  title: 'Delete Selected Week',
+                                  subtitle: 'Remove all classes for this week only',
+                                  icon: Icons.delete_sweep_rounded,
+                                  isDestructive: true,
                                 ),
                                 _buildDynamicMenuItem(
                                   value: 'clear_data',
@@ -2185,11 +2395,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 badgeText = 'Completed';
                 break;
               case 'cancelled':
+                badgeBgColor = Colors.red.withOpacity(0.15);
+                badgeTextColor = Colors.redAccent;
+                badgeText = 'Cancelled';
+                break;
               case 'no_class':
               case 'no class':
                 badgeBgColor = Colors.amber.withOpacity(0.15);
                 badgeTextColor = Colors.amberAccent;
                 badgeText = 'No Class';
+                break;
+              case 'auto':
+                badgeBgColor = Colors.cyan.withOpacity(0.15);
+                badgeTextColor = Colors.cyanAccent;
+                badgeText = 'Auto';
+                break;
+              case 'boycott':
+                badgeBgColor = Colors.red.withOpacity(0.15);
+                badgeTextColor = Colors.redAccent;
+                badgeText = 'Boycott';
                 break;
               default:
                 badgeBgColor = AppColors.textPrimary.withOpacity(0.08);
@@ -2375,6 +2599,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             const SizedBox(height: 10),
             _buildDialogStatusOption(ctx, schedulePath, classId,
                 'No Class / Cancelled', 'cancelled', Colors.amberAccent),
+            const SizedBox(height: 10),
+            _buildDialogStatusOption(ctx, schedulePath, classId,
+                'Auto Class (Uncounted)', 'auto', Colors.cyanAccent),
+            const SizedBox(height: 10),
+            _buildDialogStatusOption(ctx, schedulePath, classId,
+                'Boycott Class (Uncounted)', 'boycott', Colors.redAccent),
           ],
         ),
       ),

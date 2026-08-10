@@ -73,9 +73,12 @@ class TokenResolver {
   }
 
   static bool isWebToken(String token) {
-    return token.startsWith('http') ||
-        token.contains('fcm.googleapis.com') ||
-        token.length >= 100;
+    final lower = token.trim().toLowerCase();
+    return lower.startsWith('http://') ||
+        lower.startsWith('https://') ||
+        lower.contains('fcm.googleapis.com') ||
+        lower.contains('push.services') ||
+        lower.contains('web.push');
   }
 
   static bool _matchesCategory(String token, String categoryField) {
@@ -101,10 +104,7 @@ class TokenResolver {
     if (data[categoryField] is List) {
       for (final t in data[categoryField] as List) {
         if (t is String && t.trim().isNotEmpty) {
-          final str = t.trim();
-          if (_matchesCategory(str, categoryField)) {
-            tokens.add(str);
-          }
+          tokens.add(t.trim());
         }
       }
     }
@@ -114,19 +114,13 @@ class TokenResolver {
       if (data['fcmTokens'] is List) {
         for (final t in data['fcmTokens'] as List) {
           if (t is String && t.trim().isNotEmpty) {
-            final str = t.trim();
-            if (_matchesCategory(str, categoryField)) {
-              tokens.add(str);
-            }
+            tokens.add(t.trim());
           }
         }
       }
       final single = data['fcmToken'];
       if (single is String && single.trim().isNotEmpty) {
-        final str = single.trim();
-        if (_matchesCategory(str, categoryField)) {
-          tokens.add(str);
-        }
+        tokens.add(single.trim());
       }
     }
 
@@ -141,11 +135,14 @@ class TokenResolver {
     String? excludeUserId,
   }) async {
     try {
-      final snap = await _db
-          .collection('users')
-          .where('department', isEqualTo: department)
-          .where('batch', isEqualTo: batch)
-          .get();
+      Query<Map<String, dynamic>> query = _db.collection('users');
+      if (department.isNotEmpty) {
+        query = query.where('department', isEqualTo: department);
+      }
+      if (batch.isNotEmpty) {
+        query = query.where('batch', isEqualTo: batch);
+      }
+      final snap = await query.get();
 
       final Set<String> tokens = {};
       for (final doc in snap.docs) {

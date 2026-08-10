@@ -14,18 +14,35 @@ class DuplicateGuard {
   static final Set<String> _seen = {};
   static const int _maxSize = 300;
 
+  /// Strips platform prefixes (e.g. 'native_', 'web_', 'ww_', 'wa_', 'aa_', 'aw_')
+  /// to ensure cross-medium duplicate detection for the same underlying message.
+  static String _canonicalId(String messageId) {
+    String clean = messageId;
+    for (final prefix in ['native_', 'web_', 'ww_', 'wa_', 'aa_', 'aw_']) {
+      if (clean.startsWith(prefix)) {
+        clean = clean.substring(prefix.length);
+        break;
+      }
+    }
+    return clean;
+  }
+
   /// Returns true if this [messageId] was already seen (→ skip showing).
-  static bool isAlreadySeen(String messageId) => _seen.contains(messageId);
+  static bool isAlreadySeen(String messageId) {
+    final key = _canonicalId(messageId);
+    return _seen.contains(key);
+  }
 
   /// Marks [messageId] as seen. Evicts oldest if over capacity.
   static void markSeen(String messageId) {
-    if (_seen.contains(messageId)) return;
+    final key = _canonicalId(messageId);
+    if (_seen.contains(key)) return;
     if (_seen.length >= _maxSize) {
       final oldest = _order.removeAt(0);
       _seen.remove(oldest);
     }
-    _seen.add(messageId);
-    _order.add(messageId);
+    _seen.add(key);
+    _order.add(key);
   }
 
   /// Convenience — checks AND marks in one call.

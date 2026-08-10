@@ -7,7 +7,6 @@ import '../models/models.dart';
 import '../utils/constants.dart';
 import '../widgets/unigrid_loader.dart';
 import 'private_chat_screen.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class UserSelectionScreen extends StatefulWidget {
   const UserSelectionScreen({super.key});
@@ -80,7 +79,6 @@ class _UserSelectionScreenState extends State<UserSelectionScreen> {
                 child: StreamBuilder<QuerySnapshot>(
                   stream: _firestore
                       .collection('users')
-                      .orderBy('name')
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError)
@@ -102,7 +100,8 @@ class _UserSelectionScreenState extends State<UserSelectionScreen> {
                               doc.data() as Map<String, dynamic>, doc.id);
                         })
                         .where((u) => u.id != appUser.id)
-                        .toList();
+                        .toList()
+                      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
                     final filteredUsers = users.where((u) {
                       return u.name.toLowerCase().contains(_searchQuery) ||
@@ -114,18 +113,49 @@ class _UserSelectionScreenState extends State<UserSelectionScreen> {
                       itemBuilder: (context, index) {
                         final user = filteredUsers[index];
                         return ListTile(
-                          leading: CircleAvatar(
-                            radius: 20,
-                            backgroundImage: user.photoUrl.startsWith('data:image')
-                                ? MemoryImage(
-                                    base64Decode(user.photoUrl.split(',').last))
-                                : ((user.photoUrl.isNotEmpty && (!kIsWeb || user.photoUrl.contains('supabase')))
-                                    ? NetworkImage(user.photoUrl)
-                                    : null) as ImageProvider?,
-                            child: (user.photoUrl.isEmpty || (kIsWeb && !user.photoUrl.contains('supabase') && !user.photoUrl.startsWith('data:image')))
-                                ? Text(
-                                    user.name.isNotEmpty ? user.name[0] : 'U')
-                                : null,
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.primary.withOpacity(0.2),
+                            ),
+                            child: ClipOval(
+                              child: user.photoUrl.startsWith('data:image')
+                                  ? Image.memory(
+                                      base64Decode(user.photoUrl.split(',').last),
+                                      width: 40,
+                                      height: 40,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : (user.photoUrl.isNotEmpty
+                                      ? Image.network(
+                                          user.photoUrl,
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Center(
+                                              child: Text(
+                                                user.name.isNotEmpty ? user.name[0] : 'U',
+                                                style: TextStyle(
+                                                  color: AppColors.textPrimary,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : Center(
+                                          child: Text(
+                                            user.name.isNotEmpty ? user.name[0] : 'U',
+                                            style: TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        )),
+                            ),
                           ),
                           title: Text(
                               user.name.isNotEmpty ? user.name : 'Student',

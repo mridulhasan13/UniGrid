@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -255,7 +256,6 @@ class _SeenBySheet extends StatelessWidget {
 
   ImageProvider? _imgProvider(String photo) {
     if (photo.isEmpty) return null;
-    if (kIsWeb && !photo.contains('supabase')) return null;
     if (photo.startsWith('data:image')) {
       try {
         return MemoryImage(base64Decode(photo.split(',').last));
@@ -384,7 +384,6 @@ class _MessageBubble extends StatelessWidget {
 
   ImageProvider? _imgProvider(String photo) {
     if (photo.isEmpty) return null;
-    if (kIsWeb && !photo.contains('supabase')) return null;
     if (photo.startsWith('data:image')) {
       if (_base64Cache.containsKey(photo)) {
         return _base64Cache[photo];
@@ -739,14 +738,22 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String get _chatPath {
     final user = Provider.of<AppUser?>(context, listen: false);
+    return _getChatPathForUser(user);
+  }
+
+  String get _configPath {
+    final user = Provider.of<AppUser?>(context, listen: false);
+    return _getConfigPathForUser(user);
+  }
+
+  String _getChatPathForUser(AppUser? user) {
     if (user != null && user.hasDeptScope) {
       return deptBatchCol(user.department, user.batch, 'chat_messages');
     }
     return 'chats';
   }
 
-  String get _configPath {
-    final user = Provider.of<AppUser?>(context, listen: false);
+  String _getConfigPathForUser(AppUser? user) {
     if (user != null && user.hasDeptScope) {
       return deptBatchCol(user.department, user.batch, 'config');
     }
@@ -775,8 +782,34 @@ class _ChatScreenState extends State<ChatScreen> {
     if ((text.isEmpty && _selectedFiles.isEmpty) ||
         _isSending ||
         _isUploadingFiles) return;
-    final user = Provider.of<AppUser?>(context, listen: false);
-    if (user == null) return;
+
+    AppUser? user = Provider.of<AppUser?>(context, listen: false);
+    if (user == null) {
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null) {
+        try {
+          final doc = await _firestore.collection('users').doc(fbUser.uid).get();
+          if (doc.exists && doc.data() != null) {
+            user = AppUser.fromMap(doc.data()!, doc.id);
+          }
+        } catch (e) {
+          debugPrint('Error resolving AppUser fallback in chat: $e');
+        }
+      }
+    }
+
+    if (user == null) {
+      if (mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Authentication Required',
+          message: 'Unable to send message. Please log in again.',
+          accentColor: Colors.redAccent,
+        );
+      }
+      return;
+    }
+
     final authService = Provider.of<AuthService>(context, listen: false);
 
     // Editing existing message
@@ -914,15 +947,25 @@ class _ChatScreenState extends State<ChatScreen> {
       _replyingTo = null;
       _isSending = false;
     });
-    _firestore.collection(_chatPath).add(msgData);
-    FCMService.notifyNewMessage(
-      senderName: senderName,
-      text: text,
-      senderUserId: user.id,
-      department: user.department,
-      batch: user.batch,
-      messageId: msgData['id'] as String?,
-    );
+
+    try {
+      await _firestore.collection(_getChatPathForUser(user)).add(msgData);
+    } catch (e) {
+      debugPrint('[ChatScreen] Error writing message: $e');
+    }
+
+    try {
+      FCMService.notifyNewMessage(
+        senderName: senderName,
+        text: text,
+        senderUserId: user.id,
+        department: user.department,
+        batch: user.batch,
+        messageId: msgData['id'] as String?,
+      );
+    } catch (e) {
+      debugPrint('[ChatScreen] Error dispatching notification: $e');
+    }
 
   }
 
@@ -1001,8 +1044,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                     child: Text(
-                      msg.text.length > 100
-                          ? '${msg.text.substring(0, 100)}…'
+                      msg.text.characters.length > 100
+                          ? '${msg.text.characters.take(100)}…'
                           : msg.text,
                       style:
                           TextStyle(color: AppColors.textSecondary, fontSize: 13),
@@ -1159,7 +1202,10 @@ class _ChatScreenState extends State<ChatScreen> {
         user != null && (user.isCR || authService.isRootAdmin(user.email));
 
     return StreamBuilder<DocumentSnapshot>(
-      stream: _firestore.collection(_configPath).doc('department').snapshots(),
+      stream: _firestore
+          .collection(_getConfigPathForUser(user))
+          .doc('department')
+          .snapshots(),
       builder: (context, snap) {
         final data = snap.data?.data() as Map<String, dynamic>?;
         final deptName = data?['name'] as String? ?? 'IPE Department';
@@ -1424,8 +1470,14 @@ class _ChatScreenState extends State<ChatScreen> {
                         itemCount: members.length,
                         itemBuilder: (context, index) {
                           final member = members[index];
+                          final String displayName = member.name.isNotEmpty
+                              ? member.name
+                              : (member.email.contains('@')
+                                  ? member.email.split('@')[0]
+                                  : 'Student');
+
                           return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
                             child: Row(
                               children: [
                                 Stack(
@@ -1435,17 +1487,16 @@ class _ChatScreenState extends State<ChatScreen> {
                                       backgroundColor: AppColors.primary.withOpacity(0.15),
                                       backgroundImage: member.photoUrl.startsWith('data:image')
                                           ? MemoryImage(base64Decode(member.photoUrl.split(',').last))
-                                          : ((member.photoUrl.isNotEmpty && (!kIsWeb || member.photoUrl.contains('supabase')))
+                                          : (member.photoUrl.isNotEmpty
                                               ? NetworkImage(member.photoUrl)
                                               : null) as ImageProvider?,
-                                      child: (member.photoUrl.isEmpty || (kIsWeb && !member.photoUrl.contains('supabase') && !member.photoUrl.startsWith('data:image')))
+                                      child: member.photoUrl.isEmpty
                                           ? Text(
-                                              member.name.isNotEmpty
-                                                  ? member.name[0].toUpperCase()
-                                                  : 'U',
+                                              displayName[0].toUpperCase(),
                                               style: TextStyle(
                                                 color: AppColors.primary,
                                                 fontWeight: FontWeight.bold,
+                                                fontSize: 14,
                                               ),
                                             )
                                           : null,
@@ -1481,11 +1532,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                         children: [
                                           Flexible(
                                             child: Text(
-                                              member.name,
+                                              displayName,
                                               style: TextStyle(
                                                 color: AppColors.textPrimary,
                                                 fontWeight: FontWeight.w600,
-                                                fontSize: 14,
+                                                fontSize: 13.5,
                                               ),
                                               overflow: TextOverflow.ellipsis,
                                             ),
@@ -1493,17 +1544,17 @@ class _ChatScreenState extends State<ChatScreen> {
                                           if (member.isCR) ...[
                                             const SizedBox(width: 6),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: Colors.amber.withOpacity(0.15),
+                                                color: Colors.amber.withOpacity(0.18),
                                                 borderRadius: BorderRadius.circular(4),
-                                                border: Border.all(color: Colors.amber.withOpacity(0.3), width: 0.5),
+                                                border: Border.all(color: Colors.amber.withOpacity(0.4), width: 0.5),
                                               ),
                                               child: const Text(
                                                 'CR',
                                                 style: TextStyle(
                                                   color: Colors.amber,
-                                                  fontSize: 9,
+                                                  fontSize: 9.5,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
@@ -1517,8 +1568,10 @@ class _ChatScreenState extends State<ChatScreen> {
                                             ? 'ID: ${member.studentId}'
                                             : 'No ID set',
                                         style: TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 12,
+                                          color: member.studentId.isNotEmpty
+                                              ? AppColors.textSecondary
+                                              : AppColors.textSecondary.withOpacity(0.5),
+                                          fontSize: 11.5,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1526,13 +1579,13 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Flexible(
-                                  flex: 2,
+                                Expanded(
+                                  flex: 3,
                                   child: Text(
                                     member.email,
                                     style: TextStyle(
-                                      color: AppColors.textSecondary.withOpacity(0.6),
-                                      fontSize: 11,
+                                      color: AppColors.textSecondary.withOpacity(0.85),
+                                      fontSize: 12,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                     textAlign: TextAlign.end,
@@ -1855,8 +1908,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessageList(AppUser appUser) {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore
-          .collection(_chatPath)
-          .orderBy('createdAt', descending: true)
+          .collection(_getChatPathForUser(appUser))
+          .orderBy('preciseTime', descending: true)
           .limit(_messageLimit)
           .snapshots(),
       builder: (context, snap) {

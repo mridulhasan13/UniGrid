@@ -596,7 +596,8 @@ class FCMService {
     required String batch,
     String? messageId,
   }) async {
-    final preview = text.length > 80 ? '${text.substring(0, 80)}...' : text;
+    final preview =
+        text.characters.length > 80 ? '${text.characters.take(80)}...' : text;
     await sendToDeptAndBatch(
       department: department,
       batch: batch,
@@ -620,6 +621,22 @@ class FCMService {
       batch: batch,
       title: 'New ${type.isNotEmpty ? type : "Announcement"}',
       body: title,
+      senderUserId: senderUserId,
+      messageId: messageId,
+    );
+  }
+
+  static Future<void> notifyGeneralAnnouncement({
+    required String title,
+    required String content,
+    required String senderUserId,
+    String? messageId,
+  }) async {
+    await sendToDeptAndBatch(
+      department: '',
+      batch: '',
+      title: '📢 General Announcement',
+      body: title.isNotEmpty ? title : content,
       senderUserId: senderUserId,
       messageId: messageId,
     );

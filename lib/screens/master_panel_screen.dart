@@ -10,6 +10,7 @@ import '../utils/dept_scope.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../notifications/in_app_notification.dart';
+import '../widgets/general_announcements_manager.dart';
 
 class MasterPanelScreen extends StatefulWidget {
   const MasterPanelScreen({super.key});
@@ -103,9 +104,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 96,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
             child: Row(
@@ -142,6 +147,12 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                 ),
               ],
             ).animate().fadeIn(duration: 500.ms).slideX(begin: -0.2, end: 0),
+          ),
+
+          // GENERAL ANNOUNCEMENT COMPOSER (ROOT ADMIN)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: GeneralAnnouncementComposer(),
           ),
 
           // Search Bar
@@ -244,117 +255,117 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
           ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.2, end: 0),
 
           // Users List
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore.collection('users').snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                      child: Text('Error: ${snapshot.error}',
-                          style: const TextStyle(color: Colors.red)));
-                }
+          StreamBuilder<QuerySnapshot>(
+            stream: _firestore.collection('users').snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                    child: Text('Error: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.red)));
+              }
 
-                if (!snapshot.hasData) {
-                  return const Center(
-                    child: UniGridLoader(
-                      title: 'Loading Users',
-                      subtitle: 'Fetching active profiles...',
-                      showBackground: false,
-                    ),
-                  );
-                }
+              if (!snapshot.hasData) {
+                return const Center(
+                  child: UniGridLoader(
+                    title: 'Loading Users',
+                    subtitle: 'Fetching active profiles...',
+                    showBackground: false,
+                  ),
+                );
+              }
 
-                final users = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final name = (data['name'] ?? '').toString().toLowerCase();
-                  final email = (data['email'] ?? '').toString().toLowerCase();
-                  final studentId = (data['studentId'] ?? '').toString().toLowerCase();
-                  final deptVal = (data['department'] ?? '').toString().toLowerCase();
-                  final batchVal = (data['batch'] ?? '').toString().toLowerCase();
-                  final phone = (data['phoneNumber'] ?? '').toString().toLowerCase();
-                  final school = (data['schoolName'] ?? '').toString().toLowerCase();
-                  final college = (data['collegeName'] ?? '').toString().toLowerCase();
+              final users = snapshot.data!.docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final name = (data['name'] ?? '').toString().toLowerCase();
+                final email = (data['email'] ?? '').toString().toLowerCase();
+                final studentId = (data['studentId'] ?? '').toString().toLowerCase();
+                final deptVal = (data['department'] ?? '').toString().toLowerCase();
+                final batchVal = (data['batch'] ?? '').toString().toLowerCase();
+                final phone = (data['phoneNumber'] ?? '').toString().toLowerCase();
+                final school = (data['schoolName'] ?? '').toString().toLowerCase();
+                final college = (data['collegeName'] ?? '').toString().toLowerCase();
 
-                  final matchesSearch = name.contains(_searchQuery) ||
-                      email.contains(_searchQuery) ||
-                      studentId.contains(_searchQuery) ||
-                      deptVal.contains(_searchQuery) ||
-                      batchVal.contains(_searchQuery) ||
-                      phone.contains(_searchQuery) ||
-                      school.contains(_searchQuery) ||
-                      college.contains(_searchQuery);
-                  final matchesDept = _selectedDeptFilter == 'All' ||
-                      (data['department'] ?? '') == _selectedDeptFilter;
-                  final matchesBatch = _selectedBatchFilter == 'All' ||
-                      (data['batch'] ?? '') == _selectedBatchFilter;
+                final matchesSearch = name.contains(_searchQuery) ||
+                    email.contains(_searchQuery) ||
+                    studentId.contains(_searchQuery) ||
+                    deptVal.contains(_searchQuery) ||
+                    batchVal.contains(_searchQuery) ||
+                    phone.contains(_searchQuery) ||
+                    school.contains(_searchQuery) ||
+                    college.contains(_searchQuery);
+                final matchesDept = _selectedDeptFilter == 'All' ||
+                    (data['department'] ?? '') == _selectedDeptFilter;
+                final matchesBatch = _selectedBatchFilter == 'All' ||
+                    (data['batch'] ?? '') == _selectedBatchFilter;
 
-                  return matchesSearch && matchesDept && matchesBatch;
-                }).toList()
-                  ..sort((a, b) {
-                    final aName =
-                        ((a.data() as Map<String, dynamic>)['name'] ?? '')
-                            .toString()
-                            .toLowerCase();
-                    final bName =
-                        ((b.data() as Map<String, dynamic>)['name'] ?? '')
-                            .toString()
-                            .toLowerCase();
-                    return aName.compareTo(bName);
-                  });
+                return matchesSearch && matchesDept && matchesBatch;
+              }).toList()
+                ..sort((a, b) {
+                  final aName =
+                      ((a.data() as Map<String, dynamic>)['name'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                  final bName =
+                      ((b.data() as Map<String, dynamic>)['name'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                  return aName.compareTo(bName);
+                });
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _selectedDeptFilter == 'All' && _selectedBatchFilter == 'All'
-                                ? 'All Registered Members'
-                                : '${_selectedDeptFilter == 'All' ? 'All Depts' : _selectedDeptFilter} · ${_selectedBatchFilter == 'All' ? 'All Batches' : 'Batch $_selectedBatchFilter'}',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _selectedDeptFilter == 'All' && _selectedBatchFilter == 'All'
+                              ? 'All Registered Members'
+                              : '${_selectedDeptFilter == 'All' ? 'All Depts' : _selectedDeptFilter} · ${_selectedBatchFilter == 'All' ? 'All Batches' : 'Batch $_selectedBatchFilter'}',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: AppColors.primary.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Text(
-                              '${users.length} Member${users.length == 1 ? "" : "s"}',
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (users.isEmpty)
-                      Expanded(
-                        child: Center(
-                          child: Text('No users found.',
-                              style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
                         ),
-                      )
-                    else
-                      Expanded(
-                        child: ListView.builder(
-                          padding:
-                              const EdgeInsets.only(left: 24, right: 24, bottom: 100),
-                          itemCount: users.length,
-                          itemBuilder: (context, index) {
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Text(
+                            '${users.length} Member${users.length == 1 ? "" : "s"}',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (users.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Center(
+                        child: Text('No users found.',
+                            style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      itemCount: users.length,
+                      itemBuilder: (context, index) {
                     final doc = users[index];
                     final data = doc.data() as Map<String, dynamic>;
                     final uid = doc.id;
@@ -374,24 +385,49 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         children: [
                           Row(
                             children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor:
-                                    AppColors.primary.withOpacity(0.2),
-                                backgroundImage: (photoUrl.isNotEmpty && (!kIsWeb || photoUrl.contains('supabase')))
-                                    ? NetworkImage(photoUrl)
-                                    : null,
-                                child: (photoUrl.isEmpty || (kIsWeb && !photoUrl.contains('supabase')))
-                                    ? Text(
-                                        name.isNotEmpty
-                                            ? name[0].toUpperCase()
-                                            : (email.isNotEmpty
-                                                ? email[0].toUpperCase()
-                                                : 'U'),
-                                        style: TextStyle(
-                                            color: AppColors.textPrimary))
-                                    : null,
-                              ),
+                               Container(
+                                 width: 48,
+                                 height: 48,
+                                 decoration: BoxDecoration(
+                                   shape: BoxShape.circle,
+                                   color: AppColors.primary.withOpacity(0.2),
+                                 ),
+                                 child: ClipOval(
+                                   child: (photoUrl.isNotEmpty)
+                                       ? Image.network(
+                                           photoUrl,
+                                           width: 48,
+                                           height: 48,
+                                           fit: BoxFit.cover,
+                                           errorBuilder: (context, error, stackTrace) {
+                                             return Center(
+                                               child: Text(
+                                                 name.isNotEmpty
+                                                     ? name[0].toUpperCase()
+                                                     : (email.isNotEmpty
+                                                         ? email[0].toUpperCase()
+                                                         : 'U'),
+                                                 style: TextStyle(
+                                                     color: AppColors.textPrimary,
+                                                     fontWeight: FontWeight.bold),
+                                               ),
+                                             );
+                                           },
+                                         )
+                                       : Center(
+                                           child: Text(
+                                             name.isNotEmpty
+                                                 ? name[0].toUpperCase()
+                                                 : (email.isNotEmpty
+                                                     ? email[0].toUpperCase()
+                                                     : 'U'),
+                                             style: TextStyle(
+                                                 color: AppColors.textPrimary,
+                                                 fontWeight: FontWeight.bold),
+                                           ),
+                                         ),
+                                 ),
+                               ),
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Column(
@@ -655,14 +691,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         .slideY(begin: 0.1, end: 0);
                       },
                     ),
-                  ),
                 ],
               );
             },
-            ),
           ),
         ],
       ),
+    ),
     );
   }
 }
