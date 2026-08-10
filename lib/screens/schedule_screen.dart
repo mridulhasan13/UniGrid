@@ -2415,6 +2415,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 badgeTextColor = Colors.redAccent;
                 badgeText = 'Boycott';
                 break;
+              case 'holiday':
+                badgeBgColor = Colors.orange.withOpacity(0.15);
+                badgeTextColor = Colors.orangeAccent;
+                badgeText = 'Holiday';
+                break;
               default:
                 badgeBgColor = AppColors.textPrimary.withOpacity(0.08);
                 badgeTextColor = AppColors.textSecondary;
@@ -2605,6 +2610,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             const SizedBox(height: 10),
             _buildDialogStatusOption(ctx, schedulePath, classId,
                 'Boycott Class (Uncounted)', 'boycott', Colors.redAccent),
+            const SizedBox(height: 10),
+            _buildDialogStatusOption(ctx, schedulePath, classId,
+                'Holiday (Uncounted)', 'holiday', Colors.orangeAccent),
           ],
         ),
       ),

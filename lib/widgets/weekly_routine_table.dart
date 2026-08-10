@@ -406,7 +406,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                                   sDate.month == dayDate.month &&
                                   sDate.day == dayDate.day) {
                                 final st = c.status.trim().toLowerCase();
-                                if (st == 'auto' || st == 'boycott') {
+                                if (st == 'auto' || st == 'boycott' || st == 'holiday') {
                                   activeStatus = st;
                                   break;
                                 }
@@ -417,6 +417,7 @@ class WeeklyRoutineTable extends StatelessWidget {
 
                         final bool isAuto = activeStatus == 'auto';
                         final bool isBoycott = activeStatus == 'boycott';
+                        final bool isHoliday = activeStatus == 'holiday';
 
                         Color borderColor = AppColors.primary.withOpacity(0.2);
                         List<Color> bgColors = [
@@ -787,14 +788,14 @@ class WeeklyRoutineTable extends StatelessWidget {
           if (overrideStatus == null || overrideStatus.isEmpty) {
             for (var c in dayClasses) {
               final st = c.status.trim().toLowerCase();
-              if (st == 'auto' || st == 'boycott') {
+              if (st == 'auto' || st == 'boycott' || st == 'holiday') {
                 overrideStatus = st;
                 break;
               }
             }
           }
 
-          if (overrideStatus == 'auto' || overrideStatus == 'boycott') {
+          if (overrideStatus == 'auto' || overrideStatus == 'boycott' || overrideStatus == 'holiday') {
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(bottom: rowIdx == 4 ? 0.0 : 4.0),
@@ -819,17 +820,27 @@ class WeeklyRoutineTable extends StatelessWidget {
 
   Widget _buildDayOverrideCard(String status, int groupIdx) {
     final bool isAuto = status == 'auto';
-    final Color themeColor = isAuto ? Colors.cyanAccent : Colors.redAccent;
-    final String displayText = isAuto ? 'AUTO' : 'BOYCOTT';
+    final bool isHoliday = status == 'holiday';
+    final Color themeColor = isAuto
+        ? Colors.cyanAccent
+        : (isHoliday ? Colors.orangeAccent : Colors.redAccent);
+    final String displayText = isAuto
+        ? 'AUTO'
+        : (isHoliday ? 'HOLIDAY' : 'BOYCOTT');
     final List<Color> bgGradient = isAuto
         ? [
             const Color(0xFF003840).withOpacity(0.9),
             const Color(0xFF001F24).withOpacity(0.9),
           ]
-        : [
-            const Color(0xFF40000D).withOpacity(0.9),
-            const Color(0xFF240005).withOpacity(0.9),
-          ];
+        : (isHoliday
+            ? [
+                const Color(0xFF402200).withOpacity(0.9),
+                const Color(0xFF241300).withOpacity(0.9),
+              ]
+            : [
+                const Color(0xFF40000D).withOpacity(0.9),
+                const Color(0xFF240005).withOpacity(0.9),
+              ]);
 
     return Container(
       decoration: BoxDecoration(
@@ -885,9 +896,9 @@ class WeeklyRoutineTable extends StatelessWidget {
             style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
           ),
           content: Text(
-            currentStatus == 'auto' || currentStatus == 'boycott'
+            currentStatus == 'auto' || currentStatus == 'boycott' || currentStatus == 'holiday'
                 ? 'This day is marked as ${currentStatus!.toUpperCase()} by the CR.\nAll classes for this day are uncounted.'
-                : 'Only Class Representatives (CRs) can set Auto or Boycott status for schedule days.',
+                : 'Only Class Representatives (CRs) can set Auto, Boycott, or Holiday status for schedule days.',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
           actions: [
@@ -951,7 +962,20 @@ class WeeklyRoutineTable extends StatelessWidget {
                 _updateDayStatus(context, user, day, dayDate, 'boycott');
               },
             ),
-            if (currentStatus == 'auto' || currentStatus == 'boycott') ...[
+            const SizedBox(height: 10),
+            _buildDayOptionButton(
+              context: ctx,
+              title: 'Holiday',
+              subtitle: 'Mark entire day as Holiday. All classes uncounted.',
+              icon: Icons.beach_access_rounded,
+              color: Colors.orangeAccent,
+              isSelected: currentStatus == 'holiday',
+              onTap: () {
+                Navigator.pop(ctx);
+                _updateDayStatus(context, user, day, dayDate, 'holiday');
+              },
+            ),
+            if (currentStatus == 'auto' || currentStatus == 'boycott' || currentStatus == 'holiday') ...[
               const SizedBox(height: 12),
               Divider(color: AppColors.glassCardBorder),
               const SizedBox(height: 4),
@@ -1124,17 +1148,23 @@ class WeeklyRoutineTable extends StatelessWidget {
       if (context.mounted) {
         final String label = newStatus == 'auto'
             ? 'Auto Day'
-            : (newStatus == 'boycott' ? 'Boycott Day' : 'Normal Routine');
+            : (newStatus == 'boycott'
+                ? 'Boycott Day'
+                : (newStatus == 'holiday' ? 'Holiday' : 'Normal Routine'));
         InAppNotification.show(
           context,
           title: '$day Status Updated',
           message: '$day is now set to "$label". Classes are ${newStatus == 'normal' ? 'restored' : 'uncounted'}.',
           accentColor: newStatus == 'auto'
               ? Colors.cyanAccent
-              : (newStatus == 'boycott' ? Colors.redAccent : Colors.greenAccent),
+              : (newStatus == 'boycott'
+                  ? Colors.redAccent
+                  : (newStatus == 'holiday' ? Colors.orangeAccent : Colors.greenAccent)),
           icon: newStatus == 'auto'
               ? Icons.smart_button_rounded
-              : (newStatus == 'boycott' ? Icons.block_rounded : Icons.check_circle_outline_rounded),
+              : (newStatus == 'boycott'
+                  ? Icons.block_rounded
+                  : (newStatus == 'holiday' ? Icons.beach_access_rounded : Icons.check_circle_outline_rounded)),
         );
       }
     } catch (e) {

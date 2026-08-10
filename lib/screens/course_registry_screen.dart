@@ -1080,9 +1080,10 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                     final stat = s.status.trim().toLowerCase();
                                     if (stat == 'auto' ||
                                         stat == 'boycott' ||
+                                        stat == 'holiday' ||
                                         stat == 'no class' ||
                                         stat == 'no_class') {
-                                      continue; // No Class, Auto, and Boycott are uncounted!
+                                      continue; // No Class, Auto, Boycott, and Holiday are uncounted!
                                     }
                                     totalClasses += 1;
                                     if (stat == 'completed') {
@@ -1100,9 +1101,10 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
 
                                   if (stat == 'auto' ||
                                       stat == 'boycott' ||
+                                      stat == 'holiday' ||
                                       stat == 'no class' ||
                                       stat == 'no_class') {
-                                    continue; // No Class, Auto, and Boycott are uncounted!
+                                    continue; // No Class, Auto, Boycott, and Holiday are uncounted!
                                   }
 
                                   // Lab → 1 session regardless of how many slots it fills.
