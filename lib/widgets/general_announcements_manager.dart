@@ -227,7 +227,10 @@ class GeneralAnnouncementsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
-    final isRootAdmin = authService.isRootAdmin(authService.currentAuthEmail);
+    final isRootAdmin = authService.isRootAdmin(authService.currentAuthEmail) ||
+        authService.isRootAdmin(user.email) ||
+        user.isAdmin ||
+        user.isCR;
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -456,19 +459,28 @@ class _GeneralCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  item['postedBy'] as String,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item['postedBy'] as String,
+                    textAlign: TextAlign.end,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-                if (isRootAdmin)
+                if (isRootAdmin) ...[
+                  const SizedBox(width: 4),
                   IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                     icon: const Icon(Icons.delete_outline_rounded,
-                        color: Colors.redAccent, size: 18),
+                        color: Colors.redAccent, size: 20),
+                    tooltip: 'Delete Announcement',
                     onPressed: () async {
                       final confirm = await showDialog<bool>(
                         context: context,
@@ -496,6 +508,7 @@ class _GeneralCard extends StatelessWidget {
                       }
                     },
                   ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
