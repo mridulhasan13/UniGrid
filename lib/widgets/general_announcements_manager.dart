@@ -721,6 +721,8 @@ class _GeneralAnnouncementComposerState
 
   @override
   Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width <= 600;
+
     return GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -849,35 +851,45 @@ class _GeneralAnnouncementComposerState
           ),
           const SizedBox(height: 14),
 
-          // Attachment & Submit Row
-          Row(
-            children: [
-              OutlinedButton.icon(
-                onPressed: _pickFile,
-                icon: const Icon(Icons.attach_file_rounded, size: 18),
-                label: Text(
-                  _attachedFile == null
-                      ? 'Attach File'
-                      : _attachedFile!.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: BorderSide(color: AppColors.glassCardBorder),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+          // Attachment & Submit Row (Responsive for Mobile & Desktop)
+          if (isMobile) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _pickFile,
+                    icon: const Icon(Icons.attach_file_rounded, size: 18),
+                    label: Text(
+                      _attachedFile == null
+                          ? 'Attach File'
+                          : _attachedFile!.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textPrimary,
+                      side: BorderSide(color: AppColors.glassCardBorder),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              if (_attachedFile != null)
-                IconButton(
-                  icon: const Icon(Icons.close_rounded,
-                      color: Colors.redAccent, size: 18),
-                  onPressed: () => setState(() => _attachedFile = null),
-                ),
-              const Spacer(),
-              ElevatedButton.icon(
+                if (_attachedFile != null) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded,
+                        color: Colors.redAccent, size: 18),
+                    onPressed: () => setState(() => _attachedFile = null),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
                 onPressed: _isPosting ? null : _dispatchGeneralAnnouncement,
                 icon: _isPosting
                     ? SizedBox(
@@ -890,15 +902,63 @@ class _GeneralAnnouncementComposerState
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ] else
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickFile,
+                  icon: const Icon(Icons.attach_file_rounded, size: 18),
+                  label: Text(
+                    _attachedFile == null
+                        ? 'Attach File'
+                        : _attachedFile!.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: BorderSide(color: AppColors.glassCardBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                if (_attachedFile != null)
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded,
+                        color: Colors.redAccent, size: 18),
+                    onPressed: () => setState(() => _attachedFile = null),
+                  ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: _isPosting ? null : _dispatchGeneralAnnouncement,
+                  icon: _isPosting
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              color: AppColors.onPrimary, strokeWidth: 2))
+                      : const Icon(Icons.send_rounded, size: 18),
+                  label: Text(_isPosting ? 'Dispatching...' : 'Dispatch Global'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.onPrimary,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
