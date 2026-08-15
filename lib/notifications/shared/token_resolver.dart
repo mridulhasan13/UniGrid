@@ -96,8 +96,10 @@ class TokenResolver {
       }
     }
 
-    // 2. Secondary fallback: check general fcmTokens & fcmToken only if explicit array was empty
-    if (tokens.isEmpty) {
+    // 2. Secondary fallback: check general fcmTokens & fcmToken ONLY if explicit category fields do not exist on doc
+    if (tokens.isEmpty &&
+        !data.containsKey('webTokens') &&
+        !data.containsKey('nativeTokens')) {
       if (data['fcmTokens'] is List) {
         for (final t in data['fcmTokens'] as List) {
           if (t is String && t.trim().isNotEmpty) {
