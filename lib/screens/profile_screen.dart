@@ -927,11 +927,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               phoneNumber: _phoneController.text.trim(),
                               schoolName: _schoolController.text.trim(),
                               collegeName: _collegeController.text.trim(),
-                            )
-                            .timeout(
-                              const Duration(seconds: 30),
-                              onTimeout: () => throw TimeoutException(
-                                  'Update timed out. Please check connection.'),
                             );
                         if (mounted) {
                           setState(() {
@@ -1069,11 +1064,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 phoneNumber: _phoneController.text.trim(),
                                 schoolName: _schoolController.text.trim(),
                                 collegeName: _collegeController.text.trim(),
-                              )
-                              .timeout(
-                                const Duration(seconds: 30),
-                                onTimeout: () => throw TimeoutException(
-                                    'Update timed out. Please check connection.'),
                               );
                           if (mounted) {
                             setState(() {
