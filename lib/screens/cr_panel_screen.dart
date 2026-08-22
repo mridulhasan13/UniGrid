@@ -540,8 +540,20 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                             isEqualTo: req['requestedEmail'])
                                         .get();
                                     if (query.docs.isNotEmpty) {
-                                      await query.docs.first.reference
+                                      final userDoc = query.docs.first;
+                                      await userDoc.reference
                                           .update({'isCR': true});
+                                      
+                                      final crUser = Provider.of<AppUser?>(context, listen: false);
+                                      if (crUser != null) {
+                                        FCMService.notifyAccountApproved(
+                                          recipientUserId: userDoc.id,
+                                          department: crUser.department,
+                                          batch: crUser.batch,
+                                          senderUserId: crUser.id,
+                                        ).catchError((_) {});
+                                      }
+
                                       await FirebaseFirestore.instance
                                           .collection('admin_requests')
                                           .doc(reqId)
@@ -1002,6 +1014,17 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                         .collection('users')
                                         .doc(docId)
                                         .update({'isApproved': true});
+
+                                    final crUser = Provider.of<AppUser?>(context, listen: false);
+                                    if (crUser != null) {
+                                      FCMService.notifyAccountApproved(
+                                        recipientUserId: docId,
+                                        department: (data['department'] ?? crUser.department).toString(),
+                                        batch: batch.isNotEmpty ? batch : crUser.batch,
+                                        senderUserId: crUser.id,
+                                      ).catchError((_) {});
+                                    }
+
                                     if (context.mounted) {
                                       InAppNotification.show(
                                         context,

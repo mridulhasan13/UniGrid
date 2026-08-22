@@ -1313,16 +1313,13 @@ class WeeklyRoutineTable extends StatelessWidget {
     }
 
     final user = Provider.of<AppUser?>(context);
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final isRootAdmin = user != null && authService.isRootAdmin(user.email);
-    final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
 
     final double roomFontSize = stackedCount >= 3 ? 5.0 : (isCompact ? 5.5 : 6.5);
     final double titleFontSize = stackedCount >= 3 ? 6.2 : (isCompact ? 7.0 : 8.0);
     final double verticalPadding = stackedCount >= 3 ? 0.5 : (isCompact ? 1.0 : 3.0);
 
     return GestureDetector(
-      onTap: isCR ? () => _showStatusUpdateDialog(context, cls, user) : null,
+      onTap: () => _showClassDetailsSheet(context, cls, user),
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -1374,99 +1371,601 @@ class WeeklyRoutineTable extends StatelessWidget {
     );
   }
 
-  void _showStatusUpdateDialog(BuildContext context, ClassSchedule cls, AppUser? user) {
-    showModalBottomSheet(
+  Future<Map<String, dynamic>?> _lookupTeacherAndCourse(
+      ClassSchedule cls, AppUser? user) async {
+    if (user == null || !user.hasDeptScope) return null;
+
+    final List<String> candidateInitials = [];
+    if (cls.teacher.trim().isNotEmpty) {
+      candidateInitials.add(cls.teacher.trim().toLowerCase());
+    }
+
+    // Extract potential teacher short code from subject like "YE 211-0723: YM - A"
+    final subject = cls.subject.trim();
+    if (subject.contains(':')) {
+      final afterColon = subject.split(':')[1].trim();
+      final parts = afterColon.split(RegExp(r'[\s\-_]+'));
+      for (final p in parts) {
+        if (p.isNotEmpty && p.length <= 5) {
+          candidateInitials.add(p.toLowerCase());
+        }
+      }
+    }
+
+    try {
+      final List<String> searchPaths = [
+        'depts/${user.department}/courses',
+        deptBatchCol(user.department, user.batch, 'courses'),
+        'courses',
+      ];
+
+      for (final path in searchPaths) {
+        try {
+          final snap = await FirebaseFirestore.instance.collection(path).get();
+          for (final doc in snap.docs) {
+            final data = doc.data();
+            final cCode = (data['courseCode'] ?? '').toString().trim();
+            final tShort = (data['teacherShort'] ?? '').toString().trim();
+            final tName = (data['teacherName'] ?? '').toString().trim();
+            final cName = (data['courseName'] ?? '').toString().trim();
+
+            final bool matchesInitial = tShort.isNotEmpty &&
+                candidateInitials.contains(tShort.toLowerCase());
+            final bool matchesCode = cCode.isNotEmpty &&
+                (subject.toLowerCase().contains(cCode.toLowerCase()) ||
+                    cCode.toLowerCase().contains(subject.split(':')[0].trim().toLowerCase()));
+
+            if (matchesInitial || matchesCode) {
+              return {
+                'courseCode': cCode,
+                'courseName': cName,
+                'teacherName': tName,
+                'teacherShort': tShort.isNotEmpty
+                    ? tShort
+                    : (candidateInitials.isNotEmpty
+                        ? candidateInitials.first.toUpperCase()
+                        : ''),
+                'totalCredit': data['totalCredit'],
+                'levelTerm': data['levelTerm'],
+              };
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('Error looking up course/teacher: $e');
+    }
+    return null;
+  }
+
+  void _showClassDetailsSheet(
+      BuildContext context, ClassSchedule cls, AppUser? user) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isRootAdmin = user != null && authService.isRootAdmin(user.email);
+    final isCR = user != null && (user.isCR || user.isAdmin || isRootAdmin);
+
+    showDialog(
       context: context,
-      backgroundColor: AppColors.backgroundTop,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 24,
-              bottom: MediaQuery.of(ctx).padding.bottom + 48,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Update Status: ${cls.subject}',
-                    style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.schedule, color: Colors.blueAccent),
-                  title:
-                      Text('Upcoming', style: TextStyle(color: AppColors.textPrimary)),
-                  onTap: () {
-                    _updateStatus(context, ctx, cls, 'upcoming');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.check_circle, color: Colors.green),
-                  title: Text('Completed',
-                      style: TextStyle(color: AppColors.textPrimary)),
-                  onTap: () {
-                    _updateStatus(context, ctx, cls, 'completed');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.cancel, color: Colors.redAccent),
-                  title: Text('Cancelled',
-                      style: TextStyle(color: AppColors.textPrimary)),
-                  onTap: () {
-                    _updateStatus(context, ctx, cls, 'cancelled');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.block, color: Colors.yellowAccent),
-                  title:
-                      Text('No Class', style: TextStyle(color: AppColors.textPrimary)),
-                  onTap: () {
-                    _updateStatus(context, ctx, cls, 'no class');
-                  },
-                ),
-                Divider(color: AppColors.glassCardBorder),
-                ListTile(
-                  leading: const Icon(Icons.edit, color: Colors.amberAccent),
-                  title: Text('Edit Class Details',
-                      style: TextStyle(color: AppColors.textPrimary)),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                         builder: (context) => ScheduleBuilderScreen(
-                          classToEdit: cls,
-                          customSlots: customSlots,
-                          user: user,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 450),
+            child: FutureBuilder<Map<String, dynamic>?>(
+              future: _lookupTeacherAndCourse(cls, user),
+              builder: (context, snapshot) {
+                final courseInfo = snapshot.data;
+                final String resolvedCourseName = (cls.subname.isNotEmpty
+                        ? cls.subname
+                        : (courseInfo?['courseName'] ?? ''))
+                    .toString()
+                    .trim();
+                final String resolvedTeacherName =
+                    (courseInfo?['teacherName'] ?? '').toString().trim();
+
+                // Extract short tag
+                String teacherShort = cls.teacher.isNotEmpty
+                    ? cls.teacher
+                    : (courseInfo?['teacherShort'] ?? '');
+
+                if (teacherShort.isEmpty && cls.subject.contains(':')) {
+                  final afterColon = cls.subject.split(':')[1].trim();
+                  final parts = afterColon.split(RegExp(r'[\s\-_]+'));
+                  if (parts.isNotEmpty && parts.first.length <= 5) {
+                    teacherShort = parts.first;
+                  }
+                }
+
+                // Display teacher as "Full Name (Short)"
+                final String teacherDisplayTitle;
+                if (resolvedTeacherName.isNotEmpty) {
+                  if (teacherShort.isNotEmpty &&
+                      !resolvedTeacherName.contains('($teacherShort)')) {
+                    teacherDisplayTitle =
+                        '$resolvedTeacherName ($teacherShort)';
+                  } else {
+                    teacherDisplayTitle = resolvedTeacherName;
+                  }
+                } else if (teacherShort.isNotEmpty) {
+                  teacherDisplayTitle = 'Teacher ($teacherShort)';
+                } else {
+                  teacherDisplayTitle = 'Faculty Member';
+                }
+
+                // Clean avatar initial (strip Dr., Prof., etc.)
+                String extractCleanAvatarInitial(String short, String fullName) {
+                  String clean = short.trim();
+                  clean = clean.replaceAll(
+                      RegExp(r'^(Dr\.|Prof\.|Engr\.|Mr\.|Mrs\.|Ms\.)\s*',
+                          caseSensitive: false),
+                      '');
+                  clean = clean.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+
+                  if (clean.isNotEmpty) {
+                    if (clean.length > 3) {
+                      return clean.substring(0, 3).toUpperCase();
+                    }
+                    return clean.toUpperCase();
+                  }
+
+                  if (fullName.trim().isNotEmpty) {
+                    final parts = fullName.trim().split(RegExp(r'\s+')).where((p) {
+                      final low = p.toLowerCase();
+                      return low != 'dr.' &&
+                          low != 'dr' &&
+                          low != 'prof.' &&
+                          low != 'prof' &&
+                          low != 'engr.' &&
+                          low != 'engr' &&
+                          low != 'mr.' &&
+                          low != 'mr';
+                    }).toList();
+                    if (parts.length >= 2) {
+                      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+                    } else if (parts.isNotEmpty) {
+                      return parts[0][0].toUpperCase();
+                    }
+                  }
+                  return 'T';
+                }
+
+                final String avatarInitial =
+                    extractCleanAvatarInitial(teacherShort, resolvedTeacherName);
+
+                Color statusColor;
+                IconData statusIcon;
+                String statusText = cls.status.toUpperCase();
+
+                switch (cls.status.toLowerCase()) {
+                  case 'completed':
+                    statusColor = Colors.greenAccent;
+                    statusIcon = Icons.check_circle_rounded;
+                    break;
+                  case 'cancelled':
+                    statusColor = Colors.redAccent;
+                    statusIcon = Icons.cancel_rounded;
+                    break;
+                  case 'no class':
+                  case 'no_class':
+                    statusColor = Colors.amberAccent;
+                    statusIcon = Icons.block_rounded;
+                    statusText = 'NO CLASS';
+                    break;
+                  case 'upcoming':
+                    statusColor = Colors.blueAccent;
+                    statusIcon = Icons.schedule_rounded;
+                    break;
+                  default:
+                    statusColor = AppColors.primary;
+                    statusIcon = Icons.event_available_rounded;
+                    statusText = 'NORMAL';
+                }
+
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundTop.withOpacity(0.96),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: AppColors.primary.withOpacity(0.25),
+                            width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 24,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header row with Icon, Title, Status, and Close button
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(Icons.school_rounded,
+                                      color: AppColors.primary, size: 22),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        cls.subject,
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      if (resolvedCourseName.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          resolvedCourseName,
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                GestureDetector(
+                                  onTap: () => Navigator.pop(ctx),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.textPrimary
+                                          .withOpacity(0.08),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.close_rounded,
+                                        size: 16,
+                                        color: AppColors.textSecondary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Status Pill
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: statusColor.withOpacity(0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(statusIcon,
+                                      color: statusColor, size: 12),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    statusText,
+                                    style: TextStyle(
+                                      color: statusColor,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Class Details Grid
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color:
+                                    AppColors.glassCardColor.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                    color: AppColors.textPrimary
+                                        .withOpacity(0.08)),
+                              ),
+                              child: Column(
+                                children: [
+                                  _buildDetailRow(
+                                    Icons.meeting_room_rounded,
+                                    'Room',
+                                    cls.room.isNotEmpty
+                                        ? cls.room
+                                        : 'Not specified',
+                                    Colors.cyanAccent,
+                                  ),
+                                  const Divider(
+                                      color: Colors.white10, height: 16),
+                                  _buildDetailRow(
+                                    Icons.access_time_rounded,
+                                    'Time & Slot',
+                                    '${cls.time} (Slot ${cls.startSlot}${cls.span > 1 ? " - ${cls.startSlot + cls.span - 1}" : ""})',
+                                    Colors.amberAccent,
+                                  ),
+                                  const Divider(
+                                      color: Colors.white10, height: 16),
+                                  _buildDetailRow(
+                                    Icons.calendar_today_rounded,
+                                    'Day',
+                                    cls.dayOfWeek,
+                                    Colors.purpleAccent,
+                                  ),
+                                  if (cls.group.isNotEmpty) ...[
+                                    const Divider(
+                                        color: Colors.white10, height: 16),
+                                    _buildDetailRow(
+                                      Icons.group_rounded,
+                                      'Section / Group',
+                                      cls.group,
+                                      Colors.blueAccent,
+                                    ),
+                                  ],
+                                  if (courseInfo?['totalCredit'] != null) ...[
+                                    const Divider(
+                                        color: Colors.white10, height: 16),
+                                    _buildDetailRow(
+                                      Icons.star_outline_rounded,
+                                      'Credits',
+                                      '${courseInfo!['totalCredit']} Credits',
+                                      Colors.greenAccent,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Teacher Details Card
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppColors.secondary.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                    color: AppColors.secondary
+                                        .withOpacity(0.25)),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor:
+                                        AppColors.secondary.withOpacity(0.2),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(4.0),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          avatarInitial,
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            color: AppColors.secondary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: avatarInitial.length <= 2
+                                                ? 14
+                                                : 11.5,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          teacherDisplayTitle,
+                                          style: TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          teacherShort.isNotEmpty
+                                              ? 'Initial: $teacherShort • Department of ${user?.department ?? ""}'
+                                              : 'Department of ${user?.department ?? ""}',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // CR Controls Section
+                            if (isCR) ...[
+                              const SizedBox(height: 20),
+                              Center(
+                                child: Text(
+                                  'CR Controls (Change Class Status)',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Center(
+                                child: Wrap(
+                                  alignment: WrapAlignment.center,
+                                  runAlignment: WrapAlignment.center,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: [
+                                    _buildStatusActionChip(
+                                      label: 'Upcoming',
+                                      color: Colors.lightBlueAccent,
+                                      icon: Icons.schedule_rounded,
+                                      onTap: () => _updateStatus(
+                                          context, ctx, cls, 'upcoming'),
+                                    ),
+                                    _buildStatusActionChip(
+                                      label: 'Completed',
+                                      color: const Color(0xFF00E676),
+                                      icon: Icons.check_circle_rounded,
+                                      onTap: () => _updateStatus(
+                                          context, ctx, cls, 'completed'),
+                                    ),
+                                    _buildStatusActionChip(
+                                      label: 'Cancelled',
+                                      color: const Color(0xFFFF5252),
+                                      icon: Icons.cancel_rounded,
+                                      onTap: () => _updateStatus(
+                                          context, ctx, cls, 'cancelled'),
+                                    ),
+                                    _buildStatusActionChip(
+                                      label: 'No Class',
+                                      color: const Color(0xFFFFD700),
+                                      icon: Icons.block_rounded,
+                                      onTap: () => _updateStatus(
+                                          context, ctx, cls, 'no class'),
+                                    ),
+                                    _buildStatusActionChip(
+                                      label: 'Edit',
+                                      color: const Color(0xFFE040FB),
+                                      icon: Icons.edit_rounded,
+                                      onTap: () {
+                                        Navigator.pop(ctx);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                ScheduleBuilderScreen(
+                                              classToEdit: cls,
+                                              customSlots: customSlots,
+                                              user: user,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    _buildStatusActionChip(
+                                      label: 'Delete Slot',
+                                      color: const Color(0xFFFF3D00),
+                                      icon: Icons.delete_forever_rounded,
+                                      onTap: () =>
+                                          _deleteClass(context, ctx, cls),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading:
-                      const Icon(Icons.delete_forever, color: Colors.redAccent),
-                  title: const Text('Delete Class (Free Slot)',
-                      style: TextStyle(color: AppColors.textPrimary)),
-                  onTap: () {
-                    _deleteClass(context, ctx, cls);
-                  },
-                ),
-              ],
+                    ),
+                  ),
+                );
+              },
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(
+      IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 10),
+        Text(label,
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+        const Spacer(),
+        Text(value,
+            style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12.5)),
+      ],
+    );
+  }
+
+  Widget _buildStatusActionChip({
+    required String label,
+    required Color color,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8.5),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.22),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.85), width: 1.3),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.4),
+                blurRadius: 10,
+                spreadRadius: 0.5,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 15.5),
+              const SizedBox(width: 6.5),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
   bool _isSameScheduledDate(dynamic rawDate, DateTime? targetDate) {
     if (rawDate == null && targetDate == null) return true;
     if (rawDate == null || targetDate == null) return false;

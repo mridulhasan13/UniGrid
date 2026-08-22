@@ -1,157 +1,164 @@
-# UniGrid Digital Hub
+# UniGrid
 
-This is the central app for our UniGrid platform. We built it to make sharing notes, checking schedules, keeping track of class test marks, and chatting with each other much easier than using scattered messenger groups.
+UniGrid is a comprehensive academic coordination and resource management platform developed to streamline communication, scheduling, and coursework distribution across university departments. The platform bridges the operational workflow between students, Class Representatives (CRs), and faculty by replacing fragmented communication channels with a unified, cross-platform workspace.
 
----
-
-## Features
-
-### Notes and study materials
-* **Upload multiple files at once:** You can select a bunch of slides, books, or note PDFs together. The app will upload them all in the background so you do not have to do it one by one.
-* **Review files before uploading:** When you select files, a clean list shows up listing their names and sizes. If you accidentally picked the wrong document, just click the delete button next to it before starting the upload.
-* **Class Test (CT) Marks:** Class Representatives can upload several CT Marks PDFs for a course. They will show up as clean gradient badges on the course registry card, and you can just tap them to open.
-* **Automatic naming:** The app automatically appends the actual filename to whatever title you type in so notes are always easy to tell apart.
-
-### Chats and image sharing
-* **Group and private chats:** We have real-time chat rooms for group discussions and private one-on-one messages.
-* **Send multiple images:** You can pick and send multiple photos at the same time. The chat list will show a preview like "3 Images" so you know what was sent.
-
-### Deletion and security
-* **Deletions are protected:** Only Class Representatives or the student who originally uploaded a note can delete it. This prevents people from accidentally deleting shared study materials.
-* **Double check:** A confirmation dialog pops up whenever you click delete to make sure you actually meant to do it.
-* **Pending accounts:** To keep the portal secure, newly registered accounts are set to pending until a Class Representative or Admin approves them.
-* **Administrative Data Wiping:** Class Representatives can instantly purge all previous announcements, department chat history, and direct messages in one single safe administrative swipe, making new semester transitions completely seamless.
-
-### Calendar and routine
-* **Live schedules:** A shared calendar lists our weekly classes, rooms, and upcoming exams.
-* **Easy editing:** Class Representatives can edit class times, rooms, and teacher details in real-time, which updates for everyone instantly.
-
-### Over-the-Air (OTA) Updates & App Lifecycle
-* **Dynamic In-App Updates:** The app handles self-updating on startup, entirely bypassing manual APK transfers or App Store searches.
-* **Flexible Forced/Optional Update Modes:** Administrators can enforce a mandatory blocking update (for critical fixes/security patches) using an elegant glassmorphic blur block-screen, or offer a dismissible optional update using a premium, sliding glass notification banner at the top of the viewport.
-* **Download Speed & Progress Trackers:** Live progress percentage and background download tracking keep users fully informed prior to launching the system's package installer.
-* **Manual Profile Check:** Integrates a responsive checker inside the Profile page, locking itself and displaying `Up to Date` once it confirms the local build matches the cloud registry.
+Built with Flutter, Google Firebase, and Supabase Cloud Storage, UniGrid runs natively across Web, Android, and iOS environments with real-time data synchronization and persistent offline caching.
 
 ---
 
-## How the Features are Built
+## Overview and Problem Statement
 
-### Multi-File Upload and Naming
-We use the `file_picker` package configured with `allowMultiple: true` to let users select multiple files at once from their device or browser. To prevent memory and race condition issues, the selected files are processed sequentially. The app iterates through the files, uploads each file bytes/stream asynchronously to Supabase Storage, and maps them to Firestore documents. During notes uploading, the actual filename is parsed and appended to the notes' database record to automatically preserve clean and descriptive naming conventions.
+University academic coordination often suffers from fragmented tools. Weekly class schedules are frequently shared as static images, course materials are scattered across third-party drives, and urgent class updates get buried inside high-volume social media group chats.
 
-### Platform-Aware Google Authentication
-To avoid platform-specific errors on Web targets (such as the standard `UnimplementedError` when calling mobile authentication bindings in Chrome), the login system uses platform-aware dispatching:
-* **Web:** We import `package:flutter/foundation.dart` and check `kIsWeb`. If true, the system calls `signInWithPopup(GoogleAuthProvider())` which launches a secure browser popup window, handles OAuth, and redirects the authentication token back seamlessly.
-* **Mobile:** If `kIsWeb` is false, it uses `signInWithProvider(GoogleAuthProvider())` to support native Android and iOS redirects safely.
+UniGrid addresses these structural challenges through a dedicated, role-aware academic portal that provides:
 
-### Role-Based File Deletion
-Firestore study material documents store an `uploadedBy` string field that matches the uploader's registered email. When a user views the materials list, the UI performs a reactive check:
-```dart
-bool canDelete = isCR || (currentUser != null && material.uploadedBy == currentUser.email);
+1. A dynamic, interactive weekly class routine with real-time status indicators.
+2. A categorized, high-speed repository for lecture slides, reference books, and coursework documents.
+3. A real-time batch messenger featuring user mentions, message threading, and instant push notifications.
+4. Administrative workflows for Class Representatives to manage schedules, approve student registrations, and broadcast announcements.
+5. Strict privacy safeguards, role-based database security rules, and user-initiated data deletion controls.
+
+---
+
+## Core Capabilities
+
+### 1. Interactive Routine and Schedule Management
+* Dynamic Weekly Timetable: Automatically organizes class periods across weekdays with start and end times, room numbers, course codes, and teacher designations.
+* Real-Time Slot Statuses: Class Representatives can flag individual slots as Upcoming, Completed, Cancelled, or No Class. Status changes reflect immediately for all batch members without requiring manual page reloads.
+* Faculty and Course Profiles: Tapping any class card opens a detailed sheet displaying the instructor's full name, academic initials, contact credentials, and course information.
+* Schedule Overrides and Exam Tracking: Accommodates temporary makeup lectures, rescheduled time slots, and upcoming examination dates.
+
+### 2. Academic Materials and Document Hub
+* Multi-File Background Uploads: Students and CRs can upload multiple PDF lecture notes, presentations, and reference books simultaneously.
+* Category and Subject Filtering: Materials are automatically indexed by course code, academic subject, and document type (Notes, Books, Videos, Others).
+* Cloud Storage Integration: Files are hosted on resilient Supabase object storage buckets, ensuring fast download speeds and direct in-app document viewing via integrated PDF viewers.
+* Protected Document Lifecycle: File deletion permissions are strictly enforced. Documents can only be removed by the original uploader or an authorized Class Representative.
+
+### 3. Real-Time Batch Messaging and Collaboration
+* Instant Group Communication: Low-latency batch messaging powered by Firebase Firestore real-time streams.
+* Smart Mentions: Typing the "@" character brings up an autocomplete member directory to notify specific classmates or broadcast to the entire section.
+* High-Resolution Image Sharing: Native image compression preserves the sharpness of handwritten equations, technical drawings, and slides while optimizing network payload size.
+* Moderation and Content Reporting: In-app reporting mechanisms allow users to flag inappropriate messages for Class Representative review, ensuring a safe academic environment.
+
+### 4. Class Representative (CR) Administration
+* Student Verification and Approval: Newly registered student accounts enter a secure pending queue until verified and approved by the department CR.
+* Centralized Routine Builder: Provides CRs with visual schedule drafting tools to define default timetable templates, semester courses, and room allocations.
+* Emergency Broadcast Alerts: Dispatches high-priority push notifications across Android, iOS, and Web clients for urgent room changes, cancellations, or official notices.
+
+### 5. Security, Privacy, and User Rights
+* Scoped Data Architecture: Database queries and collections are strictly isolated by department and batch identifiers, ensuring students only access their relevant academic environment.
+* In-App Account Deletion: Users retain full ownership of their data with a self-service account deletion workflow under Security settings, permanently purging authentication records and personal profiles.
+* Transparent Privacy Standards: Fully compliant with Google Play Data Safety requirements and published privacy policies.
+
+---
+
+## System Architecture
+
+UniGrid employs a multi-tiered, reactive client-server architecture designed for reliability and performance:
+
+* Frontend Client: Built with Flutter and Dart, utilizing the Provider state management pattern for reactive UI updates and the IndexedStack pattern for zero-latency screen navigation.
+* Authentication Layer: Firebase Authentication handling secure email/password flows and OAuth-based Google Sign-In with cross-platform web and mobile dispatchers.
+* Real-Time Database: Google Cloud Firestore configured with unlimited offline persistence and granular security rules enforced at the document level.
+* Media and Document Storage: Supabase Cloud Storage managing binary object storage with authenticated token access.
+* Push Notification Pipeline: Firebase Cloud Messaging (FCM) combined with local notification channels to guarantee delivery across background, foreground, and terminated application states.
+
+---
+
+## Codebase Organization
+
+The codebase is structured modularly to separate business logic, UI components, and backend integrations:
+
 ```
-If this expression evaluates to true, the delete option is rendered next to the file. Tapping it calls a secure Firestore deletion routine and triggers a Supabase Storage API call to remove the actual file object.
-
-### Cross-Platform Compliance and Link Launching
-To ensure links and PDFs open perfectly across different operating systems:
-* **Android 11 and above:** Added an explicit `<queries>` tag to `AndroidManifest.xml` containing `http` and `https` intents. This lets Flutter's `url_launcher` search the system package manager and open the default mobile browser without runtime restrictions.
-* **iOS Configs:** Added detailed usage description keys in `Info.plist` (such as `NSPhotoLibraryUsageDescription` and `UISupportsDocumentBrowser`) so that iOS grants direct sandbox permissions to access the local file explorer and photo gallery without crashing.
-
-### Transaction-Safe Administrative Data Wiping
-
----
-
-## Tech Stack
-
-* **Frontend:** Flutter and Dart (Runs smoothly on Web, Android, and iOS)
-* **Auth:** Firebase Auth with Google Sign-In
-* **Database:** Cloud Firestore
-* **Storage:** Supabase Storage (Where notes and chat images are stored)
+UniGrid/
+|-- android/                  # Native Android configuration, manifests, and signing keys
+|-- ios/                      # Native iOS Xcode workspace, pods, and permission descriptions
+|-- web/                      # Web entry points, service workers, and privacy policy assets
+|-- firestore.rules           # Granular Firestore security and role validation rules
+|-- lib/
+    |-- main.dart             # Application entry point, service initialization, and route guards
+    |-- models/               # Strongly-typed data models (User, Routine, Material, Chat)
+    |-- notifications/        # FCM handlers, local notifications, and in-app alert banners
+    |-- screens/              # Primary application views (Home, Schedule, Materials, Chat, Profile)
+    |-- services/             # Firebase, Supabase, Authentication, and Theme management services
+    |-- utils/                # Constants, color palettes, academic mappings, and route scopes
+    |-- widgets/              # Reusable UI components, loaders, routine cards, and navigation bars
+```
 
 ---
 
-## Local Setup
+## Local Development Setup
 
-### What you need
-* Make sure you have the Flutter SDK installed on your machine.
+### Prerequisites
+* Flutter SDK (Version 3.19.0 or higher recommended)
+* Dart SDK
+* Android Studio / Xcode (for native mobile compilation)
+* Google Chrome (for web target testing)
 
-### How to run it
+### Installation Steps
 
-1. **Clone the repository:**
+1. Clone the repository:
    ```bash
    git clone https://github.com/mridulhasan13/UniGrid.git
    cd UniGrid
    ```
 
-2. **Install dependencies:**
+2. Install project dependencies:
    ```bash
    flutter pub get
    ```
 
-3. **Add Firebase config files:**
-   * Create a Firebase project in your console.
-   * Drop `google-services.json` inside the `android/app/` folder.
-   * Drop `GoogleService-Info.plist` inside the `ios/Runner/` folder.
-   * Configure Google Sign-in on your Firebase authentication console.
+3. Configure Firebase Credentials:
+   * Place `google-services.json` inside the `android/app/` directory.
+   * Place `GoogleService-Info.plist` inside the `ios/Runner/` directory.
+   * Ensure Email/Password and Google Sign-In providers are enabled in your Firebase Authentication Console.
 
-4. **Add Supabase keys:**
-   * Set up a public storage bucket named `notes` in your Supabase console.
-   * Paste your Supabase project URL and public anon key in `lib/services/supabase_config.dart`.
+4. Configure Supabase Storage:
+   * Create a public or authenticated bucket in your Supabase dashboard.
+   * Provide your Supabase project URL and anon public key in `lib/services/supabase_config.dart`.
 
-5. **Run the app:**
-   * For web:
+5. Run the development build:
+   * To run on Web:
      ```bash
      flutter run -d chrome
      ```
-   * For mobile:
+   * To run on Android:
      ```bash
-     flutter run
+     flutter run -d android
+     ```
+   * To run on iOS:
+     ```bash
+     flutter run -d ios
      ```
 
 ---
 
-## Platform Notes
+## Technical Specifications
 
-### Android (11 and above)
-Android 11 restricts opening external links by default. We have added package query intents in `AndroidManifest.xml` so that academic PDFs and links open perfectly in your web browser.
-
-### iOS Configuration
-We have added security keys in `Info.plist` describing why the app needs access to the photo library (for choosing slides and avatar images) and camera (for taking photos in chat) to prevent the app from crashing on iPhones.
-
----
-
-## Directory Structure
-
-To keep the repository clean and scalable, the codebase follows a highly organized, modular structure. For a comprehensive, file-by-file breakdown of every module, model, service, and view within the application, please refer to our detailed **[STRUCTURE.md](file:///b:/UniGrid/STRUCTURE.md)** architecture guide.
-
-Here is a high-level overview of the folder hierarchy:
-* **`lib/models/`**: Structured schema declarations mapping database records into strongly-typed Dart objects.
-* **`lib/screens/`**: Page layouts, visual interfaces, data streams, and platform-specific view layers.
-* **`lib/services/`**: Connection logic interfacing with Firebase Authentication, Cloud Firestore, Supabase Storage, and Notification APIs.
-* **`lib/utils/`**: Design tokens, glassmorphic palette parameters, typography tables, and academic mapping helpers.
-* **`lib/widgets/`**: Reusable structural interface blocks, weekly calendars, and global middleware wrappers (Offline gates and OTA update panels).
+| Parameter | Specification |
+| :--- | :--- |
+| Framework | Flutter / Dart |
+| Database | Cloud Firestore (Multi-region) |
+| File Storage | Supabase Storage API |
+| Push Notifications | Firebase Cloud Messaging (FCM) |
+| Target Android SDK | API Level 35 (Android 15) |
+| Minimum Android SDK | API Level 21 (Android 5.0) |
+| Architecture Support | 64-bit (arm64-v8a, x86_64) |
+| State Management | Provider / ChangeNotifier |
 
 ---
 
 ## Developer
 
-<img src="https://mahmudulhasanmridul.netlify.app/m-logo.svg" width="50" height="50" alt="Mahmudul Hasan Mridul Logo" align="left" style="margin-right: 15px;" />
-
 **Mahmudul Hasan Mridul**  
-Industrial and Production Engineering Student, Founder, and Developer.
-
-<br clear="left"/>
-
-[![Portfolio](https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=https%3A%2F%2Fmahmudulhasanmridul.netlify.app%2Fm-logo.svg)](https://mahmudulhasanmridul.netlify.app/)
-[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/mridulhasan13)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/mahmudul-hasan-mridul1/)
-[![Facebook](https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white)](https://www.facebook.com/mahmudulhasan.mridul01/)
-[![Instagram](https://img.shields.io/badge/Instagram-E4405F?style=for-the-badge&logo=instagram&logoColor=white)](https://www.instagram.com/mustard_slevalion/)
-[![Twitter/X](https://img.shields.io/badge/Twitter/X-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/m_h_mridul)
-[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:hmridul27@gmail.com)
+Department of Industrial and Production Engineering (IPE)  
+Bangladesh University of Textiles (BUTEX)  
+Email: hmridul27@gmail.com / unigrid.app@gmail.com  
+Portfolio: https://mahmudulhasanmridul.netlify.app/  
+GitHub: https://github.com/mridulhasan13  
+LinkedIn: https://www.linkedin.com/in/mahmudul-hasan-mridul1/  
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. Feel free to contribute or adapt it!
-
+This project is licensed under the MIT License. See the LICENSE file for full licensing terms and copyright details.

@@ -141,9 +141,6 @@ class FCMService {
       debugPrint('Topic subscription failed: $e');
     }
 
-    // Request battery optimization exclusion
-    await _requestBatteryOptimizationExclusion();
-
     // Setup local notifications channel
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -190,19 +187,6 @@ class FCMService {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         globalNavigatorKey.currentState?.pushNamed(targetRoute);
       });
-    }
-  }
-
-  // ─── Request Battery Optimization Exclusion ───────────────────────────────
-  static Future<void> _requestBatteryOptimizationExclusion() async {
-    if (!Platform.isAndroid) return;
-    try {
-      final status = await Permission.ignoreBatteryOptimizations.status;
-      if (!status.isGranted) {
-        await Permission.ignoreBatteryOptimizations.request();
-      }
-    } catch (e) {
-      debugPrint('Battery optimization exclusion failed: $e');
     }
   }
 
@@ -655,6 +639,41 @@ class FCMService {
       batch: batch,
       title: 'New Material Uploaded',
       body: '$title${subject.isNotEmpty ? ' · $subject' : ''}',
+      senderUserId: senderUserId,
+      messageId: messageId,
+    );
+  }
+
+  static Future<void> notifyNewRegistration({
+    required String studentName,
+    required String studentId,
+    required String department,
+    required String batch,
+    required String senderUserId,
+    String? messageId,
+  }) async {
+    await sendToDeptAndBatch(
+      department: department,
+      batch: batch,
+      title: 'New Registration Request 📝',
+      body: '$studentName${studentId.isNotEmpty ? " (ID: $studentId)" : ""} requested registration in $department-Batch $batch. Waiting for CR approval.',
+      senderUserId: senderUserId,
+      adminsOnly: true,
+      messageId: messageId,
+    );
+  }
+
+  static Future<void> notifyAccountApproved({
+    required String recipientUserId,
+    required String department,
+    required String batch,
+    required String senderUserId,
+    String? messageId,
+  }) async {
+    await sendPrivateNotification(
+      recipientId: recipientUserId,
+      title: 'Account Approved! 🎉',
+      body: 'Your UniGrid registration for $department - Batch $batch has been approved by the CR. Welcome aboard!',
       senderUserId: senderUserId,
       messageId: messageId,
     );

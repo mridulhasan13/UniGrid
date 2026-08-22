@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint, compute;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image/image.dart' as img;
@@ -58,19 +59,23 @@ Uint8List _compressImageForStorage(Uint8List bytes) {
 
     return Uint8List.fromList(img.encodeJpg(resized, quality: 75));
   } catch (e) {
-    debugPrint('[StorageCompress] Error during background compression: $e');
+    debugPrint('[ImageCompressor] Error compressing image on isolate: $e');
     return bytes;
   }
 }
 
-/// Uploads a file to Supabase Storage and returns its permanent public URL.
+/// Supabase Storage Service
+/// Handles uploading files/images to Supabase Storage and returns permanent public URLs.
+/// File URLs are stored in Firestore, so files are accessible across all platforms.
 ///
-/// Used by:
+/// Folders used:
+///   - auth_service.dart          → folder: 'avatars'
+///   - general_announcements_... → folder: 'announcements'
 ///   - cr_panel_screen.dart      → folder: 'announcements'
 ///   - materials_screen.dart     → folder: 'materials'
 ///   - course_registry_screen.dart → folder: 'ct_marks'
 class SupabaseStorageService {
-  static final _storage = Supabase.instance.client.storage;
+  static SupabaseStorageClient get _storage => Supabase.instance.client.storage;
 
   /// Uploads [bytes] to Supabase Storage bucket [SupabaseConfig.bucket]
   /// under [folder]/timestamp_[fileName] and returns the permanent public URL.
@@ -125,6 +130,29 @@ class SupabaseStorageService {
           .getPublicUrl(storagePath);
 
       debugPrint('[SupabaseUpload] Public URL: $publicUrl');
+
+      // Update real-time storage metrics in Firestore
+      try {
+        final Map<String, dynamic> metricUpdate = {
+          'totalBytes': FieldValue.increment(uploadBytes.length),
+          'lastUploadTime': FieldValue.serverTimestamp(),
+        };
+        if (folder.contains('announcement')) {
+          metricUpdate['announcementsBytes'] = FieldValue.increment(uploadBytes.length);
+        } else if (folder.contains('material')) {
+          metricUpdate['materialsBytes'] = FieldValue.increment(uploadBytes.length);
+        } else if (folder.contains('avatar')) {
+          metricUpdate['avatarsBytes'] = FieldValue.increment(uploadBytes.length);
+        }
+        FirebaseFirestore.instance
+            .collection('app_config')
+            .doc('storage_metrics')
+            .set(metricUpdate, SetOptions(merge: true))
+            .catchError((_) {});
+      } catch (_) {}
+
+      // Trigger keep-alive heartbeat for all previous projects in background
+      SupabaseConfig.triggerHeartbeatIfNeeded().catchError((_) {});
       return publicUrl;
     } on StorageException catch (e) {
       debugPrint('[SupabaseUpload] StorageException: ${e.message} | statusCode: ${e.statusCode}');
@@ -155,6 +183,28 @@ class SupabaseStorageService {
       debugPrint('[SupabaseUpload] Deleting: $storagePath');
       await _storage.from(SupabaseConfig.bucket).remove([storagePath]);
       debugPrint('[SupabaseUpload] Deleted: $storagePath');
+
+      // Decrement storage metrics in Firestore
+      try {
+        final Map<String, dynamic> metricUpdate = {
+          'lastUploadTime': FieldValue.serverTimestamp(),
+        };
+        if (storagePath.contains('announcement')) {
+          metricUpdate['announcementsBytes'] = FieldValue.increment(-1500000);
+          metricUpdate['totalBytes'] = FieldValue.increment(-1500000);
+        } else if (storagePath.contains('material')) {
+          metricUpdate['materialsBytes'] = FieldValue.increment(-2000000);
+          metricUpdate['totalBytes'] = FieldValue.increment(-2000000);
+        } else if (storagePath.contains('avatar')) {
+          metricUpdate['avatarsBytes'] = FieldValue.increment(-500000);
+          metricUpdate['totalBytes'] = FieldValue.increment(-500000);
+        }
+        FirebaseFirestore.instance
+            .collection('app_config')
+            .doc('storage_metrics')
+            .set(metricUpdate, SetOptions(merge: true))
+            .catchError((_) {});
+      } catch (_) {}
     } catch (e) {
       // Non-fatal: log and continue. The Firestore doc deletion is more important.
       debugPrint('[SupabaseUpload] Delete failed (non-fatal): $e');
@@ -198,5 +248,72 @@ class SupabaseStorageService {
       default:
         return 'application/octet-stream';
     }
+  }
+
+  /// Fetches live file metrics directly from Supabase Storage buckets
+  static Future<Map<String, double>> fetchLiveStorageBreakdown() async {
+    double materialsBytes = 0;
+    double announcementsBytes = 0;
+    double avatarsBytes = 0;
+    double chatBytes = 0;
+    double marksheetsBytes = 0;
+    double otherBytes = 0;
+
+    Future<void> scanPath(String path, String category) async {
+      try {
+        final items = await _storage.from(SupabaseConfig.bucket).list(path: path);
+        for (final item in items) {
+          final size = (item.metadata?['size'] as num?)?.toDouble() ??
+              (item.metadata?['contentLength'] as num?)?.toDouble() ??
+              0.0;
+          if (size > 0) {
+            if (category == 'materials' || path.startsWith('materials')) {
+              materialsBytes += size;
+            } else if (category == 'announcements' || path.startsWith('announcements')) {
+              announcementsBytes += size;
+            } else if (category == 'avatars' || path.startsWith('avatars') || path.startsWith('profile_photos')) {
+              avatarsBytes += size;
+            } else if (category == 'chat' || path.startsWith('chat_images')) {
+              chatBytes += size;
+            } else if (category == 'ct_marksheets' || path.startsWith('ct_marksheets')) {
+              marksheetsBytes += size;
+            } else {
+              otherBytes += size;
+            }
+          } else if (item.id == null || item.id!.isEmpty) {
+            // It's a folder: traverse it
+            final nextSub = path.isEmpty ? item.name : '$path/${item.name}';
+            await scanPath(nextSub, category);
+          }
+        }
+      } catch (e) {
+        debugPrint('[SupabaseStorage] Scan path error for $path: $e');
+      }
+    }
+
+    try {
+      await Future.wait([
+        scanPath('materials', 'materials'),
+        scanPath('announcements', 'announcements'),
+        scanPath('profile_photos', 'avatars'),
+        scanPath('avatars', 'avatars'),
+        scanPath('chat_images', 'chat'),
+        scanPath('ct_marksheets', 'ct_marksheets'),
+      ]);
+    } catch (e) {
+      debugPrint('[SupabaseStorage] fetchLiveStorageBreakdown error: $e');
+    }
+
+    final totalLiveBytes = materialsBytes + announcementsBytes + avatarsBytes + chatBytes + marksheetsBytes + otherBytes;
+
+    return {
+      'materialsMB': materialsBytes / (1024 * 1024),
+      'announcementsMB': announcementsBytes / (1024 * 1024),
+      'avatarsMB': avatarsBytes / (1024 * 1024),
+      'chatMB': chatBytes / (1024 * 1024),
+      'marksheetsMB': marksheetsBytes / (1024 * 1024),
+      'otherMB': otherBytes / (1024 * 1024),
+      'totalLiveStorageMB': totalLiveBytes / (1024 * 1024),
+    };
   }
 }

@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/constants.dart';
 
-/// A widget that detects URLs inside a text string and turns them into
-/// interactive, styled, clickable links that open in the device browser or external app.
+/// A widget that detects URLs and @mentions inside a text string and turns them into
+/// interactive, styled, clickable links and vibrant highlighted mention tags.
 class LinkifiedText extends StatefulWidget {
   final String text;
   final TextStyle? style;
   final TextStyle? linkStyle;
+  final TextStyle? mentionStyle;
   final TextAlign textAlign;
   final TextOverflow overflow;
   final int? maxLines;
@@ -19,6 +20,7 @@ class LinkifiedText extends StatefulWidget {
     super.key,
     this.style,
     this.linkStyle,
+    this.mentionStyle,
     this.textAlign = TextAlign.start,
     this.overflow = TextOverflow.clip,
     this.maxLines,
@@ -45,8 +47,8 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     _recognizers.clear();
   }
 
-  static final RegExp _urlRegex = RegExp(
-    r'((?:https?://|ftp://|mailto:|www\.)[^\s<]+|(?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|co|me|dev|app|bd|info|site|online|tv|cc|xyz|tech|link|store|page|live)(?:/[^\s<]*)?)',
+  static final RegExp _tokenRegex = RegExp(
+    r'((?:https?://|ftp://|mailto:|www\.)[^\s<]+|(?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|co|me|dev|app|bd|info|site|online|tv|cc|xyz|tech|link|store|page|live)(?:/[^\s<]*)?|@[a-zA-Z0-9_.-]+)',
     caseSensitive: false,
   );
 
@@ -102,7 +104,13 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     );
     final effectiveLinkStyle = widget.linkStyle ?? defaultLinkStyle;
 
-    final matches = _urlRegex.allMatches(text).toList();
+    final defaultMentionStyle = baseStyle.copyWith(
+      color: AppColors.primary,
+      fontWeight: FontWeight.bold,
+    );
+    final effectiveMentionStyle = widget.mentionStyle ?? defaultMentionStyle;
+
+    final matches = _tokenRegex.allMatches(text).toList();
 
     if (matches.isEmpty) {
       return widget.selectable
@@ -132,7 +140,20 @@ class _LinkifiedTextState extends State<LinkifiedText> {
         ));
       }
 
-      String rawUrl = text.substring(match.start, match.end);
+      String token = text.substring(match.start, match.end);
+
+      // Check if it's a mention (@user / @all)
+      if (token.startsWith('@') && token.length > 1) {
+        spans.add(TextSpan(
+          text: token,
+          style: effectiveMentionStyle,
+        ));
+        lastEnd = match.end;
+        continue;
+      }
+
+      // Handle URLs
+      String rawUrl = token;
       String trailingPunctuation = '';
 
       while (rawUrl.isNotEmpty) {

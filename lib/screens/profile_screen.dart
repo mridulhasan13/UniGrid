@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/models.dart';
@@ -53,22 +54,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadNotificationSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final bool rVal = prefs.getBool('notif_routine') ?? true;
-    final bool cVal = prefs.getBool('notif_chat') ?? true;
-    final bool aVal = prefs.getBool('notif_alerts') ?? true;
-
-    // Ensure preferences are saved as active
-    await prefs.setBool('notif_routine', rVal);
-    await prefs.setBool('notif_chat', cVal);
-    await prefs.setBool('notif_alerts', aVal);
+    bool rVal = prefs.getBool('notif_routine') ?? true;
+    bool cVal = prefs.getBool('notif_chat') ?? true;
+    bool aVal = prefs.getBool('notif_alerts') ?? true;
 
     final user = Provider.of<AppUser?>(context, listen: false);
     if (user != null) {
-      FirebaseFirestore.instance.collection('users').doc(user.id).set({
-        'notifRoutine': rVal,
-        'notifChat': cVal,
-        'notifAlerts': aVal,
-      }, SetOptions(merge: true));
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.id).get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          if (data['notifRoutine'] is bool && prefs.getBool('notif_routine') == null) {
+            rVal = data['notifRoutine'] as bool;
+            await prefs.setBool('notif_routine', rVal);
+          }
+          if (data['notifChat'] is bool && prefs.getBool('notif_chat') == null) {
+            cVal = data['notifChat'] as bool;
+            await prefs.setBool('notif_chat', cVal);
+          }
+          if (data['notifAlerts'] is bool && prefs.getBool('notif_alerts') == null) {
+            aVal = data['notifAlerts'] as bool;
+            await prefs.setBool('notif_alerts', aVal);
+          }
+        }
+      } catch (e) {
+        debugPrint('[ProfileScreen] Error checking cloud notification settings: $e');
+      }
 
       if (rVal && !kIsWeb) {
         RoutineReminderService.syncRoutineReminders(user);
@@ -98,7 +109,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       FirebaseFirestore.instance
           .collection('users')
           .doc(user.id)
-          .update({firestoreField: value}).catchError((e) {
+          .set({firestoreField: value}, SetOptions(merge: true))
+          .catchError((e) {
         debugPrint('Failed to sync notification pref to Firestore: $e');
       });
 
@@ -157,18 +169,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 
 
-  // Base64 vs Network Image Loader
+  // Base64 vs Network Image Loader (Optimized with ResizeImage for instant rendering)
   ImageProvider? _getProfileImage(String photoUrl) {
     if (photoUrl.isEmpty) return null;
     if (photoUrl.startsWith('data:image')) {
       try {
         final base64String = photoUrl.split(',').last;
-        return MemoryImage(base64Decode(base64String));
+        return ResizeImage(MemoryImage(base64Decode(base64String)), width: 180, height: 180);
       } catch (e) {
         return null;
       }
     }
-    return NetworkImage(photoUrl);
+    return ResizeImage(NetworkImage(photoUrl), width: 180, height: 180);
   }
 
   // Profile image upload picker
@@ -1316,41 +1328,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Custom Switch row
   Widget _buildSwitchTile(String title, String subtitle, bool currentVal,
       ValueChanged<bool> onChanged) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.textPrimary.withOpacity(0.02),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onChanged(!currentVal),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.textPrimary.withOpacity(0.04)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14)),
-                const SizedBox(height: 4),
-                Text(subtitle,
-                    style:
-                        TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-              ],
-            ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.02),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.04)),
           ),
-          Switch(
-            value: currentVal,
-            activeColor: AppColors.primary,
-            activeTrackColor: AppColors.primary.withOpacity(0.3),
-            inactiveThumbColor: AppColors.textSecondary.withOpacity(0.3),
-            inactiveTrackColor: AppColors.glassCardBorder,
-            onChanged: onChanged,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14)),
+                    const SizedBox(height: 4),
+                    Text(subtitle,
+                        style:
+                            TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Switch(
+                value: currentVal,
+                activeColor: AppColors.primary,
+                activeTrackColor: AppColors.primary.withOpacity(0.3),
+                inactiveThumbColor: AppColors.textSecondary.withOpacity(0.3),
+                inactiveTrackColor: AppColors.glassCardBorder,
+                onChanged: onChanged,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1532,7 +1551,150 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 24),
+
+        // ── Danger Zone: Delete Account (Play Store Compliance) ───────────────
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.redAccent.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.delete_forever_rounded,
+                      color: Colors.redAccent, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('Danger Zone: Delete Account',
+                      style: TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Permanently delete your account, profile data, and credentials from UniGrid. This action is irreversible.',
+                style: TextStyle(
+                    color: AppColors.textSecondary, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => _showDeleteAccountDialog(user),
+                icon: const Icon(Icons.delete_outline_rounded,
+                    size: 16, color: Colors.white),
+                label: const Text('Delete My Account',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent.shade700,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  void _showDeleteAccountDialog(AppUser user) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        bool isDeleting = false;
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppColors.glassCardColor,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: Colors.redAccent.withOpacity(0.3))),
+              title: Row(
+                children: const [
+                  Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+                  SizedBox(width: 10),
+                  Text('Delete Account?',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: Text(
+                'Are you sure you want to permanently delete your account (${user.email})?\n\n'
+                'All your personal data, department profile, and cloud sessions will be completely purged. This cannot be undone.',
+                style: TextStyle(
+                    color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isDeleting ? null : () => Navigator.pop(dialogCtx),
+                  child: Text('Cancel',
+                      style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                ElevatedButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          setDialogState(() => isDeleting = true);
+                          try {
+                            await Provider.of<AuthService>(context, listen: false)
+                                .deleteAccount();
+                            if (mounted) {
+                              Navigator.pop(dialogCtx);
+                              InAppNotification.show(
+                                context,
+                                title: 'Account Deleted',
+                                message: 'Your account has been deleted permanently.',
+                                accentColor: Colors.redAccent,
+                                icon: Icons.check_circle_outline_rounded,
+                              );
+                            }
+                          } catch (e) {
+                            setDialogState(() => isDeleting = false);
+                            if (mounted) {
+                              InAppNotification.show(
+                                context,
+                                title: 'Deletion Failed',
+                                message: 'Error: $e. If required, re-login and try again.',
+                                accentColor: Colors.redAccent,
+                                icon: Icons.error_outline_rounded,
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent.shade700,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: isDeleting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : const Text('Permanently Delete',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1783,18 +1945,122 @@ class _ProfileScreenState extends State<ProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // ── Header ─────────────────────────────────────────────────────
-        Text('About Developer',
+        Text('About UniGrid',
             style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 20,
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text('The person behind UniGrid',
+        Text('Platform details, mission & developer information',
             style:
                 TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 12)),
         const SizedBox(height: 24),
 
-        // ── Centered Hero Card ──────────────────────────────────────────
+        // ── 1. Top: App Info ──────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.07)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.apps_rounded, color: AppColors.primary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('App Info',
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _aboutInfoRow(Icons.grid_view_rounded, 'App Name', 'UniGrid'),
+              const Divider(color: Colors.white10, height: 16),
+              _aboutInfoRow(Icons.devices_rounded, 'Platform', 'Web, Android & Cross-Platform'),
+              const Divider(color: Colors.white10, height: 16),
+              _aboutInfoRow(Icons.person_outline_rounded, 'Built by',
+                  'Mahmudul Hasan Mridul - BUTEX - IPE - 51'),
+              const Divider(color: Colors.white10, height: 16),
+              _aboutInfoRow(Icons.terminal_rounded, 'Built with',
+                  'Flutter + Firebase + Supabase'),
+              const Divider(color: Colors.white10, height: 16),
+              _aboutInfoLinkRow(Icons.language_rounded, 'Website',
+                  'unigrid.netlify.app', 'https://unigrid.netlify.app'),
+              const Divider(color: Colors.white10, height: 16),
+              _aboutInfoLinkRow(Icons.explore_outlined, 'More Info',
+                  'info-unigrid.netlify.app', 'https://info-unigrid.netlify.app/'),
+              const Divider(color: Colors.white10, height: 16),
+              _aboutInfoLinkRow(Icons.email_outlined, 'Support',
+                  'unigrid.app@gmail.com', 'mailto:unigrid.app@gmail.com'),
+              const Divider(color: Colors.white10, height: 16),
+              _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.0'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── 2. Middle: About UniGrid ──────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.07)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.school_rounded, color: AppColors.secondary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('About UniGrid',
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              LinkifiedText(
+                'UniGrid is a modern academic coordination and scheduling ecosystem engineered specifically for university campuses. Designed to bridge the communication gap between students, Class Representatives (CRs), and faculty members, UniGrid streamlines daily university life into a centralized, intelligent workspace.\n\n'
+                'Key Capabilities:\n'
+                '• Smart Routine & Timetable: Dynamic weekly schedule tables with real-time class status tracking (Upcoming, Completed, Cancelled, No Class) and faculty details.\n'
+                '• Academic Hub: High-speed distribution of lecture slides, syllabus sheets, and coursework materials hosted on Supabase cloud storage.\n'
+                '• Real-Time Announcements & Chat: Interactive batch messenger featuring @user mentions, instant push notifications, and emergency broadcast alerts.\n'
+                '• CR & Admin Management: Dedicated leadership tools for slot building, student approval, and batch-wide moderation.',
+                selectable: true,
+                textAlign: TextAlign.justify,
+                style: TextStyle(
+                    color: AppColors.textPrimary.withOpacity(0.75),
+                    fontSize: 12.5,
+                    height: 1.65),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── 3. Bottom: Developer Hero Card ────────────────────────────────────
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
@@ -1874,6 +2140,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ? Image.network(
                                 photoUrl,
                                 fit: BoxFit.cover,
+                                cacheWidth: 220,
+                                cacheHeight: 220,
+                                gaplessPlayback: true,
                                 loadingBuilder: (ctx, child, progress) =>
                                     progress == null
                                         ? child
@@ -1906,9 +2175,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 26,
+                      fontSize: 24,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Founder & Lead Developer',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.3,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1941,7 +2220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 22),
 
                   // ── Social Buttons ──────────────────────────────────────────
                   Wrap(
@@ -1983,7 +2262,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Icon(Icons.format_quote_rounded,
                       color: AppColors.primary, size: 18),
                   const SizedBox(width: 8),
-                  Text('About Me',
+                  Text('About the Developer',
                       style: TextStyle(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.bold,
@@ -1995,47 +2274,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'Hey there! I’m Mridul, a visual storyteller, handwriting artist, and designer disguised as an engineering student. My journey is fueled by a love for aesthetics and structure, bridging the gap between the meticulous world of engineering and the fluid world of graphic design and calligraphy.\n\n'
                 'From running leadership initiatives in science and photography to digitalizing ideas into clean, striking graphics, I thrive on turning creative visions into reality.',
                 selectable: true,
+                textAlign: TextAlign.justify,
                 style: TextStyle(
                     color: AppColors.textPrimary.withOpacity(0.7),
                     fontSize: 12.5,
                     height: 1.65),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // ── App Info ──────────────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.textPrimary.withOpacity(0.03),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.textPrimary.withOpacity(0.06)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.apps_rounded, color: AppColors.primary, size: 18),
-                  const SizedBox(width: 8),
-                  Text('App Info',
-                      style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _aboutInfoRow(Icons.grid_view_rounded, 'App Name', 'UniGrid'),
-              _aboutInfoRow(Icons.person_outline_rounded, 'Built by',
-                  'Mahmudul Hasan Mridul - BUTEX - IPE - 51'),
-              _aboutInfoRow(Icons.terminal_rounded, 'Built with',
-                  'Flutter + Firebase + Supabase'),
-              _aboutInfoLinkRow(Icons.language_rounded, 'Website',
-                  'unigrid.netlify.app', 'https://unigrid.netlify.app'),
-              _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.0'),
             ],
           ),
         ),
@@ -2046,7 +2290,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Text(
-              'Copyright © 2026 - Mahmudul Hasan Mridul',
+              'Copyright © 2026 - UniGrid',
               style: TextStyle(
                   color: AppColors.textPrimary.withOpacity(0.35), fontSize: 11),
             ),
@@ -2326,26 +2570,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _aboutInfoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.primary.withOpacity(0.7), size: 15),
+          Icon(icon, color: AppColors.primary.withOpacity(0.8), size: 16),
           const SizedBox(width: 10),
           SizedBox(
-            width: 80,
-            child: Text(label,
-                style: TextStyle(
-                    color: AppColors.textPrimary.withOpacity(0.45),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600)),
+            width: 115,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: AppColors.textPrimary.withOpacity(0.6),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
+          const SizedBox(width: 20),
           Expanded(
-            child: Text(value,
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500)),
+            child: Text(
+              value,
+              textAlign: TextAlign.start,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -2365,7 +2617,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'OTA versioning and technical developer assistance.',
+          'Technical assistance, support inquiries, and developer contacts.',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 24),
@@ -2379,20 +2631,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Developer Details',
+              Text('Contact Support Team',
                   style: TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 14)),
               const SizedBox(height: 8),
               Text(
-                  'This app is designed and maintained by the Google DeepMind agentic team for IPE BUTEX.',
+                  'Need assistance, found a bug, or have suggestions for UniGrid? Reach out to our team directly via email.',
                   style: TextStyle(
                       color: AppColors.textSecondary, fontSize: 12, height: 1.4)),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    final uri = Uri.parse('mailto:unigrid.app@gmail.com?subject=UniGrid%20Support%20Request');
+                    try {
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        await launchUrl(uri);
+                      }
+                    } catch (_) {
+                      Clipboard.setData(const ClipboardData(text: 'unigrid.app@gmail.com'));
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Email copied to clipboard: unigrid.app@gmail.com')),
+                        );
+                      }
+                    }
+                  },
+                  onLongPress: () {
+                    Clipboard.setData(const ClipboardData(text: 'unigrid.app@gmail.com'));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Email copied to clipboard: unigrid.app@gmail.com')),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.35)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.email_outlined, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'unigrid.app@gmail.com',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(Icons.open_in_new_rounded, size: 13, color: AppColors.primary.withOpacity(0.7)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
               ElevatedButton.icon(
                 onPressed: () => launchUrl(
-                    Uri.parse('https://mahmudulhasanmridul.netlify.app/')),
+                    Uri.parse('https://mahmudulhasanmridul.netlify.app/'),
+                    mode: LaunchMode.externalApplication),
                 icon: Icon(Icons.open_in_new,
                     size: 16, color: AppColors.onPrimary),
                 label: Text('Visit Developer Portfolio',
@@ -2418,30 +2726,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _aboutInfoLinkRow(IconData icon, String label, String value, String url) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.primary.withOpacity(0.7), size: 15),
+          Icon(icon, color: AppColors.primary.withOpacity(0.8), size: 16),
           const SizedBox(width: 10),
           SizedBox(
-            width: 80,
-            child: Text(label,
-                style: TextStyle(
-                    color: AppColors.textPrimary.withOpacity(0.45),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600)),
+            width: 115,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: AppColors.textPrimary.withOpacity(0.6),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
+          const SizedBox(width: 20),
           Expanded(
             child: GestureDetector(
               onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
-              child: Text(
-                value,
-                style: TextStyle(
-                    color: AppColors.primary,
-                    decoration: TextDecoration.underline,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      value,
+                      textAlign: TextAlign.start,
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        decoration: TextDecoration.underline,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Icon(Icons.open_in_new_rounded, size: 12, color: AppColors.primary.withOpacity(0.7)),
+                ],
               ),
             ),
           ),
@@ -2461,7 +2784,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 fontSize: 20,
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text('Effective Date: January 1, 2026',
+        Text('Effective Date: August 20, 2026',
             style:
                 TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 12)),
         const SizedBox(height: 24),
@@ -2502,7 +2825,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 16),
               _buildSectionTitle('6. Changes to Terms'),
               _buildSectionBody(
-                'We reserves the right to modify these terms at any time. Continued use of the app after modifications constitutes acceptance of the new terms.',
+                'We reserve the right to modify these terms at any time. Continued use of the app after modifications constitutes acceptance of the new terms.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('7. Class Representative (CR) Responsibilities'),
+              _buildSectionBody(
+                'Students assigned Class Representative privileges must exercise due care when publishing timetable adjustments, routine changes, and classroom announcements. Misrepresentation of official department schedules or arbitrary deletion of peer materials is grounds for role revocation.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('8. Over-The-Air (OTA) & Automatic Updates'),
+              _buildSectionBody(
+                'UniGrid incorporates built-in over-the-air update mechanisms to deliver security patches, theme assets, and performance enhancements. Users are encouraged to maintain the latest build for optimal stability and synchronization.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('9. Academic Fair-Use & Copyright'),
+              _buildSectionBody(
+                'All course syllabi, lecture slides, and academic resources shared on UniGrid are designated strictly for internal non-commercial educational study in accordance with institutional academic fair-use guidelines.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('10. Account Suspension & Termination'),
+              _buildSectionBody(
+                'UniGrid administrators reserve the right to restrict or terminate access for any user account that engages in abusive conduct, automated scraping, vulnerability exploitation, or unauthorized privilege escalation.',
               ),
             ],
           ),
@@ -2522,7 +2865,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 fontSize: 20,
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text('Effective Date: January 1, 2026',
+        Text('Effective Date: August 20, 2026',
             style:
                 TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 12)),
         const SizedBox(height: 24),
@@ -2564,6 +2907,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildSectionTitle('6. User Rights'),
               _buildSectionBody(
                 'You can edit your profile details, update your password, or change notification preferences inside the settings at any time. For complete account deletion, you can contact your Master Admin.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('7. Diagnostic & Crash Analytics'),
+              _buildSectionBody(
+                'We may collect anonymized application performance metrics and crash telemetry (e.g. Flutter rendering latency and network error logs) to identify software bugs and enhance platform reliability without profiling individual users.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('8. Semester Data Archiving & Purging'),
+              _buildSectionBody(
+                'To prevent cloud clutter and protect student privacy, temporary class discussion histories and outdated announcements may be archived or safely purged during official semester transitions by authorized Class Representatives.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('9. Contact & Grievance Assistance'),
+              _buildSectionBody(
+                'For privacy inquiries, account data verification requests, or security vulnerability reports, please reach out to the UniGrid engineering team through the GitHub repository or your department\'s designated Master Administrator.',
               ),
             ],
           ),

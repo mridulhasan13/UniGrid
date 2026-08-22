@@ -58,7 +58,9 @@ service cloud.firestore {
       );
       allow delete: if isAuthenticated() && (
         request.auth.uid == userId || 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isCR == true
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isCR == true ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+        isRootAdmin(request.auth)
       );
     }
     
@@ -112,11 +114,27 @@ service cloud.firestore {
         isRootAdmin(request.auth)
       );
     }
+
+    // User-generated content reports & moderation flags (Play Store UGC Policy)
+    match /reports/{reportId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isCR == true ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+        isRootAdmin(request.auth)
+      );
+    }
     
     // App update / admin settings check
     match /admin_settings/{doc} {
       allow read: if true;
       allow write: if isAuthenticated() && isRootAdmin(request.auth);
+    }
+
+    // App Config (Maintenance mode, versioning, storage metrics & config)
+    match /app_config/{doc} {
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
     
     // General / Global announcements (University-wide notices)

@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>113354293876-31mmolr4iph7lgnon5o5fl9l37u7g84k.apps.googleusercontent.com</string>
+	<string>113354293876-891l1ls2asq7i8eqh3p49i3fp7fo9752.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.113354293876-31mmolr4iph7lgnon5o5fl9l37u7g84k</string>
+	<string>com.googleusercontent.apps.113354293876-891l1ls2asq7i8eqh3p49i3fp7fo9752</string>
 	<key>ANDROID_CLIENT_ID</key>
 	<string>113354293876-2thlbrouov7329n4u5usbfm93c6kp2cu.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
@@ -15,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.unigridApp</string>
+	<string>com.unigrid.app</string>
 	<key>PROJECT_ID</key>
 	<string>dept-ipe</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:113354293876:ios:32b11a8217ddaa2c9f0721</string>
+	<string>1:113354293876:ios:f27684a6244742909f0721</string>
 </dict>
 </plist>

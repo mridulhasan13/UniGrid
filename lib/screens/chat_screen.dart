@@ -479,6 +479,15 @@ class _MessageBubble extends StatelessWidget {
         ? (isBW ? Colors.white : AppColors.onPrimary)
         : AppColors.textPrimary;
 
+    final currentUser = Provider.of<AppUser?>(context, listen: false);
+    final String currentUserName = currentUser?.name.replaceAll(' ', '_').toLowerCase() ?? '';
+    final String msgLower = message.text.toLowerCase();
+    final bool isMentioned = !isOwn && (
+      (currentUserName.isNotEmpty && msgLower.contains('@$currentUserName')) ||
+      msgLower.contains('@all') ||
+      msgLower.contains('@everyone')
+    );
+
     final radius = BorderRadius.only(
       topLeft: const Radius.circular(18),
       topRight: const Radius.circular(18),
@@ -496,21 +505,57 @@ class _MessageBubble extends StatelessWidget {
             ? (isBW
                 ? const Color(0xFF2E2E30)
                 : AppColors.primary.withOpacity(0.95))
-            : const Color(0xFF1E1E1E),
+            : (isMentioned
+                ? const Color(0xFF252015)
+                : const Color(0xFF1E1E1E)),
         borderRadius: radius,
         border: Border.all(
-          color: isOwn
-              ? (isBW
-                  ? const Color(0xFF3F3F46)
-                  : AppColors.primary.withOpacity(0.4))
-              : Colors.white.withOpacity(0.08),
-          width: 0.8,
+          color: isMentioned
+              ? Colors.amberAccent.withOpacity(0.85)
+              : (isOwn
+                  ? (isBW
+                      ? const Color(0xFF3F3F46)
+                      : AppColors.primary.withOpacity(0.4))
+                  : Colors.white.withOpacity(0.08)),
+          width: isMentioned ? 1.2 : 0.8,
         ),
+        boxShadow: isMentioned
+            ? [
+                BoxShadow(
+                  color: Colors.amberAccent.withOpacity(0.2),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Mentioned tag
+          if (isMentioned)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.amber.withOpacity(0.4), width: 0.5),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.alternate_email_rounded, size: 10.5, color: Colors.amberAccent),
+                  SizedBox(width: 3.5),
+                  Text('Mentioned you',
+                      style: TextStyle(
+                          color: Colors.amberAccent,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
           // Sender name for received messages
           if (!isOwn)
             Padding(
@@ -575,6 +620,11 @@ class _MessageBubble extends StatelessWidget {
                     decoration: TextDecoration.underline,
                     fontSize: 14,
                     height: 1.4),
+                mentionStyle: TextStyle(
+                    color: isOwn ? Colors.amberAccent : Colors.cyanAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    height: 1.4),
               ),
             ],
           ] else
@@ -586,6 +636,11 @@ class _MessageBubble extends StatelessWidget {
               linkStyle: TextStyle(
                   color: isOwn ? Colors.cyanAccent : AppColors.primary,
                   decoration: TextDecoration.underline,
+                  fontSize: 14,
+                  height: 1.4),
+              mentionStyle: TextStyle(
+                  color: isOwn ? Colors.amberAccent : Colors.cyanAccent,
+                  fontWeight: FontWeight.bold,
                   fontSize: 14,
                   height: 1.4),
             ),
@@ -736,6 +791,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isUploadingFiles = false;
   final Set<String> _pendingSeenDocIds = {};
 
+  List<AppUser> _departmentMembers = [];
+  String? _mentionQuery;
+  int? _mentionStartIndex;
+
   String get _chatPath {
     final user = Provider.of<AppUser?>(context, listen: false);
     return _getChatPathForUser(user);
@@ -763,13 +822,94 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _textController.addListener(_handleMentionQuery);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AuthService>(context, listen: false).updateOnlineStatus(true);
+      _loadDepartmentMembers();
     });
+  }
+
+  void _loadDepartmentMembers() {
+    final user = Provider.of<AppUser?>(context, listen: false);
+    if (user != null && user.department.isNotEmpty) {
+      _firestore
+          .collection('users')
+          .where('department', isEqualTo: user.department)
+          .where('batch', isEqualTo: user.batch)
+          .get()
+          .then((snap) {
+        if (mounted) {
+          setState(() {
+            _departmentMembers = snap.docs
+                .map((d) => AppUser.fromMap(d.data(), d.id))
+                .where((m) => m.id != user.id)
+                .toList();
+          });
+        }
+      }).catchError((_) {});
+    }
+  }
+
+  void _handleMentionQuery() {
+    final text = _textController.text;
+    final selection = _textController.selection;
+    if (!selection.isValid || selection.baseOffset <= 0) {
+      if (_mentionQuery != null) setState(() => _mentionQuery = null);
+      return;
+    }
+
+    final cursorPosition = selection.baseOffset;
+    final textBeforeCursor = text.substring(0, cursorPosition);
+    final lastAt = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAt != -1) {
+      final prefix = textBeforeCursor.substring(lastAt + 1);
+      // Ensure no newlines and no spaces before cursor
+      if (!prefix.contains('\n') && (prefix.isEmpty || !prefix.contains(' '))) {
+        if (_mentionQuery != prefix.toLowerCase() || _mentionStartIndex != lastAt) {
+          setState(() {
+            _mentionQuery = prefix.toLowerCase();
+            _mentionStartIndex = lastAt;
+          });
+        }
+        return;
+      }
+    }
+
+    if (_mentionQuery != null) {
+      setState(() {
+        _mentionQuery = null;
+        _mentionStartIndex = null;
+      });
+    }
+  }
+
+  void _insertMention(String tag) {
+    if (_mentionStartIndex == null) return;
+    final text = _textController.text;
+    final cursorPosition = _textController.selection.baseOffset;
+    final before = text.substring(0, _mentionStartIndex!);
+    final after = (cursorPosition > 0 && cursorPosition <= text.length)
+        ? text.substring(cursorPosition)
+        : '';
+
+    final cleanTag = tag.replaceAll(' ', '_');
+    final newText = '$before@$cleanTag $after';
+    _textController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(
+          offset: before.length + cleanTag.length + 2),
+    );
+    setState(() {
+      _mentionQuery = null;
+      _mentionStartIndex = null;
+    });
+    _focusNode.requestFocus();
   }
 
   @override
   void dispose() {
+    _textController.removeListener(_handleMentionQuery);
     _textController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -1064,6 +1204,24 @@ class _ChatScreenState extends State<ChatScreen> {
                     _focusNode.requestFocus();
                   },
                 ),
+                // Copy Text (for non-empty text messages)
+                if (msg.text.isNotEmpty && !msg.isUnsent)
+                  _ActionTile(
+                    icon: Icons.copy_rounded,
+                    label: 'Copy Text',
+                    color: Colors.cyanAccent,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Clipboard.setData(ClipboardData(text: msg.text));
+                      InAppNotification.show(
+                        context,
+                        title: 'Copied',
+                        message: 'Message text copied to clipboard',
+                        accentColor: Colors.cyanAccent,
+                        icon: Icons.copy_rounded,
+                      );
+                    },
+                  ),
                 // Edit (own text messages only)
                 if (isOwn && !msg.isUnsent && msg.type == 'text')
                   _ActionTile(
@@ -1146,11 +1304,166 @@ class _ChatScreenState extends State<ChatScreen> {
                       _showSeenBy(msg);
                     },
                   ),
+                // Report Message (Play Store UGC Policy - other users' messages)
+                if (!isOwn)
+                  _ActionTile(
+                    icon: Icons.flag_outlined,
+                    label: 'Report Message',
+                    color: Colors.amberAccent,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showReportDialog(msg);
+                    },
+                  ),
                 const SizedBox(height: 12),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showReportDialog(_ChatMsg msg) {
+    String selectedReason = 'Inappropriate or Offensive Content';
+    final List<String> reasons = [
+      'Inappropriate or Offensive Content',
+      'Harassment or Hate Speech',
+      'Spam or Academic Dishonesty',
+      'Misinformation or Impersonation',
+      'Other Violation',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          bool isSubmitting = false;
+          return AlertDialog(
+            backgroundColor: AppColors.glassCardColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: Colors.amberAccent.withOpacity(0.3)),
+            ),
+            title: Row(
+              children: const [
+                Icon(Icons.flag_rounded, color: Colors.amberAccent, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'Report Content',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select the reason for reporting this message by ${msg.authorName}:',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                ...reasons.map((r) {
+                  final isSelected = selectedReason == r;
+                  return InkWell(
+                    onTap: () => setDialogState(() => selectedReason = r),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected
+                                ? Icons.radio_button_checked_rounded
+                                : Icons.radio_button_off_rounded,
+                            color: isSelected ? Colors.amberAccent : AppColors.textSecondary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              r,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : AppColors.textSecondary,
+                                fontSize: 12.5,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        setDialogState(() => isSubmitting = true);
+                        try {
+                          final user = Provider.of<AppUser?>(context, listen: false);
+                          await _firestore.collection('reports').add({
+                            'reportedMessageId': msg.id,
+                            'reportedDocId': msg.docId,
+                            'reportedAuthorId': msg.authorId,
+                            'reportedAuthorName': msg.authorName,
+                            'messageSnippet': msg.text.isNotEmpty
+                                ? (msg.text.length > 100 ? '${msg.text.substring(0, 100)}...' : msg.text)
+                                : '[Media: ${msg.type}]',
+                            'reportedByUserId': user?.id ?? 'anonymous',
+                            'reportedByEmail': user?.email ?? '',
+                            'reason': selectedReason,
+                            'timestamp': FieldValue.serverTimestamp(),
+                            'status': 'pending',
+                          });
+
+                          if (mounted) {
+                            Navigator.pop(dialogCtx);
+                            InAppNotification.show(
+                              context,
+                              title: 'Report Submitted',
+                              message: 'Thank you for keeping our community safe. Our moderation team will review this.',
+                              accentColor: Colors.amberAccent,
+                              icon: Icons.check_circle_outline_rounded,
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            Navigator.pop(dialogCtx);
+                            InAppNotification.show(
+                              context,
+                              title: 'Report Notice',
+                              message: 'Report received. Thank you.',
+                              accentColor: Colors.amberAccent,
+                              icon: Icons.flag_rounded,
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amberAccent.shade700,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text(
+                  'Submit Report',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2175,6 +2488,192 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // ---- MENTION AUTOCOMPLETE OVERLAY ----
+  Widget _buildMentionOverlay() {
+    if (_mentionQuery == null) return const SizedBox.shrink();
+
+    final query = _mentionQuery!;
+    final List<Map<String, dynamic>> items = [];
+
+    // Option 1: @all / @everyone
+    if ('all'.startsWith(query) || 'everyone'.startsWith(query) || query.isEmpty) {
+      items.add({
+        'isSpecial': true,
+        'tag': 'all',
+        'title': '@all',
+        'subtitle': 'Notify all batch members',
+        'icon': Icons.campaign_rounded,
+        'color': Colors.amberAccent,
+      });
+    }
+
+    // Option 2: Department members
+    for (final member in _departmentMembers) {
+      final name = member.name.isNotEmpty ? member.name : member.email.split('@')[0];
+      final cleanName = name.replaceAll(' ', '_');
+      if (name.toLowerCase().contains(query) || cleanName.toLowerCase().contains(query) || member.studentId.contains(query)) {
+        items.add({
+          'isSpecial': false,
+          'tag': cleanName,
+          'title': name,
+          'subtitle': member.studentId.isNotEmpty ? 'ID: ${member.studentId}' : member.email,
+          'photo': member.photoUrl,
+          'isCR': member.isCR,
+          'color': member.isCR ? Colors.amber : AppColors.primary,
+        });
+      }
+    }
+
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 190),
+      margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundTop.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withOpacity(0.35), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            shrinkWrap: true,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => Divider(
+              color: AppColors.textPrimary.withOpacity(0.06),
+              height: 1,
+            ),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              final bool isSpecial = item['isSpecial'] == true;
+              final String tag = item['tag'];
+              final String title = item['title'];
+              final String subtitle = item['subtitle'];
+              final Color color = item['color'];
+
+              Widget leadingWidget;
+              if (isSpecial) {
+                leadingWidget = Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(item['icon'] as IconData, color: color, size: 17),
+                );
+              } else {
+                final photo = (item['photo'] as String?) ?? '';
+                ImageProvider? provider;
+                if (photo.isNotEmpty) {
+                  if (photo.startsWith('data:image')) {
+                    try {
+                      provider = MemoryImage(base64Decode(photo.split(',').last));
+                    } catch (_) {}
+                  } else {
+                    provider = NetworkImage(photo);
+                  }
+                }
+                leadingWidget = CircleAvatar(
+                  radius: 16,
+                  backgroundColor: color.withOpacity(0.18),
+                  backgroundImage: provider,
+                  child: provider == null
+                      ? Text(
+                          title.isNotEmpty ? title[0].toUpperCase() : 'U',
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        )
+                      : null,
+                );
+              }
+
+              return InkWell(
+                onTap: () => _insertMention(tag),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  child: Row(
+                    children: [
+                      leadingWidget,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    title,
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (item['isCR'] == true) ...[
+                                  const SizedBox(width: 5),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.amber.withOpacity(0.5), width: 0.5),
+                                    ),
+                                    child: const Text(
+                                      'CR',
+                                      style: TextStyle(
+                                        color: Colors.amber,
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              subtitle,
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 10.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.north_west_rounded, size: 13, color: AppColors.textSecondary.withOpacity(0.4)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   // ---- INPUT BAR ----
   Widget _buildInputBar(AppUser appUser) {
     return ClipRect(
@@ -2194,6 +2693,7 @@ class _ChatScreenState extends State<ChatScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildMentionOverlay(),
               if (_selectedFiles.isNotEmpty) ...[
                 _buildSelectedFilesPreview(),
                 const SizedBox(height: 8),

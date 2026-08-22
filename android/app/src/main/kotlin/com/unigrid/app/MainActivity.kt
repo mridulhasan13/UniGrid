@@ -1,4 +1,4 @@
-package com.example.unigrid_app
+package com.unigrid.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -575,23 +576,41 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      if (material.fileUrl != null && material.fileUrl!.isNotEmpty)
+                                      if (material.fileUrl != null && material.fileUrl!.isNotEmpty) ...[
                                         IconButton(
-                                        icon: Icon(Icons.remove_red_eye,
-                                            color: AppColors.primary),
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => FileViewerScreen(
-                                                fileName:
-                                                    material.fileName ?? 'material',
-                                                fileUrl: material.fileUrl,
+                                          icon: Icon(Icons.link_rounded,
+                                              color: AppColors.secondary, size: 20),
+                                          tooltip: 'Copy File Link',
+                                          onPressed: () {
+                                            Clipboard.setData(
+                                                ClipboardData(text: material.fileUrl!));
+                                            InAppNotification.show(
+                                              context,
+                                              title: 'Link Copied',
+                                              message: 'Material URL copied to clipboard!',
+                                              accentColor: AppColors.secondary,
+                                              icon: Icons.link_rounded,
+                                            );
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: Icon(Icons.remove_red_eye,
+                                              color: AppColors.primary),
+                                          tooltip: 'View Material',
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => FileViewerScreen(
+                                                  fileName:
+                                                      material.fileName ?? 'material',
+                                                  fileUrl: material.fileUrl,
+                                                ),
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      ),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     if (isCR ||
                                         isAdmin ||
                                         isAdminEmail ||

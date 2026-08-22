@@ -133,6 +133,9 @@ class _UserSelectionScreenState extends State<UserSelectionScreen> {
                                           user.photoUrl,
                                           width: 40,
                                           height: 40,
+                                          cacheWidth: 100,
+                                          cacheHeight: 100,
+                                          gaplessPlayback: true,
                                           fit: BoxFit.cover,
                                           errorBuilder: (context, error, stackTrace) {
                                             return Center(

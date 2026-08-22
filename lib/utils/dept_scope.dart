@@ -15,6 +15,7 @@ const List<Map<String, String>> kDepartments = [
   {'code': 'TMDM', 'name': 'Textile Machinery Design & Maintenance'},
   {'code': 'TME', 'name': 'Textile Materials Engineering'},
   {'code': 'TFD', 'name': 'Textile Fashion & Design'},
+  {'code': 'DEMO', 'name': 'Demo Campus Sandbox'},
 ];
 
 /// Dept codes only (for dropdowns / validation).
@@ -30,7 +31,7 @@ String deptFullName(String code) {
 }
 
 /// Supported batch numbers.
-const List<String> kBatches = ['48', '49', '50', '51', '52'];
+const List<String> kBatches = ['48', '49', '50', '51', '52', '01'];
 
 /// Build the Firestore sub-collection path for a given dept, batch, and collection name.
 /// e.g. deptBatchCol('IPE', '51', 'announcements')

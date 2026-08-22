@@ -148,6 +148,9 @@ class AuthService {
     _userSubscription?.cancel();
 
     if (uid == null) {
+      _lastThemeDept = null;
+      _lastThemeBatch = null;
+      ThemeService.instance.stopListener();
       _userController.add(null);
       return;
     }
@@ -279,6 +282,13 @@ class AuthService {
       User? firebaseUser = result.user;
       if (firebaseUser != null) {
         await _saveSession(email.trim().toLowerCase(), false, password: password.trim());
+        // Record login event directly in Firestore
+        _firestore.collection('users').doc(firebaseUser.uid).set({
+          'lastLogin': FieldValue.serverTimestamp(),
+          'lastActive': FieldValue.serverTimestamp(),
+          'loginCount': FieldValue.increment(1),
+        }, SetOptions(merge: true));
+
         _startFirestoreListener(
           firebaseUser.uid,
           firebaseUser.email,
@@ -332,7 +342,18 @@ class AuthService {
         );
         await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
         
-
+        // Notify CRs & Admins of the new registration request
+        if (!isRoot && department.isNotEmpty && batch.isNotEmpty) {
+          FCMService.notifyNewRegistration(
+            studentName: name.isNotEmpty ? name : 'New Student',
+            studentId: studentId,
+            department: department,
+            batch: batch,
+            senderUserId: user.uid,
+          ).catchError((e) {
+            debugPrint('[AuthService] New registration push notice error: $e');
+          });
+        }
         
         return newUser;
       }
@@ -345,15 +366,66 @@ class AuthService {
   Future<void> signOut() async {
     try {
       final currentUid = _auth.currentUser?.uid;
-      if (currentUid != null) {
-        await FCMService.removeCurrentTokenOnLogout(currentUid);
-      }
+
+      // 1. Immediately tear down listeners to avoid permission-denied errors & UI stutter
+      _lastThemeDept = null;
+      _lastThemeBatch = null;
+      ThemeService.instance.stopListener();
       _userSubscription?.cancel();
+      _userSubscription = null;
+
+      // 2. Remove FCM token asynchronously in background (never blocks UI)
+      if (currentUid != null) {
+        FCMService.removeCurrentTokenOnLogout(currentUid).catchError((e) {
+          debugPrint('[AuthService] FCM token removal notice: $e');
+        });
+      }
+
+      // 3. Clear local session & sign out from Firebase
       await _clearSession();
       await _auth.signOut();
       _userController.add(null);
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint('[AuthService] signOut error: $e');
+      _userController.add(null);
+    }
+  }
+
+  /// Permanently deletes the current user's account, Firestore data, and Firebase Auth record.
+  Future<void> deleteAccount() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+      final uid = user.uid;
+
+      // 1. Remove FCM tokens
+      try {
+        await FCMService.removeCurrentTokenOnLogout(uid);
+      } catch (e) {
+        debugPrint('[AuthService] FCM token removal on delete notice: $e');
+      }
+
+      // 2. Delete Firestore User Document
+      try {
+        await _firestore.collection('users').doc(uid).delete();
+      } catch (e) {
+        debugPrint('[AuthService] Firestore user doc deletion notice: $e');
+      }
+
+      // 3. Tear down listeners & clear local session
+      _lastThemeDept = null;
+      _lastThemeBatch = null;
+      ThemeService.instance.stopListener();
+      _userSubscription?.cancel();
+      _userSubscription = null;
+      await _clearSession();
+
+      // 4. Delete Firebase Auth user record
+      await user.delete();
+      _userController.add(null);
+    } catch (e) {
+      debugPrint('[AuthService] deleteAccount error: $e');
+      rethrow;
     }
   }
 

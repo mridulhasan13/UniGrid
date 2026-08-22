@@ -240,6 +240,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           user.photoUrl,
                           width: 50,
                           height: 50,
+                          cacheWidth: 120,
+                          cacheHeight: 120,
+                          gaplessPlayback: true,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return Center(

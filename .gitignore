@@ -49,6 +49,7 @@ app.*.map.json
 **/*.key
 **/*.keystore
 **/*.jks
+**/key.properties
 
 # Firebase Functions dependencies
 **/functions/node_modules/

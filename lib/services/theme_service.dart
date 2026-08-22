@@ -23,8 +23,17 @@ class ThemeService extends ChangeNotifier {
     setTheme(savedTheme, saveToPrefs: false);
   }
 
+  void stopListener() {
+    _themeSubscription?.cancel();
+    _themeSubscription = null;
+    _retryCount = 0;
+    _activeDept = null;
+    _activeBatch = null;
+  }
+
   void initGlobalThemeListener({String? department, String? batch}) {
     _themeSubscription?.cancel();
+    _themeSubscription = null;
 
     _activeDept = department;
     _activeBatch = batch;
@@ -58,13 +67,24 @@ class ThemeService extends ChangeNotifier {
         }
       },
       onError: (e) {
-        debugPrint('[ThemeService] Scoped theme listener error: $e');
-        if (_retryCount < 5) {
+        final errStr = e.toString();
+        // If permission-denied or unauthenticated (e.g. user logged out), immediately stop without spamming retries
+        if (errStr.contains('permission-denied') ||
+            errStr.contains('unauthenticated') ||
+            errStr.contains('PERMISSION_DENIED')) {
+          debugPrint('[ThemeService] Scoped theme listener stopped due to auth/permission change.');
+          stopListener();
+          return;
+        }
+
+        if (_retryCount < 3) {
           _retryCount++;
           final delayMs = 1000 * _retryCount;
-          debugPrint('[ThemeService] Retrying scoped theme listener in ${delayMs}ms (attempt $_retryCount/5)');
+          debugPrint('[ThemeService] Retrying scoped theme listener in ${delayMs}ms (attempt $_retryCount/3)');
           Future.delayed(Duration(milliseconds: delayMs), () {
-            initGlobalThemeListener(department: department, batch: batch);
+            if (_activeDept == department && _activeBatch == batch) {
+              initGlobalThemeListener(department: department, batch: batch);
+            }
           });
         }
       },

@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDY5KClRoBm9MTpKH3Bz3OmuuCxlvutEns',
-    appId: '1:113354293876:android:f99fdb0676474d909f0721',
+    appId: '1:113354293876:android:becee82fddd01ba79f0721',
     messagingSenderId: '113354293876',
     projectId: 'dept-ipe',
     storageBucket: 'dept-ipe.firebasestorage.app',
@@ -60,20 +60,22 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDT8ia5lgptikWY21B-s8NVhLF9PTY1GAc',
-    appId: '1:113354293876:ios:32b11a8217ddaa2c9f0721',
+    appId: '1:113354293876:ios:f27684a6244742909f0721',
     messagingSenderId: '113354293876',
     projectId: 'dept-ipe',
     storageBucket: 'dept-ipe.firebasestorage.app',
-    iosBundleId: 'com.example.unigridApp',
+    iosClientId: '113354293876-891l1ls2asq7i8eqh3p49i3fp7fo9752.apps.googleusercontent.com',
+    iosBundleId: 'com.unigrid.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyDT8ia5lgptikWY21B-s8NVhLF9PTY1GAc',
-    appId: '1:113354293876:ios:32b11a8217ddaa2c9f0721',
+    appId: '1:113354293876:ios:f27684a6244742909f0721',
     messagingSenderId: '113354293876',
     projectId: 'dept-ipe',
     storageBucket: 'dept-ipe.firebasestorage.app',
-    iosBundleId: 'com.example.unigridApp',
+    iosClientId: '113354293876-891l1ls2asq7i8eqh3p49i3fp7fo9752.apps.googleusercontent.com',
+    iosBundleId: 'com.unigrid.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

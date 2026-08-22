@@ -239,6 +239,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                             widget.recipient.photoUrl,
                             width: 36,
                             height: 36,
+                            cacheWidth: 100,
+                            cacheHeight: 100,
+                            gaplessPlayback: true,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return Center(

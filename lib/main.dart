@@ -22,6 +22,7 @@ import 'widgets/network_aware_wrapper.dart';
 import 'package:flutter/foundation.dart';
 
 import 'widgets/dept_setup_guard.dart';
+import 'widgets/maintenance_guard.dart';
 import 'widgets/unigrid_loader.dart';
 
 import 'notifications/in_app_notification.dart';
@@ -49,12 +50,19 @@ void main() async {
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
+  // Maximize in-memory image cache for instant, zero-delay avatar & media rendering
+  PaintingBinding.instance.imageCache.maximumSize = 1000;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 120 * 1024 * 1024; // 120MB in-memory image buffer
+
   // Asynchronous non-blocking background initialization
   FCMService.initialize().catchError((e) {
     debugPrint('FCM init notice: $e');
   });
   NotificationCoordinator.init().catchError((e) {
     debugPrint('NotificationCoordinator init notice: $e');
+  });
+  SupabaseConfig.syncFromCloud().catchError((e) {
+    debugPrint('Supabase cloud config notice: $e');
   });
   ThemeService.instance.init();
 
@@ -137,7 +145,6 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _isRestoringSession = true;
-  bool _hasStoredSession = false;
 
   @override
   void initState() {
@@ -147,12 +154,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _initSessionCheck() async {
     final authService = Provider.of<AuthService>(context, listen: false);
-    final hasSession = await authService.hasActiveStoredSession();
-    if (mounted) {
-      setState(() {
-        _hasStoredSession = hasSession;
-      });
-    }
+    // Pre-cache core brand & profile assets in parallel
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        precacheImage(const AssetImage('assets/images/logo.png'), context);
+        precacheImage(const AssetImage('assets/images/mridul_profile.png'), context);
+      } catch (_) {}
+    });
     await authService.waitForSessionInit();
     if (mounted) {
       setState(() {
@@ -163,10 +171,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    final user = Provider.of<AppUser?>(context);
-    final firebaseUser = FirebaseAuth.instance.currentUser;
-
-    if (_isRestoringSession || (_hasStoredSession && firebaseUser == null && user == null)) {
+    if (_isRestoringSession) {
       return const Scaffold(
         body: Center(
           child: UniGridLoader(
@@ -177,6 +182,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
         ),
       );
     }
+
+    final user = Provider.of<AppUser?>(context);
+    final firebaseUser = FirebaseAuth.instance.currentUser;
 
     // 1. Truly logged out (no Firebase Auth session and no AppUser profile)
     if (firebaseUser == null && user == null) {
@@ -208,7 +216,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       nextScreen = const MainScreen();
     }
 
-    // Force all logged-in users to have a Department/Batch set up BEFORE proceeding.
-    return DeptSetupGuard(child: nextScreen);
+    // Enforce scheduled maintenance mode & force dept setup
+    return MaintenanceGuard(
+      child: DeptSetupGuard(child: nextScreen),
+    );
   }
 }

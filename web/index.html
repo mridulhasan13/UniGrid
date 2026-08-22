@@ -1,19 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -21,6 +8,12 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="The official academic and interactive communication hub for the UniGrid platform.">
   <meta name="theme-color" content="#030710">
+
+  <!-- Instant Resource Preloaders -->
+  <link rel="preload" href="flutter_bootstrap.js" as="script">
+  <link rel="preload" href="main.dart.js" as="script">
+  <link rel="preload" href="canvaskit/canvaskit.wasm" as="fetch" crossorigin="anonymous">
+  <link rel="preload" href="canvaskit/canvaskit.js" as="script">
 
   <!-- High-Speed Web Resource Preconnects -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,79 +26,24 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="shortcut icon" type="image/png" href="favicon.png">
 
-  <!-- ═══════════════════════════════════════════════════════════
-       iOS PWA — Required for "Add to Home Screen" to work properly
-       ═══════════════════════════════════════════════════════════ -->
-
-  <!-- Tells iOS Safari to run as a standalone full-screen app (hides browser chrome) -->
+  <!-- iOS PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <!-- Black-translucent makes the status bar overlay the app content (uses viewport-fit=cover area) -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="UniGrid">
 
-  <!-- Apple touch icons — iOS picks the closest size; all common sizes listed -->
+  <!-- Apple touch icons -->
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="apple-touch-icon" sizes="120x120" href="icons/Icon-192.png">
   <link rel="apple-touch-icon" sizes="152x152" href="icons/Icon-192.png">
   <link rel="apple-touch-icon" sizes="167x167" href="icons/Icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-192.png">
 
-  <!-- iOS Splash Screens — Without these iOS shows a white flash on launch.
-       Each media query targets a specific device resolution. -->
-  <!-- iPhone SE (1st gen) / iPod touch 5th gen -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
-  <!-- iPhone 6/7/8 -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
-  <!-- iPhone 6+/7+/8+ -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">
-  <!-- iPhone X / XS -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
-  <!-- iPhone XS Max / XR -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">
-  <!-- iPhone 12/13/14 mini -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
-  <!-- iPhone 12/13/14 Pro Max -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)">
-  <!-- iPhone 14 Pro / 15 Pro (Dynamic Island) -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)">
-  <!-- iPhone 14 Pro Max / 15 Pro Max -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)">
-  <!-- iPad Mini -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)">
-  <!-- iPad Air / Pro 10.5" -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)">
-  <!-- iPad Pro 11" -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)">
-  <!-- iPad Pro 12.9" -->
-  <link rel="apple-touch-startup-image" href="icons/Icon-512.png"
-    media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
   <title>UniGrid</title>
   <link rel="manifest" href="manifest.json">
 
+  <script src="flutter_bootstrap.js" async></script>
 
-  <script>
-    // The value below is injected by flutter build, do not touch.
-    const serviceWorkerVersion = null;
-  </script>
-  <script src="flutter.js" defer></script>
-
-  <!-- PDF.js library for syncfusion_flutter_pdfviewer web support (deferred to prevent blocking initial load) -->
+  <!-- PDF.js library for syncfusion_flutter_pdfviewer web support -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js" defer></script>
   <script type="text/javascript">
     window.addEventListener('load', function() {
@@ -114,6 +52,7 @@
       }
     });
   </script>
+
   <style>
     body {
       background: linear-gradient(135deg, #091428 0%, #030710 100%);
@@ -169,10 +108,13 @@
     }
 
     .logo-img {
-      width: 36px;
-      height: 36px;
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+      border-radius: 10px;
       z-index: 10;
-      animation: logo-pulse 1s ease-in-out infinite alternate;
+      filter: drop-shadow(0 2px 10px rgba(59, 130, 246, 0.35));
+      animation: logo-pulse 1.2s ease-in-out infinite alternate;
     }
 
     .loading-text {
@@ -236,8 +178,7 @@
   </style>
 </head>
 <body>
-  <!-- iOS "Add to Home Screen" install banner — only shown on iPhone/iPad Safari
-       since iOS doesn't expose a native PWA install prompt like Android/Chrome does. -->
+  <!-- iOS "Add to Home Screen" install banner -->
   <div id="ios-install-banner" style="
     display: none;
     position: fixed;
@@ -272,7 +213,7 @@
     <div class="logo-box">
       <div class="halo"></div>
       <div class="spinner" id="unigrid-spinner"></div>
-      <img src="assets/assets/images/logo.png" class="logo-img" alt="UniGrid" onerror="this.onerror=null; this.src='assets/images/logo.png';">
+      <img src="logo.png" class="logo-img" alt="UniGrid" onerror="this.onerror=null; this.src='icons/Icon-192.png';">
     </div>
     <div class="loading-text" id="unigrid-loading-text">Loading UniGrid...</div>
     <div class="loading-subtext" id="unigrid-loading-subtext">Initializing workspace environment</div>
@@ -368,23 +309,22 @@
       }
     }, 15000);
 
-    // Global JS error handler (prevents harmless script/network errors from causing reload loops)
+    // Global JS error handler
     window.addEventListener('error', function(e) {
-      if (_isAppLoaded) return; // Do not reload if app has already loaded
+      if (_isAppLoaded) return;
       console.warn('[UniGrid Web] Engine load notice:', e.message);
     });
 
     // ════════════════════════════════════════════════════════════════════════
-    // Live Build Cache Purger & Auto-Updater System (Prevents Loop Purging)
+    // Live Build Cache Purger & Auto-Updater System
     // ════════════════════════════════════════════════════════════════════════
     var CURRENT_APP_VERSION = '20260806_v12';
 
     function _purgeBrowserCacheAndReload(newVersion) {
       console.log('[UniGrid Auto-Purger] Upgrading build version to:', newVersion);
-      if (localStorage.getItem('unigrid_purging') === '1') return; // Prevent infinite reload loop
+      if (localStorage.getItem('unigrid_purging') === '1') return;
       localStorage.setItem('unigrid_purging', '1');
 
-      // Crucial Fix: Immediately persist updated version BEFORE reload to prevent loop purges
       localStorage.setItem('unigrid_app_version', newVersion);
       localStorage.setItem('unigrid_last_cache_clear', Date.now().toString());
 
@@ -427,7 +367,6 @@
       var isExpiredFiveDays = lastClearTime > 0 && (Date.now() - lastClearTime) > FIVE_DAYS_MS;
 
       if (!savedVersion) {
-        // First time visitor — record version without purging
         localStorage.setItem('unigrid_app_version', CURRENT_APP_VERSION);
         localStorage.setItem('unigrid_last_cache_clear', Date.now().toString());
         localStorage.removeItem('unigrid_purging');
@@ -441,7 +380,7 @@
       }
     })();
 
-    // Live Deployment Checker — gracefully handles version.json and non-JSON responses
+    // Live Deployment Checker
     function _checkLiveDeploymentUpdate() {
       fetch('/version.json?t=' + Date.now(), { cache: 'no-store' })
         .then(function(res) {
@@ -474,9 +413,12 @@
       }
     });
 
+    window.addEventListener('flutter-first-frame', function() {
+      clearTimeout(_loadTimeout);
+      window._onAppLoaded();
+    });
+
     window.addEventListener('load', function(ev) {
-      // Unregister legacy flutter_service_worker.js to guarantee fresh asset loading
-      // PRESERVE firebase-messaging-sw.js for web push notifications
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for (var i = 0; i < registrations.length; i++) {
@@ -486,85 +428,8 @@
             }
           }
         });
-
-        navigator.serviceWorker.register('/firebase-messaging-sw.js?v=' + CURRENT_APP_VERSION)
-          .then(function(reg) {
-            console.log('[UniGrid] FCM Service Worker registered with scope:', reg.scope);
-          })
-          .catch(function(err) {
-            console.warn('[UniGrid] FCM Service Worker registration notice:', err);
-          });
       }
-
-      _flutter.loader.loadEntrypoint({
-        serviceWorker: {
-          serviceWorkerVersion: null,
-        },
-        onEntrypointLoaded: function(engineInitializer) {
-          clearTimeout(_loadTimeout);
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            window._onAppLoaded();
-            appRunner.runApp();
-          }).catch(function(err) {
-            console.error('Flutter engine init failed:', err);
-            _showRetry('Engine initialization error. Tap below to reload.');
-          });
-        }
-      });
     });
-  </script>
-
-  <script>
-    // Show iOS "Add to Home Screen" banner ONLY on genuine iOS Safari.
-    // Detection uses two Apple-exclusive signals that no desktop browser can fake:
-    //   1. window.navigator.standalone exists ONLY on iOS (it's undefined on every
-    //      desktop OS including macOS Safari, Windows, Android, etc.)
-    //   2. Explicit UA exclusions for iOS Chrome (CriOS), Firefox (FxiOS),
-    //      Edge (EdgiOS), and Opera (OPiOS) — which ARE on iOS but can't install PWAs.
-    (function() {
-      var ua = navigator.userAgent;
-
-      // navigator.standalone is an Apple-only property — undefined on ALL non-iOS browsers
-      var isReallyIos = typeof window.navigator.standalone !== 'undefined' &&
-                        /iPhone|iPad|iPod/.test(ua);
-
-      // Exclude other browsers that run on iOS (they can't install PWAs)
-      var isIosChrome  = /CriOS/.test(ua);
-      var isIosFirefox = /FxiOS/.test(ua);
-      var isIosEdge    = /EdgiOS/.test(ua);
-      var isIosOpera   = /OPiOS/.test(ua);
-      var isNativeSafari = isReallyIos && !isIosChrome && !isIosFirefox && !isIosEdge && !isIosOpera;
-
-      // navigator.standalone === true means already running as installed PWA — no need to prompt
-      var isAlreadyInstalled = window.navigator.standalone === true;
-
-      var bannerDismissed = sessionStorage.getItem('unigrid_ios_banner_dismissed');
-
-      if (isNativeSafari && !isAlreadyInstalled && !bannerDismissed) {
-        // Delay slightly so it appears after the Flutter app has painted
-        setTimeout(function() {
-          var banner = document.getElementById('ios-install-banner');
-          if (banner) {
-            banner.style.display = 'block';
-            // Auto-fade after 12 seconds if the user ignores it
-            setTimeout(function() {
-              if (banner.style.display !== 'none') {
-                banner.style.transition = 'opacity 0.4s ease';
-                banner.style.opacity = '0';
-                setTimeout(function() { banner.style.display = 'none'; }, 400);
-              }
-            }, 12000);
-          }
-        }, 2000);
-
-        // Remember dismissal for this browser session so it doesn't re-appear on reload
-        document.getElementById('ios-install-banner')
-          .querySelector('button')
-          .addEventListener('click', function() {
-            sessionStorage.setItem('unigrid_ios_banner_dismissed', '1');
-          });
-      }
-    })();
   </script>
 </body>
 </html>

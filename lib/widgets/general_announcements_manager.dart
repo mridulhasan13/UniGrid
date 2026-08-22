@@ -128,6 +128,14 @@ class GeneralAnnouncementService {
 
   /// Delete a general announcement (Root Admin only).
   static Future<void> deleteAnnouncement(String docId) async {
+    try {
+      final snap = await _db.collection(_collection).doc(docId).get();
+      final data = snap.data();
+      final fileUrl = (data?['fileUrl'] ?? '').toString();
+      if (fileUrl.isNotEmpty) {
+        await SupabaseStorageService.deleteFileByUrl(fileUrl);
+      }
+    } catch (_) {}
     await _db.collection(_collection).doc(docId).delete();
   }
 }
