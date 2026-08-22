@@ -353,6 +353,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case 'Privacy Policy':
         activePane = _buildPrivacyPane();
         break;
+      case 'Community Guidelines':
+        activePane = _buildCommunityGuidelinesPane();
+        break;
       default:
         activePane = _buildEditProfilePane(user);
     }
@@ -413,6 +416,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               'Terms & Conditions', Icons.gavel_outlined),
                           _buildHorizontalTabItem(
                               'Privacy Policy', Icons.privacy_tip_outlined),
+                          _buildHorizontalTabItem(
+                              'Community Guidelines', Icons.verified_user_outlined),
                         ],
                       ),
                     ),
@@ -487,6 +492,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 'Terms & Conditions', Icons.gavel_outlined),
                             _buildSidebarItem(
                                 'Privacy Policy', Icons.privacy_tip_outlined),
+                            _buildSidebarItem(
+                                'Community Guidelines', Icons.verified_user_outlined),
                           ],
                         ),
                       ),
@@ -2922,6 +2929,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildSectionTitle('9. Contact & Grievance Assistance'),
               _buildSectionBody(
                 'For privacy inquiries, account data verification requests, or security vulnerability reports, please reach out to the UniGrid engineering team through the GitHub repository or your department\'s designated Master Administrator.',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Community Guidelines Pane
+  Widget _buildCommunityGuidelinesPane() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Community Guidelines',
+            style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text('Effective Date: August 20, 2026',
+            style:
+                TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 12)),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.06)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle('1. Mutual Respect & Civility'),
+              _buildSectionBody(
+                'UniGrid is a shared academic sanctuary for university students, Class Representatives, and educators. Treat all peers with respect, courtesy, and dignity. Harassment, personal attacks, hate speech, derogatory remarks, bullying, or discrimination based on race, gender, religion, or background will not be tolerated.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('2. Academic Integrity & Honest Collaboration'),
+              _buildSectionBody(
+                'Share genuine, helpful, and verified academic resources such as lecture slides, study guides, and assignment prompts. Do not upload or distribute unreleased exam papers, unauthorized test answer keys, or facilitate academic dishonesty.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('3. Clean & Purposeful Classroom Discussions'),
+              _buildSectionBody(
+                'Keep department and batch communication channels constructive and relevant to campus life and studies. Do not flood chat rooms with spam, commercial promotions, unauthorized advertisements, chain messages, or political/religious solicitation.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('4. Respecting Student Privacy & Consent'),
+              _buildSectionBody(
+                'Never publicly share or disseminate private information belonging to fellow students or faculty (such as personal phone numbers, home addresses, private photos, or confidential exam marks) without their clear and explicit permission.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('5. Class Representative (CR) Ethical Standards'),
+              _buildSectionBody(
+                'Class Representatives hold positions of trust. CRs must ensure timely, truthful publication of class schedules, notices, and test dates. Abuse of administrative powers, targeted removal of peer resources, or bias in member approval is strictly prohibited.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('6. Safe Media & Content Sharing'),
+              _buildSectionBody(
+                'Ensure all uploaded study materials, PDF attachments, and avatar images are appropriate, virus-free, and relevant to educational activities. Obscene, violent, suggestive, or copyrighted third-party material without fair use is prohibited.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('7. Platform Integrity & Fair Use'),
+              _buildSectionBody(
+                'Users must not attempt to exploit application vulnerabilities, deploy scraping bots, bypass authentication or approval guards, impersonate other university members, or disrupt cloud database operations.',
+              ),
+              const SizedBox(height: 16),
+              _buildSectionTitle('8. Reporting & Violation Enforcement'),
+              _buildSectionBody(
+                'If you witness misconduct or harmful content, report it directly to your Class Representative or Master Administrator. Disciplinary actions include formal warnings, message removal, temporary chat suspensions, CR credential revocation, or permanent account banning.',
               ),
             ],
           ),

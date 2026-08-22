@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'in_app_notification.dart';
+import 'notification_router.dart';
 import 'notification_coordinator.dart';
 
 // ─── Web Push VAPID Key ──────────────────────────────────────────────────────
@@ -146,7 +147,19 @@ class FCMService {
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const InitializationSettings initSettings =
         InitializationSettings(android: androidSettings);
-    await _localNotifications.initialize(initSettings);
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        if (response.payload != null && response.payload!.isNotEmpty) {
+          try {
+            final data = jsonDecode(response.payload!) as Map<String, dynamic>;
+            NotificationRouter.handlePayload(data);
+          } catch (e) {
+            debugPrint('[FCMService] Local notification payload parse error: $e');
+          }
+        }
+      },
+    );
 
     // Create high-importance notification channel
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -166,28 +179,17 @@ class FCMService {
     // Register tap listeners for notifications opened when app is in background or terminated
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('[FCMService] Notification opened app: ${message.data}');
-      _handleNotificationTap(message);
+      NotificationRouter.handleRemoteMessage(message);
     });
 
     FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
       if (message != null) {
         debugPrint('[FCMService] App launched from notification: ${message.data}');
-        _handleNotificationTap(message);
+        NotificationRouter.handleRemoteMessage(message);
       }
     });
 
     // Note: Foreground messages are handled by NotificationCoordinator (WAReceiver / AAReceiver).
-  }
-
-  static void _handleNotificationTap(RemoteMessage message) {
-    final route = message.data['route'];
-    if (route != null && route.toString().isNotEmpty && route.toString() != '/') {
-      final targetRoute = route.toString();
-      debugPrint('[FCMService] Navigating to route on tap: $targetRoute');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        globalNavigatorKey.currentState?.pushNamed(targetRoute);
-      });
-    }
   }
 
   // ─── Show local notification from FCM remote message (foreground only) ──────
@@ -237,9 +239,14 @@ class FCMService {
     required String title,
     required String body,
     int? id,
+    Map<String, dynamic>? data,
   }) async {
     if (kIsWeb) return;
     try {
+      final payloadData = Map<String, dynamic>.from(data ?? {'target': 'schedule', 'route': '/schedule'});
+      payloadData['title'] ??= title;
+      payloadData['body'] ??= body;
+
       await _localNotifications.show(
         id ?? title.hashCode,
         title,
@@ -259,6 +266,7 @@ class FCMService {
             ),
           ),
         ),
+        payload: jsonEncode(payloadData),
       );
     } catch (e) {
       debugPrint('Error showing local system notification: $e');
@@ -540,6 +548,7 @@ class FCMService {
     required String body,
     required String senderUserId,
     String? messageId,
+    Map<String, String>? extraData,
   }) async {
     await NotificationCoordinator.sendPrivate(
       title: title,
@@ -547,6 +556,7 @@ class FCMService {
       senderUserId: senderUserId,
       recipientId: recipientId,
       messageId: messageId,
+      extraData: extraData,
     );
   }
 
@@ -558,6 +568,7 @@ class FCMService {
     required String senderUserId,
     bool adminsOnly = false,
     String? messageId,
+    Map<String, String>? extraData,
   }) async {
     await NotificationCoordinator.sendBroadcast(
       title: title,
@@ -567,6 +578,7 @@ class FCMService {
       batch: batch,
       adminsOnly: adminsOnly,
       messageId: messageId,
+      extraData: extraData,
     );
   }
 
@@ -589,6 +601,13 @@ class FCMService {
       body: preview,
       senderUserId: senderUserId,
       messageId: messageId,
+      extraData: {
+        'target': 'group_chat',
+        'type': 'group_chat',
+        'route': '/chat',
+        'tabIndex': '3',
+        'preferenceField': 'notifChat',
+      },
     );
   }
 
@@ -607,6 +626,13 @@ class FCMService {
       body: title,
       senderUserId: senderUserId,
       messageId: messageId,
+      extraData: {
+        'target': 'announcements',
+        'type': 'announcement',
+        'route': '/home',
+        'tabIndex': '0',
+        'preferenceField': 'notifAlerts',
+      },
     );
   }
 
@@ -623,6 +649,13 @@ class FCMService {
       body: title.isNotEmpty ? title : content,
       senderUserId: senderUserId,
       messageId: messageId,
+      extraData: {
+        'target': 'general_announcement',
+        'type': 'general_announcement',
+        'route': '/home',
+        'tabIndex': '0',
+        'preferenceField': 'notifAlerts',
+      },
     );
   }
 
@@ -641,6 +674,13 @@ class FCMService {
       body: '$title${subject.isNotEmpty ? ' · $subject' : ''}',
       senderUserId: senderUserId,
       messageId: messageId,
+      extraData: {
+        'target': 'materials',
+        'type': 'material',
+        'route': '/materials',
+        'tabIndex': '2',
+        'preferenceField': 'notifAlerts',
+      },
     );
   }
 
@@ -660,6 +700,13 @@ class FCMService {
       senderUserId: senderUserId,
       adminsOnly: true,
       messageId: messageId,
+      extraData: {
+        'target': 'cr_panel',
+        'type': 'registration_request',
+        'route': '/cr_panel',
+        'tabIndex': '4',
+        'preferenceField': 'notifAlerts',
+      },
     );
   }
 
@@ -676,6 +723,13 @@ class FCMService {
       body: 'Your UniGrid registration for $department - Batch $batch has been approved by the CR. Welcome aboard!',
       senderUserId: senderUserId,
       messageId: messageId,
+      extraData: {
+        'target': 'home',
+        'type': 'account_approved',
+        'route': '/home',
+        'tabIndex': '0',
+        'preferenceField': 'notifAlerts',
+      },
     );
   }
 }

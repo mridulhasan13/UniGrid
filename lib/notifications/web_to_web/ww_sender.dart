@@ -18,10 +18,15 @@ class WWSender {
     required String senderUserId,
     required String recipientId,
     required String messageId,
+    Map<String, String>? extraData,
   }) async {
-    final tokens = await TokenResolver.getWebTokensForUser(recipientId);
+    final prefField = extraData?['preferenceField'] ?? 'notifChat';
+    final tokens = await TokenResolver.getWebTokensForUser(
+      recipientId,
+      requiredPreferenceField: prefField,
+    );
     if (tokens.isEmpty) {
-      debugPrint('[WWSender] No web tokens for recipient $recipientId');
+      debugPrint('[WWSender] No web tokens for recipient $recipientId (or notifications disabled)');
       return;
     }
     await FcmDispatcher.dispatch(
@@ -31,6 +36,7 @@ class WWSender {
       senderUserId: senderUserId,
       messageId: messageId,
       targetPlatform: 'web',
+      extraData: extraData,
     );
     debugPrint('[WWSender] Private → ${tokens.length} web token(s)');
   }
@@ -45,15 +51,19 @@ class WWSender {
     required String batch,
     bool adminsOnly = false,
     required String messageId,
+    Map<String, String>? extraData,
   }) async {
+    final prefField = extraData?['preferenceField'] ??
+        (extraData?['target'] == 'group_chat' ? 'notifChat' : 'notifAlerts');
     final tokens = await TokenResolver.getWebTokensForGroup(
       department: department,
       batch: batch,
       adminsOnly: adminsOnly,
       excludeUserId: senderUserId,
+      requiredPreferenceField: prefField,
     );
     if (tokens.isEmpty) {
-      debugPrint('[WWSender] No web tokens in $department-$batch');
+      debugPrint('[WWSender] No web tokens in $department-$batch for $prefField');
       return;
     }
     await FcmDispatcher.dispatch(
@@ -63,6 +73,7 @@ class WWSender {
       senderUserId: senderUserId,
       messageId: messageId,
       targetPlatform: 'web',
+      extraData: extraData,
     );
     debugPrint('[WWSender] Broadcast → ${tokens.length} web token(s)');
   }

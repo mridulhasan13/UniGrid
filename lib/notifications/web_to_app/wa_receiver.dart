@@ -18,6 +18,10 @@ import '../shared/duplicate_guard.dart';
 /// system-tray notification from the `notification` block in the payload
 /// (sound included). No manual handling is needed for that case.
 /// ─────────────────────────────────────────────────────────────────────────────
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../notification_router.dart';
+
 class WAReceiver {
   WAReceiver._();
 
@@ -36,6 +40,16 @@ class WAReceiver {
         AndroidInitializationSettings('@mipmap/ic_launcher');
     await _local.initialize(
       const InitializationSettings(android: androidSettings),
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        if (response.payload != null && response.payload!.isNotEmpty) {
+          try {
+            final data = jsonDecode(response.payload!) as Map<String, dynamic>;
+            NotificationRouter.handlePayload(data);
+          } catch (e) {
+            debugPrint('[WAReceiver] Error parsing local notification payload: $e');
+          }
+        }
+      },
     );
 
     // Foreground message handler
@@ -52,6 +66,31 @@ class WAReceiver {
       final senderUid = (message.data['senderUserId'] as String?) ?? '';
       if (senderUid.isNotEmpty && senderUid == currentUid) return;
 
+      // ── User notification preference check (Settings toggle) ─────────────
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final prefField = (message.data['preferenceField'] as String?) ?? '';
+        final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
+
+        if (prefField == 'notifChat' || target.contains('chat') || target.contains('private')) {
+          final notifChat = prefs.getBool('notif_chat') ?? true;
+          if (!notifChat) {
+            debugPrint('[WAReceiver] Suppressing foreground chat notification (notif_chat is OFF)');
+            return;
+          }
+        }
+
+        if (prefField == 'notifAlerts' || target.contains('announcement') || target.contains('material') || target.contains('notice')) {
+          final notifAlerts = prefs.getBool('notif_alerts') ?? true;
+          if (!notifAlerts) {
+            debugPrint('[WAReceiver] Suppressing foreground alerts notification (notif_alerts is OFF)');
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('[WAReceiver] Error checking notification preferences: $e');
+      }
+
       final title = message.notification?.title ??
           (message.data['title'] as String?) ??
           'UniGrid';
@@ -59,6 +98,10 @@ class WAReceiver {
           (message.data['body'] as String?) ??
           '';
       if (title.isEmpty && body.isEmpty) return;
+
+      final payloadMap = Map<String, dynamic>.from(message.data);
+      payloadMap['title'] ??= title;
+      payloadMap['body'] ??= body;
 
       // ── System tray notification (with sound) ────────────────────────────
       await _local.show(
@@ -76,6 +119,7 @@ class WAReceiver {
             tag: msgId,                    // prevents OS-level duplicate
           ),
         ),
+        payload: jsonEncode(payloadMap),
       );
 
       // ── In-app banner ────────────────────────────────────────────────────
@@ -83,6 +127,9 @@ class WAReceiver {
         title: title,
         message: body,
         icon: Icons.notifications_active_rounded,
+        onTap: () {
+          NotificationRouter.handlePayload(payloadMap);
+        },
       );
     });
 

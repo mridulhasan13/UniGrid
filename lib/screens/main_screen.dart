@@ -14,10 +14,17 @@ import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../utils/constants.dart';
 import '../widgets/glass_card.dart';
-import '../notifications/routine_reminder_service.dart';
+import '../notifications/notification_router.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
+
+  static final ValueNotifier<int> tabNotifier = ValueNotifier<int>(0);
+
+  /// Programmatically switch tabs from anywhere (e.g. notification clicks)
+  static void switchTab(int index) {
+    tabNotifier.value = index;
+  }
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -25,6 +32,32 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = MainScreen.tabNotifier.value;
+    MainScreen.tabNotifier.addListener(_onTabChanged);
+
+    // Process any pending notification tap once MainScreen is mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationRouter.processPendingNotification();
+    });
+  }
+
+  @override
+  void dispose() {
+    MainScreen.tabNotifier.removeListener(_onTabChanged);
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (mounted && _currentIndex != MainScreen.tabNotifier.value) {
+      setState(() {
+        _currentIndex = MainScreen.tabNotifier.value;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -154,6 +187,7 @@ class _MainScreenState extends State<MainScreen> {
                       setState(() {
                         _currentIndex = index;
                       });
+                      MainScreen.tabNotifier.value = index;
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),

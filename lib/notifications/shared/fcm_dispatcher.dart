@@ -49,6 +49,7 @@ class FcmDispatcher {
     required String senderUserId,
     required String messageId,
     String targetPlatform = 'web',
+    Map<String, String>? extraData,
   }) async {
     if (tokens.isEmpty) return;
 
@@ -88,6 +89,8 @@ class FcmDispatcher {
           'senderUserId': senderUserId,
           'messageId': messageId,
           'targetPlatform': targetPlatform,
+          'extraData': extraData ?? {},
+          ...?extraData,
         }),
       );
 
@@ -115,6 +118,7 @@ class FcmDispatcher {
         body: body,
         senderUserId: senderUserId,
         messageId: messageId,
+        extraData: extraData,
       );
     }
   }
@@ -127,6 +131,7 @@ class FcmDispatcher {
     required String body,
     required String senderUserId,
     required String messageId,
+    Map<String, String>? extraData,
   }) async {
     try {
       final jsonString = await rootBundle.loadString('assets/service_account.json');
@@ -141,6 +146,14 @@ class FcmDispatcher {
       final endpoint =
           'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
 
+      final Map<String, String> dataPayload = {
+        'title': title,
+        'body': body,
+        'senderUserId': senderUserId,
+        'messageId': messageId,
+        ...?extraData,
+      };
+
       for (final token in tokens.toSet()) {
         try {
           final response = await http.post(
@@ -153,12 +166,7 @@ class FcmDispatcher {
               'message': {
                 'token': token,
                 'notification': {'title': title, 'body': body},
-                'data': {
-                  'title': title,
-                  'body': body,
-                  'senderUserId': senderUserId,
-                  'messageId': messageId,
-                },
+                'data': dataPayload,
                 'android': {
                   'priority': 'high',
                   'notification': {

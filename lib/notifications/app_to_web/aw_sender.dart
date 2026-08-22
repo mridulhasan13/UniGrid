@@ -18,11 +18,16 @@ class AWSender {
     required String senderUserId,
     required String recipientId,
     required String messageId,
+    Map<String, String>? extraData,
   }) async {
-    final tokens = await TokenResolver.getWebTokensForUser(recipientId);
+    final prefField = extraData?['preferenceField'] ?? 'notifChat';
+    final tokens = await TokenResolver.getWebTokensForUser(
+      recipientId,
+      requiredPreferenceField: prefField,
+    );
     final webTokens = tokens.where((t) => t.trim().isNotEmpty).toSet().toList();
     if (webTokens.isEmpty) {
-      debugPrint('[AWSender] No web tokens for recipient $recipientId');
+      debugPrint('[AWSender] No web tokens for recipient $recipientId (or notifications disabled)');
       return;
     }
     await FcmDispatcher.dispatch(
@@ -32,6 +37,7 @@ class AWSender {
       senderUserId: senderUserId,
       messageId: messageId,
       targetPlatform: 'web',
+      extraData: extraData,
     );
     debugPrint('[AWSender] Private → ${webTokens.length} web token(s)');
   }
@@ -46,16 +52,20 @@ class AWSender {
     required String batch,
     bool adminsOnly = false,
     required String messageId,
+    Map<String, String>? extraData,
   }) async {
+    final prefField = extraData?['preferenceField'] ??
+        (extraData?['target'] == 'group_chat' ? 'notifChat' : 'notifAlerts');
     final tokens = await TokenResolver.getWebTokensForGroup(
       department: department,
       batch: batch,
       adminsOnly: adminsOnly,
       excludeUserId: senderUserId,
+      requiredPreferenceField: prefField,
     );
     final webTokens = tokens.where((t) => t.trim().isNotEmpty).toSet().toList();
     if (webTokens.isEmpty) {
-      debugPrint('[AWSender] No web tokens in $department-$batch');
+      debugPrint('[AWSender] No web tokens in $department-$batch for $prefField');
       return;
     }
     await FcmDispatcher.dispatch(
@@ -65,6 +75,7 @@ class AWSender {
       senderUserId: senderUserId,
       messageId: messageId,
       targetPlatform: 'web',
+      extraData: extraData,
     );
     debugPrint('[AWSender] Broadcast → ${webTokens.length} web token(s)');
   }

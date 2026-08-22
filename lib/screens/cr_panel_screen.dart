@@ -886,7 +886,13 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                   );
                 }
 
-                final allDocs = snapshot.data?.docs ?? [];
+                final allDocs = (snapshot.data?.docs ?? []).where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final dept = data['department'] ?? '';
+                  final b = data['batch'] ?? '';
+                  final email = (data['email'] ?? '').toString().toLowerCase();
+                  return dept != 'DEMO' && b != '01' && !email.contains('demo.reviewer');
+                }).toList();
 
                 // Root admins can see all pending users, CRs only see their dept/batch
                 final isRoot = isRootAdmin;
@@ -1086,7 +1092,13 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                   return const SizedBox();
                 }
 
-                final allDocs = snapshot.data?.docs ?? [];
+                final allDocs = (snapshot.data?.docs ?? []).where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final dept = data['department'] ?? '';
+                  final b = data['batch'] ?? '';
+                  final email = (data['email'] ?? '').toString().toLowerCase();
+                  return dept != 'DEMO' && b != '01' && !email.contains('demo.reviewer');
+                }).toList();
                 final isRoot = isRootAdmin;
 
                 final filteredMembers = allDocs.where((doc) {

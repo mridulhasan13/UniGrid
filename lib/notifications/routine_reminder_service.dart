@@ -8,6 +8,7 @@ import '../models/models.dart';
 import '../utils/dept_scope.dart';
 import 'in_app_notification.dart';
 import 'fcm_service.dart';
+import 'notification_router.dart';
 
 /// Background service for scheduling and dispatching 10-minute class reminders.
 class RoutineReminderService {
@@ -94,6 +95,12 @@ class RoutineReminderService {
             FCMService.showLocalSystemNotification(
               title: titleText,
               body: bodyText,
+              data: {
+                'target': 'schedule',
+                'type': 'routine_reminder',
+                'route': '/schedule',
+                'tabIndex': '1',
+              },
             );
 
             // 2. In-App Glassmorphic Overlay Banner (if app is open)
@@ -103,6 +110,14 @@ class RoutineReminderService {
                 message: bodyText,
                 icon: Icons.schedule_rounded,
                 accentColor: const Color(0xFF3B82F6),
+                onTap: () {
+                  NotificationRouter.handlePayload({
+                    'target': 'schedule',
+                    'type': 'routine_reminder',
+                    'route': '/schedule',
+                    'tabIndex': '1',
+                  });
+                },
               );
             } catch (e) {
               debugPrint('[RoutineReminder] Could not show in-app banner: $e');

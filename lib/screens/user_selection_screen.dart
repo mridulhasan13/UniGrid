@@ -99,7 +99,11 @@ class _UserSelectionScreenState extends State<UserSelectionScreen> {
                           return AppUser.fromMap(
                               doc.data() as Map<String, dynamic>, doc.id);
                         })
-                        .where((u) => u.id != appUser.id)
+                        .where((u) =>
+                            u.id != appUser.id &&
+                            u.department != 'DEMO' &&
+                            u.batch != '01' &&
+                            !u.email.toLowerCase().contains('demo.reviewer'))
                         .toList()
                       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 

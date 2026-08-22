@@ -18,23 +18,37 @@ class TokenResolver {
   // ─── Per-user lookups ──────────────────────────────────────────────────────
 
   /// All web (browser) tokens for a single user.
-  static Future<List<String>> getWebTokensForUser(String uid) async {
+  static Future<List<String>> getWebTokensForUser(String uid, {String? requiredPreferenceField}) async {
     final doc = await _db.collection('users').doc(uid).get();
-    return _extractCategory(doc.data(), 'webTokens');
+    final data = doc.data();
+    if (requiredPreferenceField != null && data != null && data[requiredPreferenceField] == false) {
+      debugPrint('[TokenResolver] Suppressed web token for user $uid ($requiredPreferenceField is disabled)');
+      return [];
+    }
+    return _extractCategory(data, 'webTokens');
   }
 
   /// All native (Android/iOS) tokens for a single user.
-  static Future<List<String>> getNativeTokensForUser(String uid) async {
+  static Future<List<String>> getNativeTokensForUser(String uid, {String? requiredPreferenceField}) async {
     final doc = await _db.collection('users').doc(uid).get();
-    return _extractCategory(doc.data(), 'nativeTokens');
+    final data = doc.data();
+    if (requiredPreferenceField != null && data != null && data[requiredPreferenceField] == false) {
+      debugPrint('[TokenResolver] Suppressed native token for user $uid ($requiredPreferenceField is disabled)');
+      return [];
+    }
+    return _extractCategory(data, 'nativeTokens');
   }
 
   /// All tokens (web + native) for a single user.
-  static Future<List<String>> getAllTokensForUser(String uid) async {
+  static Future<List<String>> getAllTokensForUser(String uid, {String? requiredPreferenceField}) async {
     final doc = await _db.collection('users').doc(uid).get();
+    final data = doc.data();
+    if (requiredPreferenceField != null && data != null && data[requiredPreferenceField] == false) {
+      return [];
+    }
     final Set<String> all = {};
-    all.addAll(_extractCategory(doc.data(), 'webTokens'));
-    all.addAll(_extractCategory(doc.data(), 'nativeTokens'));
+    all.addAll(_extractCategory(data, 'webTokens'));
+    all.addAll(_extractCategory(data, 'nativeTokens'));
     return all.toList();
   }
 
@@ -46,6 +60,7 @@ class TokenResolver {
     required String batch,
     bool adminsOnly = false,
     String? excludeUserId,
+    String? requiredPreferenceField,
   }) async {
     return _queryGroup(
       department: department,
@@ -53,6 +68,7 @@ class TokenResolver {
       adminsOnly: adminsOnly,
       excludeUserId: excludeUserId,
       categoryField: 'webTokens',
+      requiredPreferenceField: requiredPreferenceField,
     );
   }
 
@@ -62,6 +78,7 @@ class TokenResolver {
     required String batch,
     bool adminsOnly = false,
     String? excludeUserId,
+    String? requiredPreferenceField,
   }) async {
     return _queryGroup(
       department: department,
@@ -69,6 +86,7 @@ class TokenResolver {
       adminsOnly: adminsOnly,
       excludeUserId: excludeUserId,
       categoryField: 'nativeTokens',
+      requiredPreferenceField: requiredPreferenceField,
     );
   }
 
@@ -122,6 +140,7 @@ class TokenResolver {
     required bool adminsOnly,
     required String categoryField,
     String? excludeUserId,
+    String? requiredPreferenceField,
   }) async {
     try {
       Query<Map<String, dynamic>> query = _db.collection('users');
@@ -137,6 +156,12 @@ class TokenResolver {
       for (final doc in snap.docs) {
         if (excludeUserId != null && doc.id == excludeUserId) continue;
         final data = doc.data();
+
+        // ── Respect user's notification preference from settings ─────────────
+        if (requiredPreferenceField != null && data[requiredPreferenceField] == false) {
+          continue; // User has toggled OFF this notification category in Settings
+        }
+
         if (adminsOnly &&
             data['isCR'] != true &&
             data['isAdmin'] != true) {

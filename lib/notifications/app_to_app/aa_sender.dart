@@ -18,10 +18,15 @@ class AASender {
     required String senderUserId,
     required String recipientId,
     required String messageId,
+    Map<String, String>? extraData,
   }) async {
-    final tokens = await TokenResolver.getNativeTokensForUser(recipientId);
+    final prefField = extraData?['preferenceField'] ?? 'notifChat';
+    final tokens = await TokenResolver.getNativeTokensForUser(
+      recipientId,
+      requiredPreferenceField: prefField,
+    );
     if (tokens.isEmpty) {
-      debugPrint('[AASender] No native tokens for recipient $recipientId');
+      debugPrint('[AASender] No native tokens for recipient $recipientId (or notifications disabled)');
       return;
     }
     await FcmDispatcher.dispatch(
@@ -31,6 +36,7 @@ class AASender {
       senderUserId: senderUserId,
       messageId: messageId,
       targetPlatform: 'native',
+      extraData: extraData,
     );
     debugPrint('[AASender] Private → ${tokens.length} native token(s)');
   }
@@ -45,15 +51,19 @@ class AASender {
     required String batch,
     bool adminsOnly = false,
     required String messageId,
+    Map<String, String>? extraData,
   }) async {
+    final prefField = extraData?['preferenceField'] ??
+        (extraData?['target'] == 'group_chat' ? 'notifChat' : 'notifAlerts');
     final tokens = await TokenResolver.getNativeTokensForGroup(
       department: department,
       batch: batch,
       adminsOnly: adminsOnly,
       excludeUserId: senderUserId,
+      requiredPreferenceField: prefField,
     );
     if (tokens.isEmpty) {
-      debugPrint('[AASender] No native tokens in $department-$batch');
+      debugPrint('[AASender] No native tokens in $department-$batch for $prefField');
       return;
     }
     await FcmDispatcher.dispatch(
@@ -63,6 +73,7 @@ class AASender {
       senderUserId: senderUserId,
       messageId: messageId,
       targetPlatform: 'native',
+      extraData: extraData,
     );
     debugPrint('[AASender] Broadcast → ${tokens.length} native token(s)');
   }

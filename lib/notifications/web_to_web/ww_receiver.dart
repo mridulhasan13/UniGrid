@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart' show Icons;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../in_app_notification.dart';
+import '../notification_router.dart';
 import '../shared/duplicate_guard.dart';
 import '../shared/sound_helper.dart';
 
@@ -27,7 +29,7 @@ class WWReceiver {
     if (!kIsWeb || _initialized) return;
     _initialized = true;
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       final msgId = (message.data['messageId'] as String?) ??
           message.messageId ??
           'ww_${DateTime.now().millisecondsSinceEpoch}';
@@ -40,6 +42,31 @@ class WWReceiver {
       final senderUid = (message.data['senderUserId'] as String?) ?? '';
       if (senderUid.isNotEmpty && senderUid == currentUid) return;
 
+      // ── User notification preference check (Settings toggle) ─────────────
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final prefField = (message.data['preferenceField'] as String?) ?? '';
+        final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
+
+        if (prefField == 'notifChat' || target.contains('chat') || target.contains('private')) {
+          final notifChat = prefs.getBool('notif_chat') ?? true;
+          if (!notifChat) {
+            debugPrint('[WWReceiver] Suppressing web chat notification (notif_chat is OFF)');
+            return;
+          }
+        }
+
+        if (prefField == 'notifAlerts' || target.contains('announcement') || target.contains('material') || target.contains('notice')) {
+          final notifAlerts = prefs.getBool('notif_alerts') ?? true;
+          if (!notifAlerts) {
+            debugPrint('[WWReceiver] Suppressing web alerts notification (notif_alerts is OFF)');
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('[WWReceiver] Error checking notification preferences: $e');
+      }
+
       final title = message.notification?.title ??
           (message.data['title'] as String?) ??
           'UniGrid';
@@ -47,6 +74,10 @@ class WWReceiver {
           (message.data['body'] as String?) ??
           '';
       if (title.isEmpty && body.isEmpty) return;
+
+      final payloadMap = Map<String, dynamic>.from(message.data);
+      payloadMap['title'] ??= title;
+      payloadMap['body'] ??= body;
 
       // ── Sound (Web Audio API ding-dong) ──────────────────────────────────
       playNotificationSound();
@@ -56,6 +87,9 @@ class WWReceiver {
         title: title,
         message: body,
         icon: Icons.notifications_active_rounded,
+        onTap: () {
+          NotificationRouter.handlePayload(payloadMap);
+        },
       );
     });
 

@@ -48,10 +48,12 @@ messaging.onBackgroundMessage((payload) => {
 
   const notificationOptions = {
     body: notificationBody,
-    icon: 'https://unigrid.netlify.app/icons/Icon-maskable-192.png',
-    badge: 'https://unigrid.netlify.app/icons/Icon-maskable-192.png',
-    tag: (payload.data && payload.data.messageId) || (payload.notification && payload.notification.tag) || 'unigrid-notification',
+    icon: '/icons/Icon-192.png',
+    badge: '/icons/Icon-192.png',
+    tag: (payload.data && payload.data.messageId) || (payload.notification && payload.notification.tag) || ('unigrid_' + Date.now()),
     renotify: false,
+    requireInteraction: false,
+    timestamp: Date.now(),
     data: payload.data || {},
   };
 

@@ -105,9 +105,20 @@ class NotificationCoordinator {
     required String senderUserId,
     required String recipientId,
     String? messageId,
+    Map<String, String>? extraData,
   }) async {
     final msgId = messageId ??
         'pm_${senderUserId.substring(0, 6)}_${DateTime.now().millisecondsSinceEpoch}';
+
+    final payloadData = {
+      'target': 'private_chat',
+      'type': 'private_chat',
+      'route': '/private_chat',
+      'senderUserId': senderUserId,
+      'recipientId': recipientId,
+      'preferenceField': 'notifChat',
+      ...?extraData,
+    };
 
     if (kIsWeb) {
       // ── Web sender ──────────────────────────────────────────────────────
@@ -116,11 +127,13 @@ class NotificationCoordinator {
           title: title, body: body,
           senderUserId: senderUserId, recipientId: recipientId,
           messageId: msgId,
+          extraData: payloadData,
         ),
         WASender.sendPrivate(
           title: title, body: body,
           senderUserId: senderUserId, recipientId: recipientId,
           messageId: msgId,
+          extraData: payloadData,
         ),
       ]);
     } else {
@@ -130,11 +143,13 @@ class NotificationCoordinator {
           title: title, body: body,
           senderUserId: senderUserId, recipientId: recipientId,
           messageId: msgId,
+          extraData: payloadData,
         ),
         AASender.sendPrivate(
           title: title, body: body,
           senderUserId: senderUserId, recipientId: recipientId,
           messageId: msgId,
+          extraData: payloadData,
         ),
       ]);
     }
@@ -151,6 +166,7 @@ class NotificationCoordinator {
     required String batch,
     bool adminsOnly = false,
     String? messageId,
+    Map<String, String>? extraData,
   }) async {
     final msgId = messageId ??
         'bc_${department}_${batch}_${DateTime.now().millisecondsSinceEpoch}';
@@ -162,11 +178,13 @@ class NotificationCoordinator {
           title: title, body: body,
           senderUserId: senderUserId, department: department, batch: batch,
           adminsOnly: adminsOnly, messageId: msgId,
+          extraData: extraData,
         ),
         WASender.sendBroadcast(
           title: title, body: body,
           senderUserId: senderUserId, department: department, batch: batch,
           adminsOnly: adminsOnly, messageId: msgId,
+          extraData: extraData,
         ),
       ]);
     } else {
@@ -176,11 +194,13 @@ class NotificationCoordinator {
           title: title, body: body,
           senderUserId: senderUserId, department: department, batch: batch,
           adminsOnly: adminsOnly, messageId: msgId,
+          extraData: extraData,
         ),
         AASender.sendBroadcast(
           title: title, body: body,
           senderUserId: senderUserId, department: department, batch: batch,
           adminsOnly: adminsOnly, messageId: msgId,
+          extraData: extraData,
         ),
       ]);
     }

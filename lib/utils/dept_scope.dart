@@ -15,7 +15,6 @@ const List<Map<String, String>> kDepartments = [
   {'code': 'TMDM', 'name': 'Textile Machinery Design & Maintenance'},
   {'code': 'TME', 'name': 'Textile Materials Engineering'},
   {'code': 'TFD', 'name': 'Textile Fashion & Design'},
-  {'code': 'DEMO', 'name': 'Demo Campus Sandbox'},
 ];
 
 /// Dept codes only (for dropdowns / validation).
@@ -23,6 +22,7 @@ final List<String> kDeptCodes = kDepartments.map((d) => d['code']!).toList();
 
 /// Get the full name for a dept code, or return the code itself if not found.
 String deptFullName(String code) {
+  if (code == 'DEMO') return 'Demo Campus Sandbox';
   final match = kDepartments.firstWhere(
     (d) => d['code'] == code,
     orElse: () => {'code': code, 'name': code},
@@ -31,7 +31,7 @@ String deptFullName(String code) {
 }
 
 /// Supported batch numbers.
-const List<String> kBatches = ['48', '49', '50', '51', '52', '01'];
+const List<String> kBatches = ['48', '49', '50', '51', '52'];
 
 /// Build the Firestore sub-collection path for a given dept, batch, and collection name.
 /// e.g. deptBatchCol('IPE', '51', 'announcements')

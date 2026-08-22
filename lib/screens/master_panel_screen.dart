@@ -251,7 +251,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
       child: StreamBuilder<QuerySnapshot>(
         stream: _firestore.collection('users').snapshots(),
         builder: (context, snapshot) {
-          final allDocs = snapshot.data?.docs ?? [];
+          final allDocs = (snapshot.data?.docs ?? []).where((doc) {
+            final data = doc.data() as Map<String, dynamic>? ?? {};
+            final dept = data['department'] ?? '';
+            final b = data['batch'] ?? '';
+            final email = (data['email'] ?? '').toString().toLowerCase();
+            return dept != 'DEMO' && b != '01' && !email.contains('demo.reviewer');
+          }).toList();
 
           // ── Calculate Login & Activity Telemetry ─────────────────────────
           final now = DateTime.now();

@@ -111,6 +111,14 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
         body: message.text,
         senderUserId: user.id,
         messageId: textMessage['id'] as String?,
+        extraData: {
+          'target': 'private_chat',
+          'type': 'private_chat',
+          'route': '/private_chat',
+          'senderUserId': user.id,
+          'senderName': user.name,
+          'senderPhoto': user.photoUrl,
+        },
       );
     } catch (e) {
       debugPrint('[PrivateChatScreen] Error sending push notification: $e');
@@ -167,8 +175,15 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             body: 'Sent an image',
             senderUserId: user.id,
             messageId: imageMessage['id'] as String?,
+            extraData: {
+              'target': 'private_chat',
+              'type': 'private_chat',
+              'route': '/private_chat',
+              'senderUserId': user.id,
+              'senderName': user.name,
+              'senderPhoto': user.photoUrl,
+            },
           );
-
         }
       }
 
