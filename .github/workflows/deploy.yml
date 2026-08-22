@@ -50,16 +50,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install Netlify Functions Dependencies
         run: |
           cd netlify/functions
-          npm cache clean --force || true
-          npm install --legacy-peer-deps --no-audit --no-fund
+          npm install --registry=https://registry.npmjs.org/ --no-audit --no-fund || true
 
       - name: Deploy to Netlify
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         run: |
-          npx netlify-cli deploy --prod --dir=./build/web --site=$NETLIFY_SITE_ID --auth=$NETLIFY_AUTH_TOKEN --functions=./netlify/functions
+          npx --yes netlify-cli deploy --prod --dir=./build/web --site=$NETLIFY_SITE_ID --auth=$NETLIFY_AUTH_TOKEN --functions=./netlify/functions
