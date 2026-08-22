@@ -2010,7 +2010,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'info-unigrid.netlify.app', 'https://info-unigrid.netlify.app/'),
               const Divider(color: Colors.white10, height: 16),
               _aboutInfoLinkRow(Icons.email_outlined, 'Support',
-                  'unigrid.app@gmail.com', 'mailto:unigrid.app@gmail.com'),
+                  'support.unigrid@gmail.com', 'mailto:support.unigrid@gmail.com'),
               const Divider(color: Colors.white10, height: 16),
               _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.0'),
             ],
@@ -2653,7 +2653,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () async {
-                    final uri = Uri.parse('mailto:unigrid.app@gmail.com?subject=UniGrid%20Support%20Request');
+                    final uri = Uri.parse('mailto:support.unigrid@gmail.com?subject=UniGrid%20Support%20Request');
                     try {
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -2661,18 +2661,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         await launchUrl(uri);
                       }
                     } catch (_) {
-                      Clipboard.setData(const ClipboardData(text: 'unigrid.app@gmail.com'));
+                      Clipboard.setData(const ClipboardData(text: 'support.unigrid@gmail.com'));
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Email copied to clipboard: unigrid.app@gmail.com')),
+                          const SnackBar(content: Text('Email copied to clipboard: support.unigrid@gmail.com')),
                         );
                       }
                     }
                   },
                   onLongPress: () {
-                    Clipboard.setData(const ClipboardData(text: 'unigrid.app@gmail.com'));
+                    Clipboard.setData(const ClipboardData(text: 'support.unigrid@gmail.com'));
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Email copied to clipboard: unigrid.app@gmail.com')),
+                      const SnackBar(content: Text('Email copied to clipboard: support.unigrid@gmail.com')),
                     );
                   },
                   borderRadius: BorderRadius.circular(8),
@@ -2689,7 +2689,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Icon(Icons.email_outlined, size: 16, color: AppColors.primary),
                         const SizedBox(width: 8),
                         Text(
-                          'unigrid.app@gmail.com',
+                          'support.unigrid@gmail.com',
                           style: TextStyle(
                             color: AppColors.primary,
                             fontSize: 13,

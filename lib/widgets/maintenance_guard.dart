@@ -38,7 +38,7 @@ class MaintenanceGuard extends StatelessWidget {
   }
 
   Future<void> _launchEmail(BuildContext context) async {
-    final uri = Uri.parse('mailto:unigrid.app@gmail.com?subject=Urgent%20Query%20-%20UniGrid%20Maintenance');
+    final uri = Uri.parse('mailto:support.unigrid@gmail.com?subject=Urgent%20Query%20-%20UniGrid%20Maintenance');
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -46,11 +46,11 @@ class MaintenanceGuard extends StatelessWidget {
         await launchUrl(uri);
       }
     } catch (_) {
-      Clipboard.setData(const ClipboardData(text: 'unigrid.app@gmail.com'));
+      Clipboard.setData(const ClipboardData(text: 'support.unigrid@gmail.com'));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Email copied to clipboard: unigrid.app@gmail.com'),
+            content: Text('Email copied to clipboard: support.unigrid@gmail.com'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -189,10 +189,10 @@ class MaintenanceGuard extends StatelessWidget {
                                   child: InkWell(
                                     onTap: () => _launchEmail(context),
                                     onLongPress: () {
-                                      Clipboard.setData(const ClipboardData(text: 'unigrid.app@gmail.com'));
+                                      Clipboard.setData(const ClipboardData(text: 'support.unigrid@gmail.com'));
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
-                                          content: Text('Email copied to clipboard: unigrid.app@gmail.com'),
+                                          content: Text('Email copied to clipboard: support.unigrid@gmail.com'),
                                           duration: Duration(seconds: 2),
                                         ),
                                       );
@@ -218,7 +218,7 @@ class MaintenanceGuard extends StatelessWidget {
                                           Icon(Icons.email_outlined, color: AppColors.primary, size: 16),
                                           const SizedBox(width: 8),
                                           const Text(
-                                            'unigrid.app@gmail.com',
+                                            'support.unigrid@gmail.com',
                                             style: TextStyle(
                                               color: Colors.white,
                                               fontSize: 12.5,
