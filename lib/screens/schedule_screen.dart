@@ -1990,23 +1990,31 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(Icons.calendar_month_rounded,
-                      color: AppColors.primary, size: 18),
-                  const SizedBox(width: 10),
-                  Text(
-                    '($monthName)',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.calendar_month_rounded,
+                        color: AppColors.primary, size: 18),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        '($monthName)',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'Tap to open calendar',

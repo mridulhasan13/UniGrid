@@ -563,10 +563,14 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                                           Icon(Icons.person_outline,
                                               size: 12, color: AppColors.textSecondary),
                                           const SizedBox(width: 4),
-                                          Text(
-                                            'Teacher: ${material.teacherName}',
-                                            style: TextStyle(
-                                                color: AppColors.textSecondary, fontSize: 11),
+                                          Expanded(
+                                            child: Text(
+                                              'Teacher: ${material.teacherName}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                  color: AppColors.textSecondary, fontSize: 11),
+                                            ),
                                           ),
                                         ],
                                       ),

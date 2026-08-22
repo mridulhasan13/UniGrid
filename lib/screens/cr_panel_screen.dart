@@ -522,10 +522,18 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                               requests[index].data() as Map<String, dynamic>;
                           final reqId = requests[index].id;
                           return ListTile(
-                            title: Text(req['requestedEmail'] ?? '',
-                                style: TextStyle(color: AppColors.textPrimary)),
-                            subtitle: Text('By: ${req['requestedBy']}',
-                                style: TextStyle(color: AppColors.textSecondary)),
+                            title: Text(
+                              req['requestedEmail'] ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: AppColors.textPrimary),
+                            ),
+                            subtitle: Text(
+                              'By: ${req['requestedBy']}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -999,12 +1007,16 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                             ),
                             title: Text(
                               name.isNotEmpty ? name : email,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w600),
                             ),
                             subtitle: Text(
                               '$email${batch.isNotEmpty ? ' · Batch $batch' : ''}${studentId.isNotEmpty ? ' · ID: $studentId' : ''}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   color: AppColors.textSecondary, fontSize: 11),
                             ),
