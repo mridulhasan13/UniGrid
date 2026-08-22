@@ -88,41 +88,43 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     final conversationRef =
         _firestore.collection('conversations').doc(conversationId);
 
-    // 1. Update conversation metadata for Inbox sorting FIRST (ensures participants exist)
-    await conversationRef.set({
-      'participants': [user.id, widget.recipient.id],
-      'lastMessage': message.text,
-      'lastMessageTime': timestamp,
-      'lastMessageSenderId': user.id,
-      'unreadCount_${widget.recipient.id}': FieldValue.increment(1),
-      'readStatus': {
-        user.id: true,
-        widget.recipient.id: false,
-      },
-    }, SetOptions(merge: true));
-
-    // 2. Write message into subcollection SECOND
-    await conversationRef.collection('messages').add(textMessage);
-
-    try {
-      FCMService.sendPrivateNotification(
-        recipientId: widget.recipient.id,
-        title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
-        body: message.text,
-        senderUserId: user.id,
-        messageId: textMessage['id'] as String?,
-        extraData: {
-          'target': 'private_chat',
-          'type': 'private_chat',
-          'route': '/private_chat',
-          'senderUserId': user.id,
-          'senderName': user.name,
-          'senderPhoto': user.photoUrl,
+    // Concurrently write message and update conversation metadata (eliminates roundtrip delay)
+    Future.wait([
+      conversationRef.set({
+        'participants': [user.id, widget.recipient.id],
+        'lastMessage': message.text,
+        'lastMessageTime': timestamp,
+        'lastMessageSenderId': user.id,
+        'unreadCount_${widget.recipient.id}': FieldValue.increment(1),
+        'readStatus': {
+          user.id: true,
+          widget.recipient.id: false,
         },
-      );
-    } catch (e) {
+      }, SetOptions(merge: true)),
+      conversationRef.collection('messages').add(textMessage),
+    ]).catchError((e) {
+      debugPrint('[PrivateChatScreen] Error writing message: $e');
+      return <dynamic>[];
+    });
+
+    // Dispatch notification asynchronously in background
+    FCMService.sendPrivateNotification(
+      recipientId: widget.recipient.id,
+      title: user.name.isNotEmpty ? user.name : user.email.split('@')[0],
+      body: message.text,
+      senderUserId: user.id,
+      messageId: textMessage['id'] as String?,
+      extraData: {
+        'target': 'private_chat',
+        'type': 'private_chat',
+        'route': '/private_chat',
+        'senderUserId': user.id,
+        'senderName': user.name,
+        'senderPhoto': user.photoUrl,
+      },
+    ).catchError((e) {
       debugPrint('[PrivateChatScreen] Error sending push notification: $e');
-    }
+    });
   }
 
   void _handleAttachmentPressed() async {

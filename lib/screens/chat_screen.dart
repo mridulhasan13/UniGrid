@@ -1088,28 +1088,59 @@ class _ChatScreenState extends State<ChatScreen> {
       _isSending = false;
     });
 
-    try {
-      await _firestore.collection(_getChatPathForUser(user)).add(msgData);
-    } catch (e) {
+    // Write message to Firestore without blocking UI
+    _firestore
+        .collection(_getChatPathForUser(user))
+        .add(msgData)
+        .catchError((e) {
       debugPrint('[ChatScreen] Error writing message: $e');
-    }
+      return _firestore.collection(_getChatPathForUser(user)).doc('error');
+    });
 
-    try {
-      FCMService.notifyNewMessage(
-        senderName: senderName,
-        text: text,
-        senderUserId: user.id,
-        department: user.department,
-        batch: user.batch,
-        messageId: msgData['id'] as String?,
-      );
-    } catch (e) {
+    // Dispatch notification asynchronously
+    FCMService.notifyNewMessage(
+      senderName: senderName,
+      text: text,
+      senderUserId: user.id,
+      department: user.department,
+      batch: user.batch,
+      messageId: msgData['id'] as String?,
+    ).catchError((e) {
       debugPrint('[ChatScreen] Error dispatching notification: $e');
-    }
-
+    });
   }
 
-  // ---- MARK AS SEEN ----
+  Timer? _seenDebounceTimer;
+  final Set<String> _queuedSeenDocIds = {};
+
+  // ---- BATCH MARK AS SEEN (Debounced to prevent snapshot storm) ----
+  void _queueMarkAsSeen(_ChatMsg msg, String userId) {
+    if (msg.authorId == userId) return;
+    if (msg.seenBy.contains(userId)) return;
+    if (_pendingSeenDocIds.contains(msg.docId) || _queuedSeenDocIds.contains(msg.docId)) return;
+
+    _queuedSeenDocIds.add(msg.docId);
+    _seenDebounceTimer?.cancel();
+    _seenDebounceTimer = Timer(const Duration(milliseconds: 600), () async {
+      if (_queuedSeenDocIds.isEmpty) return;
+      final docIdsToUpdate = Set<String>.from(_queuedSeenDocIds);
+      _queuedSeenDocIds.clear();
+      _pendingSeenDocIds.addAll(docIdsToUpdate);
+
+      final batch = _firestore.batch();
+      for (final docId in docIdsToUpdate) {
+        final ref = _firestore.collection(_chatPath).doc(docId);
+        batch.update(ref, {'seenBy': FieldValue.arrayUnion([userId])});
+      }
+      try {
+        await batch.commit();
+      } catch (e) {
+        debugPrint('[ChatScreen] Error committing seenBy batch: $e');
+      }
+    });
+  }
+
+  // ---- MANUAL MARK AS SEEN (On Tap) ----
   Future<void> _markAsSeen(_ChatMsg msg, String userId) async {
     if (msg.authorId == userId) return;
     if (msg.seenBy.contains(userId)) return;
@@ -2242,11 +2273,11 @@ class _ChatScreenState extends State<ChatScreen> {
         final msgs = snap.data!.docs.map((d) => _ChatMsg.fromDoc(d)).toList()
           ..sort((a, b) => b.preciseTime.compareTo(a.preciseTime));
 
-        // Automatically mark all loaded received unread messages as seen in database post-frame
+        // Batch mark unread messages as seen in database post-frame
         WidgetsBinding.instance.addPostFrameCallback((_) {
           for (final msg in msgs) {
             if (msg.authorId != appUser.id && !msg.seenBy.contains(appUser.id)) {
-              _markAsSeen(msg, appUser.id);
+              _queueMarkAsSeen(msg, appUser.id);
             }
           }
         });
@@ -2289,6 +2320,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 !_sameDay(msg.createdAt, msgs[i + 1].createdAt);
 
             return Column(
+              key: ValueKey(msg.id),
               children: [
                 if (showDate) _dateSeparator(msg.createdAt),
                 _SwipeToReply(
