@@ -929,7 +929,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               collegeName: _collegeController.text.trim(),
                             )
                             .timeout(
-                              const Duration(seconds: 5),
+                              const Duration(seconds: 30),
                               onTimeout: () => throw TimeoutException(
                                   'Update timed out. Please check connection.'),
                             );
@@ -1071,7 +1071,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 collegeName: _collegeController.text.trim(),
                               )
                               .timeout(
-                                const Duration(seconds: 5),
+                                const Duration(seconds: 30),
                                 onTimeout: () => throw TimeoutException(
                                     'Update timed out. Please check connection.'),
                               );
