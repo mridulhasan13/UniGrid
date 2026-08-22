@@ -2002,7 +2002,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _aboutInfoLinkRow(Icons.email_outlined, 'Support',
                   'support.unigrid@gmail.com', 'mailto:support.unigrid@gmail.com'),
               const Divider(color: Colors.white10, height: 16),
-              _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.1'),
+              _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.2'),
             ],
           ),
         ),
