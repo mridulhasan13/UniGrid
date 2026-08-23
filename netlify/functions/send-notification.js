@@ -227,22 +227,41 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: CORS, body: "" };
   }
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: "Method not allowed" }) };
+    return {
+      statusCode: 405,
+      headers: { ...CORS, "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "Method not allowed" }),
+    };
   }
 
   let body;
   try {
-    body = JSON.parse(event.body);
-  } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "Invalid JSON body" }) };
+    const rawBody = event.isBase64Encoded
+      ? Buffer.from(event.body, "base64").toString("utf-8")
+      : (event.body || "{}");
+    body = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
+  } catch (err) {
+    return {
+      statusCode: 400,
+      headers: { ...CORS, "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "Invalid JSON body: " + err.message }),
+    };
   }
 
   const { tokens, title, bodyText, senderUserId, messageId, targetPlatform, url, route } = body;
   if (!Array.isArray(tokens) || tokens.length === 0) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'tokens' array is required" }) };
+    return {
+      statusCode: 400,
+      headers: { ...CORS, "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "'tokens' array is required" }),
+    };
   }
   if (!title || !bodyText) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "'title' and 'bodyText' are required" }) };
+    return {
+      statusCode: 400,
+      headers: { ...CORS, "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "'title' and 'bodyText' are required" }),
+    };
   }
 
   // Load credentials from environment variable first, then fallback to local bundled file
@@ -264,7 +283,7 @@ exports.handler = async (event) => {
   if (!serviceAccount || !serviceAccount.private_key || !serviceAccount.client_email) {
     return {
       statusCode: 500,
-      headers: CORS,
+      headers: { ...CORS, "Content-Type": "application/json" },
       body: JSON.stringify({
         error: "service_account.json is missing required fields. Please set SERVICE_ACCOUNT_JSON in Netlify site environment variables."
       })
@@ -276,7 +295,11 @@ exports.handler = async (event) => {
     accessToken = await getAccessToken(serviceAccount);
   } catch (err) {
     console.error("OAuth error:", err);
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: "OAuth failed: " + err.message }) };
+    return {
+      statusCode: 500,
+      headers: { ...CORS, "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "OAuth failed: " + err.message })
+    };
   }
 
   const projectId = serviceAccount.project_id;
