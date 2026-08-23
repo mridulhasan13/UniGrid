@@ -1533,13 +1533,14 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
     );
   }
 
-  // ── 5. SYSTEM CONTROLS, BACKUP & STORAGE OPTIMIZER ─────────────────────────
+  // ── 5. SYSTEM CONTROLS & MAINTENANCE ──────────────────────────────────────
   Widget _buildSystemControlCard(List<DocumentSnapshot> allDocs) {
     return GlassCard(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             children: [
               Container(
@@ -1548,33 +1549,39 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   color: Colors.redAccent.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.settings_suggest_rounded,
+                child: const Icon(Icons.tune_rounded,
                     color: Colors.redAccent, size: 20),
               ),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'System Controls & Maintenance',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'System Controls',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  Text(
-                    'Emergency switches & broadcast center',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
+                    Text(
+                      'Emergency switch & administrative tools',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 10.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // ── 1. EMERGENCY MAINTENANCE MODE SWITCH ────────────────────────
           StreamBuilder<DocumentSnapshot>(
@@ -1586,121 +1593,76 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () => _toggleMaintenanceMode(!isMaintenance),
-                  splashColor: (isMaintenance ? Colors.redAccent : AppColors.primary).withOpacity(0.12),
-                  highlightColor: (isMaintenance ? Colors.redAccent : AppColors.primary).withOpacity(0.06),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeInOutCubic,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       color: isMaintenance
-                          ? Colors.redAccent.withOpacity(0.18)
+                          ? Colors.redAccent.withOpacity(0.16)
                           : Colors.white.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isMaintenance
                             ? Colors.redAccent.withOpacity(0.6)
                             : AppColors.glassCardBorder,
-                        width: isMaintenance ? 1.5 : 1.0,
+                        width: isMaintenance ? 1.4 : 0.8,
                       ),
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        Icon(
+                          isMaintenance ? Icons.lock_rounded : Icons.lock_open_rounded,
+                          color: isMaintenance ? Colors.redAccent : Colors.greenAccent,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 200),
-                                    child: Icon(
-                                      isMaintenance ? Icons.warning_rounded : Icons.check_circle_outline_rounded,
-                                      key: ValueKey<bool>(isMaintenance),
-                                      color: isMaintenance ? Colors.redAccent : Colors.greenAccent,
-                                      size: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    isMaintenance ? '🚨 Maintenance Mode ACTIVE' : 'Emergency Maintenance Mode',
-                                    style: TextStyle(
-                                      color: isMaintenance ? Colors.redAccent : AppColors.textPrimary,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                isMaintenance ? 'Maintenance Mode ACTIVE' : 'Maintenance Mode',
+                                style: TextStyle(
+                                  color: isMaintenance ? Colors.redAccent : AppColors.textPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              const SizedBox(height: 3),
                               Text(
                                 isMaintenance
-                                    ? '🔴 Students are currently locked out. Root Admins have full access.'
-                                    : 'Tap to lock regular users during urgent database updates.',
+                                    ? 'Regular students are locked out'
+                                    : 'Lock student access during updates',
                                 style: TextStyle(
-                                  color: isMaintenance ? Colors.redAccent.shade100 : AppColors.textSecondary,
-                                  fontSize: 10.5,
+                                  color: AppColors.textSecondary,
+                                  fontSize: 10,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        // ── Butter-Smooth Custom Animated Toggle ─────────
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeInOutCubic,
-                          width: 52,
-                          height: 28,
-                          padding: const EdgeInsets.all(3),
+                        const SizedBox(width: 8),
+                        // Mini Toggle
+                        Container(
+                          width: 44,
+                          height: 24,
+                          padding: const EdgeInsets.all(2.5),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: isMaintenance
-                                ? Colors.redAccent
-                                : Colors.white.withOpacity(0.15),
-                            boxShadow: isMaintenance
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.redAccent.withOpacity(0.4),
-                                      blurRadius: 8,
-                                      spreadRadius: 1,
-                                    ),
-                                  ]
-                                : null,
+                            borderRadius: BorderRadius.circular(16),
+                            color: isMaintenance ? Colors.redAccent : Colors.white.withOpacity(0.15),
                           ),
                           child: AnimatedAlign(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeInOutCubic,
-                            alignment: isMaintenance
-                                ? Alignment.centerRight
-                                : Alignment.centerLeft,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeInOut,
+                            alignment: isMaintenance ? Alignment.centerRight : Alignment.centerLeft,
                             child: Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
+                              width: 19,
+                              height: 19,
+                              decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: Colors.white,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.25),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  isMaintenance
-                                      ? Icons.lock_rounded
-                                      : Icons.lock_open_rounded,
-                                  size: 13,
-                                  color: isMaintenance
-                                      ? Colors.redAccent
-                                      : const Color(0xFF1E293B),
-                                ),
                               ),
                             ),
                           ),
@@ -1712,76 +1674,103 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
               );
             },
           ),
-          const SizedBox(height: 12),
-
-          // ── 2. BROADCAST PUSH NOTIFICATION CENTER BUTTON ─────────────────
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => _showPushBroadcastModal(context),
-              icon: const Icon(Icons.campaign_rounded, size: 18, color: Colors.white),
-              label: const Text(
-                'Global Priority Push Broadcast Center',
-                style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ),
           const SizedBox(height: 10),
 
-          // ── 3. BACKUP & STORAGE UTILITIES ─────────────────────────────────
+          // ── 2. QUICK ADMINISTRATIVE ACTIONS (2-COLUMN GRID) ─────────────
           Row(
             children: [
+              // Priority Broadcast
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _exportDatabaseJson(allDocs),
-                  icon: const Icon(Icons.download_rounded, size: 16, color: Colors.blueAccent),
-                  label: const Text('Export JSON Backup', style: TextStyle(color: Colors.blueAccent, fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.blueAccent.withOpacity(0.4)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                  ),
+                child: _buildSystemActionButton(
+                  icon: Icons.campaign_rounded,
+                  label: 'Priority Broadcast',
+                  color: AppColors.primary,
+                  onTap: () => _showPushBroadcastModal(context),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
+              // JSON Backup
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    InAppNotification.show(
-                      context,
-                      title: 'Pinging Storage',
-                      message: 'Executing keep-alive ping across all Supabase buckets...',
-                      accentColor: Colors.tealAccent,
-                      icon: Icons.sync_rounded,
-                    );
-                    await SupabaseConfig.triggerHeartbeatIfNeeded(force: true);
-                    if (mounted) {
-                      InAppNotification.show(
-                        context,
-                        title: 'Storage Awake & Verified',
-                        message: 'All Supabase database buckets refreshed successfully!',
-                        accentColor: Colors.greenAccent,
-                        icon: Icons.check_circle_rounded,
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.bolt_rounded, size: 16, color: Colors.tealAccent),
-                  label: const Text('Force Storage Ping', style: TextStyle(color: Colors.tealAccent, fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.tealAccent.withOpacity(0.4)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                  ),
+                child: _buildSystemActionButton(
+                  icon: Icons.download_rounded,
+                  label: 'Export JSON',
+                  color: Colors.blueAccent,
+                  onTap: () => _exportDatabaseJson(allDocs),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          // Storage Keep-Alive Ping
+          _buildSystemActionButton(
+            icon: Icons.bolt_rounded,
+            label: 'Keep-Alive Storage Ping',
+            color: Colors.tealAccent,
+            isFullWidth: true,
+            onTap: () async {
+              InAppNotification.show(
+                context,
+                title: 'Pinging Storage',
+                message: 'Executing keep-alive ping across all Supabase buckets...',
+                accentColor: Colors.tealAccent,
+                icon: Icons.sync_rounded,
+              );
+              await SupabaseConfig.triggerHeartbeatIfNeeded(force: true);
+              if (mounted) {
+                InAppNotification.show(
+                  context,
+                  title: 'Storage Awake & Verified',
+                  message: 'All Supabase database buckets refreshed successfully!',
+                  accentColor: Colors.greenAccent,
+                  icon: Icons.check_circle_rounded,
+                );
+              }
+            },
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSystemActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+    bool isFullWidth = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.28), width: 0.9),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 15, color: color),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
