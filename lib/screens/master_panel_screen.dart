@@ -1262,38 +1262,53 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          const SizedBox(height: 12),
+          // Row 1: Firebase Auth & Cloud Firestore (2 columns)
+          Row(
             children: [
-              _buildServiceHealthPill(
-                title: 'Firebase Auth',
-                status: 'Operational',
-                ping: '22ms',
-                icon: Icons.vpn_key_rounded,
-                color: Colors.amberAccent,
+              Expanded(
+                child: _buildServiceHealthPill(
+                  title: 'Firebase Auth',
+                  status: 'Operational',
+                  ping: '22ms',
+                  icon: Icons.vpn_key_rounded,
+                  color: Colors.amberAccent,
+                ),
               ),
-              _buildServiceHealthPill(
-                title: 'Cloud Firestore',
-                status: 'Operational',
-                ping: '18ms',
-                icon: Icons.dns_rounded,
-                color: const Color(0xFFF97316),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildServiceHealthPill(
+                  title: 'Cloud Firestore',
+                  status: 'Operational',
+                  ping: '18ms',
+                  icon: Icons.dns_rounded,
+                  color: const Color(0xFFF97316),
+                ),
               ),
-              _buildServiceHealthPill(
-                title: 'Supabase Storage',
-                status: 'Active (1GB Cap)',
-                ping: '35ms',
-                icon: Icons.cloud_done_rounded,
-                color: Colors.tealAccent,
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Row 2: Supabase Storage & FCM Push System (2 columns)
+          Row(
+            children: [
+              Expanded(
+                child: _buildServiceHealthPill(
+                  title: 'Supabase Storage',
+                  status: 'Active (1GB)',
+                  ping: '35ms',
+                  icon: Icons.cloud_done_rounded,
+                  color: Colors.tealAccent,
+                ),
               ),
-              _buildServiceHealthPill(
-                title: 'FCM Push System',
-                status: 'Ready (Direct)',
-                ping: '14ms',
-                icon: Icons.notifications_active_rounded,
-                color: Colors.blueAccent,
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildServiceHealthPill(
+                  title: 'FCM Push System',
+                  status: 'Ready (Direct)',
+                  ping: '14ms',
+                  icon: Icons.notifications_active_rounded,
+                  color: Colors.blueAccent,
+                ),
               ),
             ],
           ),
@@ -1310,8 +1325,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
     required Color color,
   }) {
     return Container(
-      width: 155,
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: color.withOpacity(0.06),
         borderRadius: BorderRadius.circular(10),
