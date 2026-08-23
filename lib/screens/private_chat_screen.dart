@@ -482,15 +482,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => Scaffold(
-                            backgroundColor: Colors.black,
-                            appBar: AppBar(
-                              backgroundColor: Colors.black,
-                              foregroundColor: Colors.white,
-                            ),
-                            body: Center(
-                              child: InteractiveViewer(child: imgWidget),
-                            ),
+                          builder: (context) => FileViewerScreen(
+                            fileName: message.name,
+                            fileUrl: message.uri,
                           ),
                         ),
                       );
