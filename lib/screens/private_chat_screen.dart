@@ -684,11 +684,12 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       mediaUri = message.uri;
     }
 
+    bool isSubmitting = false;
+
     showDialog(
       context: context,
       builder: (d) => StatefulBuilder(
         builder: (dialogCtx, setDialogState) {
-          bool isSubmitting = false;
           return AlertDialog(
             backgroundColor: AppColors.glassCardColor,
             shape: RoundedRectangleBorder(
@@ -714,7 +715,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                 ...reasons.map((r) {
                   final isSelected = selectedReason == r;
                   return InkWell(
-                    onTap: () => setDialogState(() => selectedReason = r),
+                    onTap: isSubmitting ? null : () => setDialogState(() => selectedReason = r),
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
@@ -745,7 +746,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
+                onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
                 child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
               ),
               ElevatedButton(
@@ -755,7 +756,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         setDialogState(() => isSubmitting = true);
                         try {
                           final user = Provider.of<AppUser?>(context, listen: false);
-                          await FirebaseFirestore.instance.collection('reports').add({
+                          final reportDocId = '${user?.id ?? 'anon'}_${message.id.replaceAll('/', '_')}';
+                          await FirebaseFirestore.instance.collection('reports').doc(reportDocId).set({
                             'reportedMessageId': message.id,
                             'reportedDocId': message.id,
                             'reportedAuthorId': widget.recipient.id,
@@ -774,7 +776,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                             'reason': selectedReason,
                             'timestamp': FieldValue.serverTimestamp(),
                             'status': 'pending',
-                          });
+                          }, SetOptions(merge: true));
 
                           if (mounted) {
                             Navigator.pop(dialogCtx);

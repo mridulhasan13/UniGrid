@@ -560,81 +560,74 @@ class _GeneralCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Badge & Actions
+            // Top Badges & Actions
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: badgeColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: badgeColor.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Icon(Icons.campaign, color: badgeColor, size: 14),
-                      const SizedBox(width: 5),
-                      Text(
-                        type.toUpperCase(),
-                        style: TextStyle(
-                          color: badgeColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: badgeColor.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.campaign, color: badgeColor, size: 14),
+                            const SizedBox(width: 5),
+                            Text(
+                              type.toUpperCase(),
+                              style: TextStyle(
+                                color: badgeColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      if (target != null &&
+                          target.isNotEmpty &&
+                          target != 'All University Members')
+                        Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: AppColors.primary.withOpacity(0.35)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.near_me_rounded,
+                                  color: AppColors.primary, size: 11),
+                              const SizedBox(width: 3),
+                              Text(
+                                target,
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                if (target != null &&
-                    target.isNotEmpty &&
-                    target != 'All University Members') ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                          color: AppColors.primary.withOpacity(0.35)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.near_me_rounded,
-                            color: AppColors.primary, size: 11),
-                        const SizedBox(width: 3),
-                        Text(
-                          target,
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    item['postedBy'] as String,
-                    textAlign: TextAlign.end,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (isRootAdmin) ...[
-                  const SizedBox(width: 4),
+                if (isRootAdmin)
                   IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -668,7 +661,6 @@ class _GeneralCard extends StatelessWidget {
                       }
                     },
                   ),
-                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -770,15 +762,41 @@ class _GeneralCard extends StatelessWidget {
             ],
 
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                dateStr,
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.person_pin_rounded,
+                          size: 13.5, color: AppColors.secondary),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          item['postedBy'] as String,
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Text(
+                  dateStr,
+                  style: TextStyle(
+                    color: AppColors.textSecondary.withOpacity(0.7),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

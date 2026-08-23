@@ -2395,9 +2395,12 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                           ),
                           const SizedBox(height: 8),
 
-                          // Timestamp line
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          // Timestamp & resolver line (responsive)
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            alignment: WrapAlignment.spaceBetween,
                             children: [
                               Text(
                                 'Reported on $formattedDate',
@@ -2410,8 +2413,9 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                 Text(
                                   'Resolved by: ${report['resolvedBy']}',
                                   style: TextStyle(
-                                    color: Colors.greenAccent.withOpacity(0.8),
+                                    color: Colors.greenAccent.withOpacity(0.85),
                                     fontSize: 10,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                             ],
@@ -2967,7 +2971,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       itemCount: users.length,
       itemBuilder: (context, index) {
         final doc = users[index];
@@ -2981,17 +2985,40 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
         final isRoot = Provider.of<AuthService>(context, listen: false)
             .isRootAdmin(email);
 
+        final String dept = data['department'] ?? 'N/A';
+        final String batch = data['batch'] ?? 'N/A';
+        final String studentId = data['studentId'] ?? '';
+        final String phone = data['phoneNumber'] ?? '';
+        final String school = (data['schoolName'] ?? '').toString().trim();
+        final String college = (data['collegeName'] ?? '').toString().trim();
+
+        String joinedFormatted = '';
+        if (data['createdAt'] != null) {
+          DateTime? dt;
+          if (data['createdAt'] is Timestamp) {
+            dt = (data['createdAt'] as Timestamp).toDate();
+          } else if (data['createdAt'] is String) {
+            dt = DateTime.tryParse(data['createdAt'] as String);
+          }
+          if (dt != null) {
+            joinedFormatted = DateFormat('MMM d, yyyy • h:mm a').format(dt);
+          }
+        }
+
         return GlassCard(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Header: Avatar + User Info + Badges + Action ──────────
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // Compact Avatar
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppColors.primary.withOpacity(0.2),
@@ -3000,10 +3027,10 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       child: (photoUrl.isNotEmpty)
                           ? Image.network(
                               photoUrl,
-                              width: 48,
-                              height: 48,
-                              cacheWidth: 120,
-                              cacheHeight: 120,
+                              width: 38,
+                              height: 38,
+                              cacheWidth: 100,
+                              cacheHeight: 100,
                               gaplessPlayback: true,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
@@ -3016,6 +3043,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                             : 'U'),
                                     style: TextStyle(
                                         color: AppColors.textPrimary,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.bold),
                                   ),
                                 );
@@ -3030,271 +3058,312 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                         : 'U'),
                                 style: TextStyle(
                                     color: AppColors.textPrimary,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.bold),
                               ),
                             ),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 10),
+                  // User Details
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                name,
+                                style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isRoot) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: Colors.redAccent.withOpacity(0.5)),
+                                ),
+                                child: const Text(
+                                  'ROOT',
+                                  style: TextStyle(
+                                      color: Colors.redAccent,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ] else if (isCR) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: AppColors.primary.withOpacity(0.5)),
+                                ),
+                                child: Text(
+                                  'CR',
+                                  style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
+                        const SizedBox(height: 1),
                         Text(
                           email,
                           style: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 14),
+                              color: AppColors.textSecondary, fontSize: 11.5),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        if (data['department'] != null ||
-                            data['batch'] != null ||
-                            data['studentId'] != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              '${data['department'] ?? 'N/A'} • Batch ${data['batch'] ?? 'N/A'} • ID: ${data['studentId'] ?? 'N/A'}',
-                              style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 12),
-                            ),
-                          ),
-                        Builder(builder: (context) {
-                          final dynamic rawJoined = data['createdAt'];
-                          DateTime? joinedDate;
-                          if (rawJoined != null) {
-                            if (rawJoined is Timestamp) {
-                              joinedDate = rawJoined.toDate();
-                            } else if (rawJoined is String) {
-                              joinedDate = DateTime.tryParse(rawJoined);
-                            }
-                          }
-                          final String joinedStr = joinedDate != null
-                              ? DateFormat('dd MMM yyyy, hh:mm a').format(joinedDate)
-                              : 'N/A';
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Row(
-                              children: [
-                                Icon(Icons.calendar_today_outlined,
-                                    size: 13,
-                                    color: AppColors.textSecondary),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Joined: $joinedStr',
+                        const SizedBox(height: 2),
+                        // Metadata string: Dept • Batch • ID • Phone
+                        Text(
+                          '$dept • Batch $batch${studentId.isNotEmpty ? " • ID: $studentId" : ""}${phone.isNotEmpty ? " • $phone" : ""}',
+                          style: TextStyle(
+                              color: AppColors.primary.withOpacity(0.9),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (school.isNotEmpty || college.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.account_balance_outlined,
+                                  size: 11, color: AppColors.secondary),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  [
+                                    if (school.isNotEmpty) 'Sch: $school',
+                                    if (college.isNotEmpty) 'Col: $college',
+                                  ].join(' • '),
                                   style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12),
+                                    color: AppColors.textSecondary.withOpacity(0.85),
+                                    fontSize: 10,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                          );
-                        }),
-                        if ((data['phoneNumber'] ?? '').toString().isNotEmpty ||
-                            (data['schoolName'] ?? '').toString().isNotEmpty ||
-                            (data['collegeName'] ?? '').toString().isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if ((data['phoneNumber'] ?? '').toString().isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 2),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.phone_outlined,
-                                            size: 13,
-                                            color: AppColors.textSecondary),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          data['phoneNumber'].toString(),
-                                          style: TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                if ((data['schoolName'] ?? '').toString().isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 2),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.school_outlined,
-                                            size: 13,
-                                            color: AppColors.textSecondary),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            'School: ${data['schoolName']}',
-                                            style: TextStyle(
-                                                color: AppColors.textSecondary,
-                                                fontSize: 12),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                if ((data['collegeName'] ?? '').toString().isNotEmpty)
-                                  Row(
-                                    children: [
-                                      Icon(Icons.account_balance_outlined,
-                                          size: 13,
-                                          color: AppColors.textSecondary),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          'College: ${data['collegeName']}',
-                                          style: TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontSize: 12),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
+                        ],
+                        if (joinedFormatted.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.calendar_today_rounded,
+                                  size: 10, color: Colors.cyanAccent.withOpacity(0.8)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'Joined: $joinedFormatted',
+                                  style: TextStyle(
+                                    color: Colors.cyanAccent.withOpacity(0.85),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  if (isRoot)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text('ROOT',
-                          style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold)),
-                    )
-                  else
+                  if (!isRoot)
                     IconButton(
-                      icon: const Icon(Icons.delete_outline,
-                          color: Colors.redAccent),
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: Colors.redAccent, size: 18),
                       tooltip: 'Delete User',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                       onPressed: () => _deleteUser(uid, email),
                     ),
                 ],
               ),
+
               if (!isRoot) ...[
-                Divider(color: AppColors.glassCardBorder, height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('CR / Admin Access',
-                        style: TextStyle(color: AppColors.textPrimary)),
-                    Switch(
-                      value: isCR,
-                      activeColor: AppColors.primary,
-                      onChanged: (val) =>
-                          _updateUserStatus(uid, 'isCR', val),
-                    ),
-                  ],
+                const SizedBox(height: 8),
+                Container(
+                  height: 0.6,
+                  color: AppColors.glassCardBorder.withOpacity(0.4),
                 ),
+                const SizedBox(height: 6),
+
+                // ── Controls: Toggles & Dropdowns in Compact Row ──────────
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Approve Account',
-                        style: TextStyle(color: AppColors.textPrimary)),
-                    Switch(
-                      value: isApproved,
-                      activeColor: Colors.greenAccent,
-                      onChanged: (val) =>
-                          _updateUserStatus(uid, 'isApproved', val),
+                    // CR Switch
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('CR',
+                            style: TextStyle(
+                                color: isCR
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
+                        Transform.scale(
+                          scale: 0.68,
+                          child: Switch(
+                            value: isCR,
+                            activeThumbColor: AppColors.primary,
+                            activeTrackColor: AppColors.primary.withOpacity(0.4),
+                            inactiveThumbColor: Colors.grey,
+                            inactiveTrackColor: Colors.white12,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            onChanged: (val) =>
+                                _updateUserStatus(uid, 'isCR', val),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                Divider(color: AppColors.glassCardBorder, height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Department',
-                        style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13)),
-                    DropdownButton<String>(
-                      value: kDeptCodes.contains(data['department'])
-                          ? data['department']
-                          : null,
-                      hint: Text('Select Dept',
+                    const SizedBox(width: 4),
+
+                    // Approved Switch
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Approved',
+                            style: TextStyle(
+                                color: isApproved
+                                    ? Colors.greenAccent
+                                    : AppColors.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
+                        Transform.scale(
+                          scale: 0.68,
+                          child: Switch(
+                            value: isApproved,
+                            activeThumbColor: Colors.greenAccent,
+                            activeTrackColor: Colors.greenAccent.withOpacity(0.4),
+                            inactiveThumbColor: Colors.grey,
+                            inactiveTrackColor: Colors.white12,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            onChanged: (val) =>
+                                _updateUserStatus(uid, 'isApproved', val),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Spacer(),
+
+                    // Dept Dropdown Pill
+                    Container(
+                      height: 26,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.12), width: 0.8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: kDeptCodes.contains(data['department'])
+                              ? data['department']
+                              : null,
+                          hint: Text('Dept',
+                              style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 10.5)),
+                          dropdownColor: AppColors.backgroundTop,
                           style: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 13)),
-                      dropdownColor: AppColors.backgroundTop,
-                      style: TextStyle(
-                          color: AppColors.textPrimary, fontSize: 13),
-                      underline: Container(),
-                      items: kDepartments
-                          .map((d) => DropdownMenuItem<String>(
-                                value: d['code'],
-                                child: Text(d['code']!,
-                                    style: TextStyle(
-                                        color: AppColors.textPrimary)),
-                              ))
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          _updateUserStatus(uid, 'department', val);
-                        }
-                      },
+                              color: AppColors.textPrimary,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold),
+                          isDense: true,
+                          icon: Icon(Icons.arrow_drop_down,
+                              size: 14, color: AppColors.textSecondary),
+                          items: kDepartments
+                              .map((d) => DropdownMenuItem<String>(
+                                    value: d['code'],
+                                    child: Text(d['code']!),
+                                  ))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              _updateUserStatus(uid, 'department', val);
+                            }
+                          },
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Batch',
-                        style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13)),
-                    DropdownButton<String>(
-                      value: kBatches.contains(data['batch'])
-                          ? data['batch']
-                          : null,
-                      hint: Text('Select Batch',
+                    const SizedBox(width: 6),
+
+                    // Batch Dropdown Pill
+                    Container(
+                      height: 26,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.12), width: 0.8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: kBatches.contains(data['batch'])
+                              ? data['batch']
+                              : null,
+                          hint: Text('Batch',
+                              style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 10.5)),
+                          dropdownColor: AppColors.backgroundTop,
                           style: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 13)),
-                      dropdownColor: AppColors.backgroundTop,
-                      items: kBatches
-                          .map((b) => DropdownMenuItem<String>(
-                                value: b,
-                                child: Text(
-                                  b,
-                                  style: TextStyle(
-                                      color: AppColors.textPrimary),
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          _updateUserStatus(uid, 'batch', val);
-                        }
-                      },
+                              color: AppColors.textPrimary,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold),
+                          isDense: true,
+                          icon: Icon(Icons.arrow_drop_down,
+                              size: 14, color: AppColors.textSecondary),
+                          items: kBatches
+                              .map((b) => DropdownMenuItem<String>(
+                                    value: b,
+                                    child: Text(b),
+                                  ))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              _updateUserStatus(uid, 'batch', val);
+                            }
+                          },
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ],
             ],
           ),
-        )
-            .animate()
-            .fadeIn(
-                delay: Duration(milliseconds: 300 + (index * 50)))
-            .slideY(begin: 0.1, end: 0);
+        );
       },
     );
   }

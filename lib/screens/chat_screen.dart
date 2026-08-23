@@ -747,24 +747,18 @@ class _MessageBubble extends StatelessWidget {
     }
     return GestureDetector(
       onTap: () {
-        // Open full-screen image viewer on tap
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => Scaffold(
-            backgroundColor: Colors.black,
-            appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
-            body: Center(child: InteractiveViewer(child: img)),
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => FileViewerScreen(
+              fileName: message.fileName ?? 'Image.jpg',
+              fileUrl: uri,
+            ),
           ),
-        ));
+        );
       },
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 280,
-            maxHeight: 340,
-          ),
-          child: img,
-        ),
+        borderRadius: BorderRadius.circular(12),
+        child: img,
       ),
     );
   }
@@ -1373,11 +1367,12 @@ class _ChatScreenState extends State<ChatScreen> {
       'Other Violation',
     ];
 
+    bool isSubmitting = false;
+
     showDialog(
       context: context,
       builder: (d) => StatefulBuilder(
         builder: (dialogCtx, setDialogState) {
-          bool isSubmitting = false;
           return AlertDialog(
             backgroundColor: AppColors.glassCardColor,
             shape: RoundedRectangleBorder(
@@ -1410,7 +1405,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ...reasons.map((r) {
                   final isSelected = selectedReason == r;
                   return InkWell(
-                    onTap: () => setDialogState(() => selectedReason = r),
+                    onTap: isSubmitting ? null : () => setDialogState(() => selectedReason = r),
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
@@ -1443,7 +1438,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
+                onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
                 child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
               ),
               ElevatedButton(
@@ -1453,7 +1448,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         setDialogState(() => isSubmitting = true);
                         try {
                           final user = Provider.of<AppUser?>(context, listen: false);
-                          await _firestore.collection('reports').add({
+                          final reportDocId = '${user?.id ?? 'anon'}_${msg.id.replaceAll('/', '_')}';
+                          await _firestore.collection('reports').doc(reportDocId).set({
                             'reportedMessageId': msg.id,
                             'reportedDocId': msg.docId,
                             'reportedAuthorId': msg.authorId,
@@ -1472,7 +1468,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             'reason': selectedReason,
                             'timestamp': FieldValue.serverTimestamp(),
                             'status': 'pending',
-                          });
+                          }, SetOptions(merge: true));
 
                           if (mounted) {
                             Navigator.pop(dialogCtx);
