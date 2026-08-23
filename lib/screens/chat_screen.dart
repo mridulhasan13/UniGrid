@@ -318,7 +318,9 @@ class _SeenBySheet extends StatelessWidget {
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 24),
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).padding.bottom + 24,
+                    ),
                     itemCount: docs.length,
                     itemBuilder: (ctx, i) {
                       final data =
@@ -1185,20 +1187,25 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) => ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+            ),
             decoration: BoxDecoration(
               color: AppColors.backgroundTop.withOpacity(0.92),
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 // Drag handle
                 Container(
                   width: 40,
@@ -1352,7 +1359,8 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   void _showReportDialog(_ChatMsg msg) {
@@ -2033,7 +2041,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
             return Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
+                bottom: MediaQuery.of(context).viewInsets.bottom +
+                    MediaQuery.of(context).padding.bottom,
               ),
               child: ClipRRect(
                 borderRadius:

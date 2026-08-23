@@ -592,19 +592,25 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) => ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+            ),
             decoration: BoxDecoration(
               color: AppColors.backgroundTop.withOpacity(0.92),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Container(
                   width: 40,
                   height: 4,
@@ -655,7 +661,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   void _showReportPrivateDialog(types.Message message) {

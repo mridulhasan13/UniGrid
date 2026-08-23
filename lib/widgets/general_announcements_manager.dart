@@ -232,6 +232,7 @@ class GeneralNotificationBell extends StatelessWidget {
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
+                    useSafeArea: true,
                     backgroundColor: Colors.transparent,
                     builder: (_) => GeneralAnnouncementsSheet(user: user!),
                   );
@@ -503,7 +504,12 @@ class GeneralAnnouncementsSheet extends StatelessWidget {
                     });
 
                     return ListView.builder(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        top: 16,
+                        bottom: MediaQuery.of(context).padding.bottom + 24,
+                      ),
                       itemCount: items.length,
                       itemBuilder: (context, index) {
                         final item = items[index];
