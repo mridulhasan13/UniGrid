@@ -18,6 +18,8 @@ import 'file_viewer_screen.dart';
 import '../services/auth_service.dart';
 import '../notifications/fcm_service.dart';
 
+import '../notifications/in_app_notification.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import '../services/theme_service.dart';
@@ -424,6 +426,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                     );
                   }
                 },
+                onMessageLongPress: (context, message) {
+                  _showPrivateMessageActions(message);
+                },
                 user: currentChatUser,
                 showUserAvatars: true,
                 showUserNames: false,
@@ -576,6 +581,232 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  void _showPrivateMessageActions(types.Message message) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final bool isOwn = message.author.id == currentUid;
+    String messageText = '';
+    if (message is types.TextMessage) {
+      messageText = message.text;
+    } else if (message is types.ImageMessage) {
+      messageText = '[Image: ${message.name}]';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.backgroundTop.withOpacity(0.92),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.textPrimary.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                if (messageText.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    child: Text(
+                      messageText.length > 100 ? '${messageText.substring(0, 100)}…' : messageText,
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      maxLines: 2,
+                    ),
+                  ),
+                Divider(color: AppColors.textPrimary.withOpacity(0.08)),
+                if (message is types.TextMessage && message.text.isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.copy_rounded, color: Colors.cyanAccent),
+                    title: const Text('Copy Text', style: TextStyle(color: Colors.white)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Clipboard.setData(ClipboardData(text: message.text));
+                      InAppNotification.show(
+                        context,
+                        title: 'Copied',
+                        message: 'Message text copied to clipboard',
+                        accentColor: Colors.cyanAccent,
+                        icon: Icons.copy_rounded,
+                      );
+                    },
+                  ),
+                if (!isOwn)
+                  ListTile(
+                    leading: const Icon(Icons.flag_rounded, color: Colors.amberAccent),
+                    title: const Text('Report Message', style: TextStyle(color: Colors.amberAccent)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showReportPrivateDialog(message);
+                    },
+                  ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showReportPrivateDialog(types.Message message) {
+    String selectedReason = 'Inappropriate or Offensive Content';
+    final List<String> reasons = [
+      'Inappropriate or Offensive Content',
+      'Harassment or Hate Speech',
+      'Spam or Academic Dishonesty',
+      'Misinformation or Impersonation',
+      'Other Violation',
+    ];
+
+    String snippet = '';
+    String? mediaUri;
+    if (message is types.TextMessage) {
+      snippet = message.text;
+    } else if (message is types.ImageMessage) {
+      snippet = '[Image: ${message.name}]';
+      mediaUri = message.uri;
+    }
+
+    showDialog(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          bool isSubmitting = false;
+          return AlertDialog(
+            backgroundColor: AppColors.glassCardColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: Colors.amberAccent.withOpacity(0.3)),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.flag_rounded, color: Colors.amberAccent, size: 22),
+                SizedBox(width: 8),
+                Text('Report Content', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select the reason for reporting this message by ${widget.recipient.name}:',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                ...reasons.map((r) {
+                  final isSelected = selectedReason == r;
+                  return InkWell(
+                    onTap: () => setDialogState(() => selectedReason = r),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                            color: isSelected ? Colors.amberAccent : AppColors.textSecondary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              r,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : AppColors.textSecondary,
+                                fontSize: 12.5,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        setDialogState(() => isSubmitting = true);
+                        try {
+                          final user = Provider.of<AppUser?>(context, listen: false);
+                          await FirebaseFirestore.instance.collection('reports').add({
+                            'reportedMessageId': message.id,
+                            'reportedDocId': message.id,
+                            'reportedAuthorId': widget.recipient.id,
+                            'reportedAuthorName': widget.recipient.name,
+                            'messageSnippet': snippet.isNotEmpty
+                                ? (snippet.length > 250 ? '${snippet.substring(0, 250)}...' : snippet)
+                                : '[Media]',
+                            'messageType': message is types.ImageMessage ? 'image' : 'text',
+                            'mediaUrl': mediaUri,
+                            'reportedByUserId': user?.id ?? 'anonymous',
+                            'reportedByName': user?.name.isNotEmpty == true ? user!.name : 'Student',
+                            'reportedByEmail': user?.email ?? '',
+                            'department': user?.department ?? '',
+                            'batch': user?.batch ?? '',
+                            'chatPath': 'conversations/${_getConversationId(user?.id ?? '', widget.recipient.id)}/messages',
+                            'reason': selectedReason,
+                            'timestamp': FieldValue.serverTimestamp(),
+                            'status': 'pending',
+                          });
+
+                          if (mounted) {
+                            Navigator.pop(dialogCtx);
+                            InAppNotification.show(
+                              context,
+                              title: 'Report Submitted',
+                              message: 'Thank you for keeping our community safe. Our moderation team will review this.',
+                              accentColor: Colors.amberAccent,
+                              icon: Icons.check_circle_outline_rounded,
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            Navigator.pop(dialogCtx);
+                            InAppNotification.show(
+                              context,
+                              title: 'Report Notice',
+                              message: 'Report received. Thank you.',
+                              accentColor: Colors.amberAccent,
+                              icon: Icons.flag_rounded,
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amberAccent.shade700,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Submit Report', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

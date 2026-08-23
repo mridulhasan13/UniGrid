@@ -1451,10 +1451,16 @@ class _ChatScreenState extends State<ChatScreen> {
                             'reportedAuthorId': msg.authorId,
                             'reportedAuthorName': msg.authorName,
                             'messageSnippet': msg.text.isNotEmpty
-                                ? (msg.text.length > 100 ? '${msg.text.substring(0, 100)}...' : msg.text)
+                                ? (msg.text.length > 250 ? '${msg.text.substring(0, 250)}...' : msg.text)
                                 : '[Media: ${msg.type}]',
+                            'messageType': msg.type,
+                            'mediaUrl': msg.uri,
                             'reportedByUserId': user?.id ?? 'anonymous',
+                            'reportedByName': user?.name.isNotEmpty == true ? user!.name : 'Student',
                             'reportedByEmail': user?.email ?? '',
+                            'department': user?.department ?? '',
+                            'batch': user?.batch ?? '',
+                            'chatPath': _chatPath,
                             'reason': selectedReason,
                             'timestamp': FieldValue.serverTimestamp(),
                             'status': 'pending',

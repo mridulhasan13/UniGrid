@@ -16,6 +16,7 @@ import '../models/models.dart';
 import '../widgets/general_announcements_manager.dart';
 import '../services/supabase_config.dart';
 import '../services/supabase_storage_service.dart';
+import 'file_viewer_screen.dart';
 
 class MasterPanelScreen extends StatefulWidget {
   const MasterPanelScreen({super.key});
@@ -32,6 +33,15 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
   bool? _localMaintenanceMode;
   Map<String, double>? _liveSupabaseMetrics;
   bool _isFetchingLiveStorage = false;
+  String _reportsFilter = 'All';
+  String _reportsSearchQuery = '';
+  final TextEditingController _reportsSearchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reportsSearchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -437,6 +447,12 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
                   child: _buildSystemControlCard(allDocs),
                 ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1, end: 0),
+
+                // ── 6. UGC CONTENT MODERATION & REPORTS CENTER ───────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                  child: _buildReportsManagementCard(),
+                ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.1, end: 0),
 
                 // GENERAL ANNOUNCEMENT COMPOSER (ROOT ADMIN)
                 const Padding(
@@ -1797,6 +1813,898 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
           context,
           title: 'Export Failed',
           message: 'Error exporting database: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
+  }
+
+  // ─── 6. UGC CONTENT MODERATION & REPORTS CENTER ──────────────────────────
+  Widget _buildReportsManagementCard() {
+    return GlassCard(
+      padding: const EdgeInsets.all(20),
+      child: StreamBuilder<QuerySnapshot>(
+        stream: _firestore.collection('reports').snapshots(),
+        builder: (context, snapshot) {
+          final docs = snapshot.data?.docs ?? [];
+          final int totalReports = docs.length;
+          final int pendingReports = docs.where((d) {
+            final data = d.data() as Map<String, dynamic>? ?? {};
+            final status = (data['status'] ?? 'pending').toString().toLowerCase();
+            return status == 'pending';
+          }).length;
+          final int solvedReports = docs.where((d) {
+            final data = d.data() as Map<String, dynamic>? ?? {};
+            final status = (data['status'] ?? '').toString().toLowerCase();
+            return status == 'resolved' || status == 'solved';
+          }).length;
+          final int dismissedReports = docs.where((d) {
+            final data = d.data() as Map<String, dynamic>? ?? {};
+            final status = (data['status'] ?? '').toString().toLowerCase();
+            return status == 'dismissed';
+          }).length;
+
+          // Filter by selected status tab
+          var filteredList = docs.where((d) {
+            final data = d.data() as Map<String, dynamic>? ?? {};
+            final status = (data['status'] ?? 'pending').toString().toLowerCase();
+            if (_reportsFilter == 'pending') return status == 'pending';
+            if (_reportsFilter == 'resolved') return status == 'resolved' || status == 'solved';
+            if (_reportsFilter == 'dismissed') return status == 'dismissed';
+            return true;
+          }).toList();
+
+          // Filter by search query
+          if (_reportsSearchQuery.trim().isNotEmpty) {
+            final q = _reportsSearchQuery.trim().toLowerCase();
+            filteredList = filteredList.where((d) {
+              final data = d.data() as Map<String, dynamic>? ?? {};
+              final reporterName = (data['reportedByName'] ?? '').toString().toLowerCase();
+              final reporterEmail = (data['reportedByEmail'] ?? '').toString().toLowerCase();
+              final accusedName = (data['reportedAuthorName'] ?? '').toString().toLowerCase();
+              final accusedId = (data['reportedAuthorId'] ?? '').toString().toLowerCase();
+              final snippet = (data['messageSnippet'] ?? '').toString().toLowerCase();
+              final reason = (data['reason'] ?? '').toString().toLowerCase();
+              final dept = (data['department'] ?? '').toString().toLowerCase();
+              return reporterName.contains(q) ||
+                  reporterEmail.contains(q) ||
+                  accusedName.contains(q) ||
+                  accusedId.contains(q) ||
+                  snippet.contains(q) ||
+                  reason.contains(q) ||
+                  dept.contains(q);
+            }).toList();
+          }
+
+          // Sort descending by timestamp
+          filteredList.sort((a, b) {
+            final dataA = a.data() as Map<String, dynamic>? ?? {};
+            final dataB = b.data() as Map<String, dynamic>? ?? {};
+            DateTime dtA = DateTime.fromMillisecondsSinceEpoch(0);
+            DateTime dtB = DateTime.fromMillisecondsSinceEpoch(0);
+            if (dataA['timestamp'] is Timestamp) dtA = (dataA['timestamp'] as Timestamp).toDate();
+            if (dataB['timestamp'] is Timestamp) dtB = (dataB['timestamp'] as Timestamp).toDate();
+            return dtB.compareTo(dtA);
+          });
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.shield_outlined,
+                        color: Colors.amberAccent, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'CONTENT MODERATION & REPORTS',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            if (pendingReports > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$pendingReports pending',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        Text(
+                          'Community violations, user complaints, and moderation actions',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Real-Time Counters Grid
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildReportMetricTile(
+                      label: 'Total Reports',
+                      count: totalReports,
+                      color: Colors.blueAccent,
+                      icon: Icons.flag_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildReportMetricTile(
+                      label: 'Pending Review',
+                      count: pendingReports,
+                      color: Colors.amberAccent,
+                      icon: Icons.hourglass_top_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildReportMetricTile(
+                      label: 'Solved',
+                      count: solvedReports,
+                      color: Colors.greenAccent,
+                      icon: Icons.check_circle_outline_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildReportMetricTile(
+                      label: 'Dismissed',
+                      count: dismissedReports,
+                      color: Colors.grey,
+                      icon: Icons.cancel_outlined,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Filter Tabs & Search
+              Row(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildReportFilterChip('All', 'All ($totalReports)'),
+                          const SizedBox(width: 6),
+                          _buildReportFilterChip('pending', 'Pending ($pendingReports)', color: Colors.amberAccent),
+                          const SizedBox(width: 6),
+                          _buildReportFilterChip('resolved', 'Solved ($solvedReports)', color: Colors.greenAccent),
+                          const SizedBox(width: 6),
+                          _buildReportFilterChip('dismissed', 'Dismissed ($dismissedReports)', color: Colors.grey),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Search Bar
+              TextField(
+                controller: _reportsSearchController,
+                onChanged: (val) => setState(() => _reportsSearchQuery = val),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Search by reporter, reported user, message snippet, or reason...',
+                  hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  prefixIcon: Icon(Icons.search, color: AppColors.textSecondary, size: 18),
+                  suffixIcon: _reportsSearchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear, color: AppColors.textSecondary, size: 16),
+                          onPressed: () {
+                            _reportsSearchController.clear();
+                            setState(() => _reportsSearchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.04),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: AppColors.glassCardBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: AppColors.glassCardBorder),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Report Items List
+              if (filteredList.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.02),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.glassCardBorder),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.verified_user_outlined,
+                        size: 40,
+                        color: Colors.greenAccent.withOpacity(0.4),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _reportsSearchQuery.isNotEmpty
+                            ? 'No reports matching "$_reportsSearchQuery"'
+                            : (_reportsFilter == 'pending'
+                                ? 'No pending reports! All community flags are clear.'
+                                : 'No report records found in this category.'),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filteredList.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (ctx, index) {
+                    final reportDoc = filteredList[index];
+                    final report = reportDoc.data() as Map<String, dynamic>;
+                    final String reportId = reportDoc.id;
+                    final String status = (report['status'] ?? 'pending').toString().toLowerCase();
+                    final String reason = report['reason'] ?? 'Community Policy Violation';
+                    final String messageSnippet = report['messageSnippet'] ?? '[No Content]';
+                    final String reportedAuthorName = report['reportedAuthorName'] ?? 'Unknown User';
+                    final String reportedAuthorId = report['reportedAuthorId'] ?? 'N/A';
+                    final String reportedByName = report['reportedByName'] ?? 'Anonymous Student';
+                    final String reportedByEmail = report['reportedByEmail'] ?? '';
+                    final String department = report['department'] ?? '';
+                    final String batch = report['batch'] ?? '';
+                    final String chatPath = report['chatPath'] ?? '';
+                    final String reportedDocId = report['reportedDocId'] ?? '';
+                    final String? mediaUrl = report['mediaUrl'] as String?;
+
+                    DateTime reportDate = DateTime.now();
+                    if (report['timestamp'] is Timestamp) {
+                      reportDate = (report['timestamp'] as Timestamp).toDate();
+                    }
+                    final String formattedDate =
+                        DateFormat('MMM dd, yyyy · hh:mm a').format(reportDate);
+
+                    final bool isPending = status == 'pending';
+                    final bool isSolved = status == 'resolved' || status == 'solved';
+                    final bool isDismissed = status == 'dismissed';
+
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isPending
+                            ? Colors.amber.withOpacity(0.04)
+                            : (isSolved
+                                ? Colors.green.withOpacity(0.03)
+                                : Colors.white.withOpacity(0.02)),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isPending
+                              ? Colors.amberAccent.withOpacity(0.35)
+                              : (isSolved
+                                  ? Colors.greenAccent.withOpacity(0.3)
+                                  : AppColors.glassCardBorder),
+                          width: isPending ? 1.2 : 0.8,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Top Status Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Reason Chip
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.flag_rounded, color: Colors.redAccent, size: 12),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      reason,
+                                      style: const TextStyle(
+                                        color: Colors.redAccent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Status Badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isPending
+                                      ? Colors.amber.withOpacity(0.2)
+                                      : (isSolved
+                                          ? Colors.green.withOpacity(0.2)
+                                          : Colors.grey.withOpacity(0.2)),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isPending
+                                        ? Colors.amberAccent
+                                        : (isSolved ? Colors.greenAccent : Colors.grey),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isPending
+                                          ? Icons.hourglass_top_rounded
+                                          : (isSolved
+                                              ? Icons.check_circle_rounded
+                                              : Icons.cancel_outlined),
+                                      size: 11,
+                                      color: isPending
+                                          ? Colors.amberAccent
+                                          : (isSolved ? Colors.greenAccent : Colors.grey),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isPending ? 'Pending' : (isSolved ? 'Solved' : 'Dismissed'),
+                                      style: TextStyle(
+                                        color: isPending
+                                            ? Colors.amberAccent
+                                            : (isSolved ? Colors.greenAccent : Colors.grey),
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Reported Content Quote Box
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.white.withOpacity(0.08)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Reported Message Content:',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '"$messageSnippet"',
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontStyle: FontStyle.italic,
+                                    height: 1.3,
+                                  ),
+                                ),
+                                if (mediaUrl != null && mediaUrl.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  InkWell(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => FileViewerScreen(
+                                            fileName: 'Reported_Media_${reportId.substring(0, 5)}.jpg',
+                                            fileUrl: mediaUrl,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.photo_library_rounded, size: 13, color: AppColors.primary),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'View Attached Media',
+                                            style: TextStyle(
+                                              color: AppColors.primary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Reporter & Accused Info Table
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Reporter
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.person_pin_rounded,
+                                            size: 13, color: AppColors.secondary),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Reported By:',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      reportedByName,
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (reportedByEmail.isNotEmpty)
+                                      Text(
+                                        reportedByEmail,
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 10.5,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    if (department.isNotEmpty || batch.isNotEmpty)
+                                      Text(
+                                        'Dept: $department | Batch: $batch',
+                                        style: TextStyle(
+                                          color: AppColors.primary,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+
+                              // Accused Author
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.gavel_rounded,
+                                            size: 13, color: Colors.redAccent),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Against Author:',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      reportedAuthorName,
+                                      style: const TextStyle(
+                                        color: Colors.redAccent,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'ID: $reportedAuthorId',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 10,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Timestamp line
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Reported on $formattedDate',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary.withOpacity(0.7),
+                                  fontSize: 10,
+                                ),
+                              ),
+                              if (report['resolvedBy'] != null)
+                                Text(
+                                  'Resolved by: ${report['resolvedBy']}',
+                                  style: TextStyle(
+                                    color: Colors.greenAccent.withOpacity(0.8),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Action Buttons Row
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              // Mark as Solved
+                              if (!isSolved)
+                                ElevatedButton.icon(
+                                  onPressed: () => _updateReportStatus(reportId, 'resolved'),
+                                  icon: const Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.black),
+                                  label: const Text('Mark Solved', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.greenAccent,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+
+                              // Dismiss
+                              if (!isDismissed)
+                                OutlinedButton.icon(
+                                  onPressed: () => _updateReportStatus(reportId, 'dismissed'),
+                                  icon: const Icon(Icons.cancel_outlined, size: 14, color: Colors.grey),
+                                  label: const Text('Dismiss', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: Colors.grey.withOpacity(0.4)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+
+                              // Delete Message from Chat
+                              if (chatPath.isNotEmpty && reportedDocId.isNotEmpty)
+                                OutlinedButton.icon(
+                                  onPressed: () => _deleteReportedMessageFromChat(
+                                    reportId: reportId,
+                                    chatPath: chatPath,
+                                    reportedDocId: reportedDocId,
+                                  ),
+                                  icon: const Icon(Icons.delete_sweep_rounded, size: 14, color: Colors.redAccent),
+                                  label: const Text('Delete From Chat', style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: Colors.redAccent.withOpacity(0.4)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+
+                              // Delete Report Log
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.redAccent),
+                                tooltip: 'Delete report record',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => _deleteReportLog(reportId),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildReportMetricTile({
+    required String label,
+    required int count,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(height: 4),
+          Text(
+            '$count',
+            style: TextStyle(
+              color: color,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportFilterChip(String filterKey, String label, {Color? color}) {
+    final bool isSelected = _reportsFilter == filterKey;
+    final activeColor = color ?? AppColors.primary;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : AppColors.textSecondary,
+          fontSize: 11.5,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      selected: isSelected,
+      selectedColor: activeColor.withOpacity(0.7),
+      backgroundColor: Colors.white.withOpacity(0.04),
+      onSelected: (_) => setState(() => _reportsFilter = filterKey),
+    );
+  }
+
+  Future<void> _updateReportStatus(String reportId, String newStatus) async {
+    final currentUser = Provider.of<AppUser?>(context, listen: false);
+    try {
+      await _firestore.collection('reports').doc(reportId).update({
+        'status': newStatus,
+        'resolvedAt': FieldValue.serverTimestamp(),
+        'resolvedBy': currentUser?.email ?? 'Root Admin',
+      });
+      if (mounted) {
+        InAppNotification.show(
+          context,
+          title: newStatus == 'resolved' ? 'Report Solved' : 'Report Dismissed',
+          message: newStatus == 'resolved'
+              ? 'Violation resolved and logged.'
+              : 'Report dismissed.',
+          accentColor: newStatus == 'resolved' ? Colors.greenAccent : Colors.grey,
+          icon: newStatus == 'resolved'
+              ? Icons.check_circle_rounded
+              : Icons.cancel_outlined,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Update Failed',
+          message: 'Error updating report: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteReportedMessageFromChat({
+    required String reportId,
+    required String chatPath,
+    required String reportedDocId,
+  }) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.backgroundTop,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.redAccent.withOpacity(0.4)),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+            SizedBox(width: 8),
+            Text('Delete Message From Chat?', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          'This will permanently remove the reported message from the student chat room and mark this report as solved.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Delete Message', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      // 1. Delete message document from chat path
+      await _firestore.collection(chatPath).doc(reportedDocId).delete();
+
+      // 2. Mark report as solved
+      final currentUser = Provider.of<AppUser?>(context, listen: false);
+      await _firestore.collection('reports').doc(reportId).update({
+        'status': 'resolved',
+        'actionTaken': 'Message deleted by Moderator',
+        'resolvedAt': FieldValue.serverTimestamp(),
+        'resolvedBy': currentUser?.email ?? 'Root Admin',
+      });
+
+      if (mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Message Removed & Solved',
+          message: 'Reported message was removed from chat and marked as solved.',
+          accentColor: Colors.greenAccent,
+          icon: Icons.check_circle_rounded,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Action Failed',
+          message: 'Failed to delete message: $e',
+          accentColor: Colors.redAccent,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteReportLog(String reportId) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.backgroundTop,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.redAccent.withOpacity(0.4)),
+        ),
+        title: const Text('Delete Report Record?', style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: const Text('This will permanently delete this report log from the database.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _firestore.collection('reports').doc(reportId).delete();
+      if (mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Report Deleted',
+          message: 'Report record removed successfully.',
+          accentColor: Colors.redAccent,
+          icon: Icons.delete_outline_rounded,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        InAppNotification.show(
+          context,
+          title: 'Deletion Failed',
+          message: 'Error deleting report: $e',
           accentColor: Colors.redAccent,
           icon: Icons.error_outline_rounded,
         );
