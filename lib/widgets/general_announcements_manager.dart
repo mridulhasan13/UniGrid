@@ -12,6 +12,7 @@ import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_storage_service.dart';
 import '../utils/constants.dart';
+import '../utils/dept_scope.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/unigrid_loader.dart';
@@ -798,6 +799,7 @@ class _GeneralAnnouncementComposerState
   final _contentController = TextEditingController();
   final _detailsController = TextEditingController();
   String _type = 'General';
+  String _target = 'All University Members';
   PlatformFile? _attachedFile;
   bool _isPosting = false;
 
@@ -844,6 +846,15 @@ class _GeneralAnnouncementComposerState
     final postedBy =
         user.name.isNotEmpty ? '${user.name} (Root Admin)' : 'Root Admin';
 
+    // Resolve department or batch from _target
+    String targetDept = '';
+    String targetBatch = '';
+    if (_target.startsWith('Dept: ')) {
+      targetDept = _target.replaceFirst('Dept: ', '').trim();
+    } else if (_target.startsWith('Batch ')) {
+      targetBatch = _target.replaceFirst('Batch ', '').trim();
+    }
+
     try {
       await GeneralAnnouncementService.postGeneralAnnouncement(
         title: title,
@@ -853,6 +864,9 @@ class _GeneralAnnouncementComposerState
         postedBy: postedBy,
         postedByUserId: user.id,
         file: _attachedFile,
+        target: _target,
+        department: targetDept,
+        batch: targetBatch,
       );
 
       _titleController.clear();
@@ -867,7 +881,7 @@ class _GeneralAnnouncementComposerState
         InAppNotification.show(
           context,
           title: 'Global Announcement Dispatched',
-          message: 'General Announcement sent to all users across the app!',
+          message: 'General Announcement sent to $_target!',
           accentColor: Colors.green,
           icon: Icons.campaign_rounded,
         );
@@ -920,7 +934,7 @@ class _GeneralAnnouncementComposerState
                       ),
                     ),
                     Text(
-                      'Broadcast to EVERY user across all departments & batches',
+                      'Broadcast official notices to selected audience',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,
@@ -931,7 +945,52 @@ class _GeneralAnnouncementComposerState
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
+
+          // Target Audience Dropdown
+          Text(
+            'Target Audience',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.glassCardBorder),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _target,
+                isExpanded: true,
+                dropdownColor: AppColors.backgroundTop,
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                items: [
+                  const DropdownMenuItem(
+                    value: 'All University Members',
+                    child: Text('All University Members'),
+                  ),
+                  ...kDepartments.map((d) => DropdownMenuItem(
+                        value: 'Dept: ${d['code']}',
+                        child: Text('Dept: ${d['code']} - ${d['name']}'),
+                      )),
+                  ...kBatches.map((b) => DropdownMenuItem(
+                        value: 'Batch $b',
+                        child: Text('Batch $b'),
+                      )),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _target = val);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
 
           // Title
           TextField(

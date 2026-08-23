@@ -143,28 +143,39 @@ class TokenResolver {
     String? requiredPreferenceField,
   }) async {
     try {
-      Query<Map<String, dynamic>> query = _db.collection('users');
-      if (department.isNotEmpty) {
-        query = query.where('department', isEqualTo: department);
-      }
-      if (batch.isNotEmpty) {
-        query = query.where('batch', isEqualTo: batch);
-      }
-      final snap = await query.get();
+      final snap = await _db.collection('users').get();
 
       final Set<String> tokens = {};
+      final cleanDept = department.trim().toUpperCase();
+      final cleanBatch = batch.replaceAll('Batch', '').trim();
+
       for (final doc in snap.docs) {
         if (excludeUserId != null && doc.id == excludeUserId) continue;
         final data = doc.data();
 
+        // 1. Department filter (case-insensitive)
+        if (cleanDept.isNotEmpty) {
+          final userDept =
+              (data['department'] ?? '').toString().trim().toUpperCase();
+          if (userDept != cleanDept) continue;
+        }
+
+        // 2. Batch filter (type-safe, handles int or string)
+        if (cleanBatch.isNotEmpty) {
+          final userBatch = (data['batch'] ?? '')
+              .toString()
+              .replaceAll('Batch', '')
+              .trim();
+          if (userBatch != cleanBatch) continue;
+        }
+
         // ── Respect user's notification preference from settings ─────────────
-        if (requiredPreferenceField != null && data[requiredPreferenceField] == false) {
+        if (requiredPreferenceField != null &&
+            data[requiredPreferenceField] == false) {
           continue; // User has toggled OFF this notification category in Settings
         }
 
-        if (adminsOnly &&
-            data['isCR'] != true &&
-            data['isAdmin'] != true) {
+        if (adminsOnly && data['isCR'] != true && data['isAdmin'] != true) {
           continue;
         }
         tokens.addAll(_extractCategory(data, categoryField));

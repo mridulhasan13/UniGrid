@@ -63,6 +63,35 @@ class WWReceiver {
             return;
           }
         }
+
+        // ── Target audience scope guard (safety net for targeted notices) ────
+        final targetDept = (message.data['targetDept'] ?? message.data['department'] ?? '').toString().trim().toUpperCase();
+        final targetBatch = (message.data['targetBatch'] ?? message.data['batch'] ?? '').toString().replaceAll('Batch', '').trim();
+        final targetStr = (message.data['target'] ?? '').toString().trim();
+
+        String resolvedDept = targetDept;
+        String resolvedBatch = targetBatch;
+        if (resolvedDept.isEmpty && resolvedBatch.isEmpty && targetStr.isNotEmpty) {
+          if (targetStr.startsWith('Dept: ')) {
+            resolvedDept = targetStr.replaceFirst('Dept: ', '').trim().toUpperCase();
+          } else if (targetStr.startsWith('Batch ')) {
+            resolvedBatch = targetStr.replaceFirst('Batch ', '').trim();
+          }
+        }
+
+        if (resolvedDept.isNotEmpty || resolvedBatch.isNotEmpty) {
+          final userDept = (prefs.getString('auth_session_department') ?? '').trim().toUpperCase();
+          final userBatch = (prefs.getString('auth_session_batch') ?? '').trim();
+
+          if (resolvedDept.isNotEmpty && userDept.isNotEmpty && userDept != resolvedDept) {
+            debugPrint('[WWReceiver] Suppressing notice: web dept ($userDept) does not match target ($resolvedDept)');
+            return;
+          }
+          if (resolvedBatch.isNotEmpty && userBatch.isNotEmpty && userBatch != resolvedBatch) {
+            debugPrint('[WWReceiver] Suppressing notice: web batch ($userBatch) does not match target ($resolvedBatch)');
+            return;
+          }
+        }
       } catch (e) {
         debugPrint('[WWReceiver] Error checking notification preferences: $e');
       }

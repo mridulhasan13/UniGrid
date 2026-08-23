@@ -230,6 +230,10 @@ class AuthService {
 
           final appUser = AppUser.fromMap(data, doc.id);
           _userController.add(appUser);
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setString('auth_session_department', appUser.department);
+            prefs.setString('auth_session_batch', appUser.batch);
+          }).catchError((_) {});
           if (appUser.hasDeptScope) {
             // Only restart the Firestore theme listener when the user's dept/batch
             // actually changes. Restarting on every snapshot would cancel+recreate
