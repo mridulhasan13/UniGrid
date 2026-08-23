@@ -28,8 +28,13 @@ class GeneralAnnouncementService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _collection = 'general_announcements';
 
-  /// Stream of unseen general announcement count for a specific [userId].
-  static Stream<int> unseenCountStream(String userId) {
+  /// Stream of unseen general announcement count for a specific [userId], filtered by audience.
+  static Stream<int> unseenCountStream(
+    String userId, {
+    String? userDept,
+    String? userBatch,
+    bool isRoot = false,
+  }) {
     if (userId.isEmpty) return Stream.value(0);
     return _db
         .collection(_collection)
@@ -38,7 +43,39 @@ class GeneralAnnouncementService {
       int unseen = 0;
       for (final doc in snap.docs) {
         final data = doc.data();
-        final List seenBy = data['seenBy'] is List ? (data['seenBy'] as List) : [];
+
+        // Check audience target if not root admin
+        if (!isRoot) {
+          final targetDept = (data['targetDept'] ?? '').toString().trim();
+          final targetBatch = (data['targetBatch'] ?? '').toString().trim();
+          final target = (data['target'] ?? '').toString().trim();
+
+          if (targetDept.isNotEmpty &&
+              userDept != null &&
+              userDept.trim().toUpperCase() != targetDept.toUpperCase()) {
+            continue;
+          }
+          if (targetBatch.isNotEmpty &&
+              userBatch != null &&
+              userBatch.trim() != targetBatch) {
+            continue;
+          }
+          if (target.startsWith('Dept: ')) {
+            final d = target.replaceFirst('Dept: ', '').trim();
+            if (userDept != null &&
+                userDept.trim().toUpperCase() != d.toUpperCase()) {
+              continue;
+            }
+          } else if (target.startsWith('Batch ')) {
+            final b = target.replaceFirst('Batch ', '').trim();
+            if (userBatch != null && userBatch.trim() != b) {
+              continue;
+            }
+          }
+        }
+
+        final List seenBy =
+            data['seenBy'] is List ? (data['seenBy'] as List) : [];
         if (!seenBy.contains(userId)) {
           unseen++;
         }
@@ -59,7 +96,7 @@ class GeneralAnnouncementService {
     }
   }
 
-  /// Post a new General Announcement (Root Admin only) and dispatch FCM push to all users.
+  /// Post a new General Announcement (Root Admin only) and dispatch FCM push.
   static Future<void> postGeneralAnnouncement({
     required String title,
     required String content,
@@ -68,11 +105,17 @@ class GeneralAnnouncementService {
     required String postedBy,
     required String postedByUserId,
     PlatformFile? file,
+    String target = 'All University Members',
+    String department = '',
+    String batch = '',
   }) async {
     final Map<String, dynamic> docData = {
       'title': title,
       'content': content,
       'type': type.isNotEmpty ? type : 'General',
+      'target': target,
+      'targetDept': department,
+      'targetBatch': batch,
       'timestamp': FieldValue.serverTimestamp(),
       'postedBy': postedBy,
       'postedByUserId': postedByUserId,
@@ -89,13 +132,16 @@ class GeneralAnnouncementService {
     // 1. Post document to global Firestore collection
     final docRef = await _db.collection(_collection).add(docData);
 
-    // 2. Dispatch FCM global notification to all users across app
+    // 2. Dispatch FCM notification targeted to audience
     try {
       FCMService.notifyGeneralAnnouncement(
         title: title,
         content: content,
         senderUserId: postedByUserId,
         messageId: docRef.id,
+        department: department,
+        batch: batch,
+        target: target,
       );
     } catch (e) {
       debugPrint('[GeneralAnnouncementService] FCM notification error: $e');
@@ -152,9 +198,17 @@ class GeneralNotificationBell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userId = user?.id ?? '';
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isRoot = authService.isRootAdmin(authService.currentAuthEmail) ||
+        authService.isRootAdmin(user?.email);
 
     return StreamBuilder<int>(
-      stream: GeneralAnnouncementService.unseenCountStream(userId),
+      stream: GeneralAnnouncementService.unseenCountStream(
+        userId,
+        userDept: user?.department,
+        userBatch: user?.batch,
+        isRoot: isRoot,
+      ),
       builder: (context, snapshot) {
         final unseenCount = snapshot.data ?? 0;
 
@@ -235,10 +289,9 @@ class GeneralAnnouncementsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
+    // ONLY Root Admins have deletion & administrative power over General Notices
     final isRootAdmin = authService.isRootAdmin(authService.currentAuthEmail) ||
-        authService.isRootAdmin(user.email) ||
-        user.isAdmin ||
-        user.isCR;
+        authService.isRootAdmin(user.email);
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -350,32 +403,92 @@ class GeneralAnnouncementsSheet extends StatelessWidget {
                       );
                     }
 
-                    // Map & Sort by timestamp descending
-                    final items = docs.map((d) {
-                      final data = d.data() as Map<String, dynamic>;
-                      DateTime dt = DateTime.now();
-                      if (data['timestamp'] is Timestamp) {
-                        dt = (data['timestamp'] as Timestamp).toDate();
-                      }
-                      final List seenBy =
-                          data['seenBy'] is List ? (data['seenBy'] as List) : [];
-                      final bool isSeen = seenBy.contains(user.id);
+                    // Map & filter by audience (unless root admin)
+                    final items = docs
+                        .map((d) {
+                          final data = d.data() as Map<String, dynamic>;
+                          DateTime dt = DateTime.now();
+                          if (data['timestamp'] is Timestamp) {
+                            dt = (data['timestamp'] as Timestamp).toDate();
+                          }
+                          final List seenBy = data['seenBy'] is List
+                              ? (data['seenBy'] as List)
+                              : [];
+                          final bool isSeen = seenBy.contains(user.id);
 
-                      return {
-                        'id': d.id,
-                        'title': data['title'] ?? '',
-                        'content': data['content'] ?? '',
-                        'type': data['type'] ?? 'General',
-                        'timestamp': dt,
-                        'postedBy': data['postedBy'] ?? 'Root Admin',
-                        'fileUrl': data['fileUrl'],
-                        'fileName': data['fileName'],
-                        'details': data['details'],
-                        'isSeen': isSeen,
-                      };
-                    }).toList()
+                          return {
+                            'id': d.id,
+                            'title': data['title'] ?? '',
+                            'content': data['content'] ?? '',
+                            'type': data['type'] ?? 'General',
+                            'target': data['target'] ?? '',
+                            'targetDept': data['targetDept'] ?? '',
+                            'targetBatch': data['targetBatch'] ?? '',
+                            'timestamp': dt,
+                            'postedBy': data['postedBy'] ?? 'Root Admin',
+                            'fileUrl': data['fileUrl'],
+                            'fileName': data['fileName'],
+                            'details': data['details'],
+                            'isSeen': isSeen,
+                          };
+                        })
+                        .where((item) {
+                          if (isRootAdmin) return true;
+                          final targetDept =
+                              (item['targetDept'] as String).trim();
+                          final targetBatch =
+                              (item['targetBatch'] as String).trim();
+                          final target = (item['target'] as String).trim();
+
+                          if (targetDept.isNotEmpty &&
+                              user.department.trim().toUpperCase() !=
+                                  targetDept.toUpperCase()) {
+                            return false;
+                          }
+                          if (targetBatch.isNotEmpty &&
+                              user.batch.trim() != targetBatch) {
+                            return false;
+                          }
+                          if (target.startsWith('Dept: ')) {
+                            final d = target.replaceFirst('Dept: ', '').trim();
+                            if (user.department.trim().toUpperCase() !=
+                                d.toUpperCase()) {
+                              return false;
+                            }
+                          } else if (target.startsWith('Batch ')) {
+                            final b = target.replaceFirst('Batch ', '').trim();
+                            if (user.batch.trim() != b) {
+                              return false;
+                            }
+                          }
+                          return true;
+                        })
+                        .toList()
                       ..sort((a, b) => (b['timestamp'] as DateTime)
                           .compareTo(a['timestamp'] as DateTime));
+
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.notifications_paused_rounded,
+                              size: 48,
+                              color: AppColors.textPrimary.withOpacity(0.25),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No general announcements for your scope.',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
 
                     // Schedule mark-as-seen post-frame to prevent infinite build/stream loops
                     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -422,6 +535,7 @@ class _GeneralCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String type = item['type'] as String;
+    final String? target = item['target'] as String?;
     final DateTime dt = item['timestamp'] as DateTime;
     final String dateStr = DateFormat('MMM dd, hh:mm a').format(dt);
     final String? fileUrl = item['fileUrl'] as String?;
@@ -467,6 +581,37 @@ class _GeneralCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (target != null &&
+                    target.isNotEmpty &&
+                    target != 'All University Members') ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: AppColors.primary.withOpacity(0.35)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.near_me_rounded,
+                            color: AppColors.primary, size: 11),
+                        const SizedBox(width: 3),
+                        Text(
+                          target,
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

@@ -13,7 +13,7 @@ import 'glass_card.dart';
 /// 2. Force App Update Prompt (if installed version < minimum required version)
 class MaintenanceGuard extends StatelessWidget {
   final Widget child;
-  static const String currentAppVersion = '1.0.0';
+  static const String currentAppVersion = '1.0.1';
 
   const MaintenanceGuard({super.key, required this.child});
 

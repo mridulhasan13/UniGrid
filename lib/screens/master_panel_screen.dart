@@ -1960,24 +1960,38 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             final currentUser = Provider.of<AppUser?>(context, listen: false);
 
                             try {
+                              // Resolve department or batch from selectedTarget
+                              String targetDept = '';
+                              String targetBatch = '';
+                              if (selectedTarget.startsWith('Dept: ')) {
+                                targetDept = selectedTarget.replaceFirst('Dept: ', '').trim();
+                              } else if (selectedTarget.startsWith('Batch ')) {
+                                targetBatch = selectedTarget.replaceFirst('Batch ', '').trim();
+                              }
+
                               // 1. Post to Firestore General Announcements
                               final docRef = await _firestore.collection('general_announcements').add({
                                 'title': '[$selectedType] $title',
                                 'content': msg,
                                 'type': selectedType,
                                 'target': selectedTarget,
+                                'targetDept': targetDept,
+                                'targetBatch': targetBatch,
                                 'timestamp': FieldValue.serverTimestamp(),
                                 'postedBy': currentUser?.name ?? 'Master Admin',
                                 'postedByUserId': currentUser?.id ?? '',
                                 'seenBy': [currentUser?.id ?? ''],
                               });
 
-                              // 2. Dispatch FCM Global Push Notification
+                              // 2. Dispatch FCM Global Push Notification filtered by target audience
                               FCMService.notifyGeneralAnnouncement(
                                 title: '[$selectedType] $title',
                                 content: msg,
                                 senderUserId: currentUser?.id ?? '',
                                 messageId: docRef.id,
+                                department: targetDept,
+                                batch: targetBatch,
+                                target: selectedTarget,
                               );
 
                               Navigator.pop(ctx);

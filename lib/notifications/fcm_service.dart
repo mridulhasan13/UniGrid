@@ -641,10 +641,25 @@ class FCMService {
     required String content,
     required String senderUserId,
     String? messageId,
+    String department = '',
+    String batch = '',
+    String target = '',
   }) async {
+    String dept = department.trim();
+    String bth = batch.trim();
+
+    // Auto-resolve dept or batch if target string was passed instead
+    if (dept.isEmpty && bth.isEmpty && target.isNotEmpty) {
+      if (target.startsWith('Dept: ')) {
+        dept = target.replaceFirst('Dept: ', '').trim();
+      } else if (target.startsWith('Batch ')) {
+        bth = target.replaceFirst('Batch ', '').trim();
+      }
+    }
+
     await sendToDeptAndBatch(
-      department: '',
-      batch: '',
+      department: dept,
+      batch: bth,
       title: '📢 General Announcement',
       body: title.isNotEmpty ? title : content,
       senderUserId: senderUserId,
