@@ -613,12 +613,16 @@ class _GeneralCard extends StatelessWidget {
                               Icon(Icons.near_me_rounded,
                                   color: AppColors.primary, size: 11),
                               const SizedBox(width: 3),
-                              Text(
-                                target,
-                                style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                              Flexible(
+                                child: Text(
+                                  target,
+                                  style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],

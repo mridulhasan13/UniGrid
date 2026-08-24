@@ -360,6 +360,23 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
 
                 final preciseTime = data['preciseTime'] ?? timestamp * 1000;
 
+                final bool isUnsent = data['isUnsent'] ?? false;
+                final bool isDeleted = data['isDeleted'] ?? false;
+
+                if (isUnsent || isDeleted) {
+                  return types.TextMessage(
+                    author: author,
+                    createdAt: timestamp,
+                    id: data['id'] ?? doc.id,
+                    text: 'This message was unsent',
+                    metadata: {
+                      'preciseTime': preciseTime,
+                      'isUnsent': isUnsent,
+                      'isDeleted': isDeleted,
+                    },
+                  );
+                }
+
                 if (data['type'] == 'image') {
                   return types.ImageMessage(
                     author: author,
@@ -394,26 +411,42 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                 onEndReached: _handleEndReached,
                 textMessageBuilder: (message, {required messageWidth, required showName}) {
                   final isMe = message.author.id == currentChatUser.id;
+                  final isUnsent = message.metadata?['isUnsent'] == true ||
+                      message.metadata?['isDeleted'] == true;
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    child: LinkifiedText(
-                      message.text,
-                      selectable: true,
-                      style: TextStyle(
-                        color: isMe ? Colors.white : AppColors.textPrimary,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                      linkStyle: TextStyle(
-                        color: isMe ? Colors.cyanAccent : AppColors.primary,
-                        decoration: TextDecoration.underline,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
+                    child: isUnsent
+                        ? Text(
+                            message.text,
+                            style: TextStyle(
+                              color: (isMe ? Colors.white : AppColors.textPrimary)
+                                  .withOpacity(0.45),
+                              fontSize: 13,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          )
+                        : LinkifiedText(
+                            message.text,
+                            selectable: true,
+                            style: TextStyle(
+                              color: isMe ? Colors.white : AppColors.textPrimary,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                            linkStyle: TextStyle(
+                              color: isMe ? Colors.cyanAccent : AppColors.primary,
+                              decoration: TextDecoration.underline,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                          ),
                   );
                 },
                 onMessageTap: (context, message) {
+                  if (message.metadata?['isUnsent'] == true ||
+                      message.metadata?['isDeleted'] == true) {
+                    return;
+                  }
                   if (message is types.ImageMessage) {
                     Navigator.push(
                       context,
@@ -580,6 +613,10 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   }
 
   void _showPrivateMessageActions(types.Message message) {
+    final bool isUnsent = message.metadata?['isUnsent'] == true ||
+        message.metadata?['isDeleted'] == true;
+    if (isUnsent) return;
+
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final bool isOwn = message.author.id == currentUid;
     String messageText = '';

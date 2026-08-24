@@ -1911,19 +1911,21 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
                               'CONTENT MODERATION & REPORTS',
                               style: TextStyle(
                                 color: AppColors.textPrimary,
-                                fontSize: 16,
+                                fontSize: 14.5,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            if (pendingReports > 0) ...[
-                              const SizedBox(width: 8),
+                            if (pendingReports > 0)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                 decoration: BoxDecoration(
@@ -1939,7 +1941,6 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                   ),
                                 ),
                               ),
-                            ],
                           ],
                         ),
                         Text(
@@ -3139,51 +3140,72 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                           style: TextStyle(
                               color: AppColors.primary.withOpacity(0.9),
                               fontSize: 10.5,
-                              fontWeight: FontWeight.w500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                              fontWeight: FontWeight.w500,
+                              height: 1.3),
                         ),
-                        if (school.isNotEmpty || college.isNotEmpty) ...[
-                          const SizedBox(height: 2),
+                        if (school.isNotEmpty) ...[
+                          const SizedBox(height: 3),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.account_balance_outlined,
-                                  size: 11, color: AppColors.secondary),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 1),
+                                child: Icon(Icons.school_outlined,
+                                    size: 12, color: AppColors.secondary),
+                              ),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  [
-                                    if (school.isNotEmpty) 'Sch: $school',
-                                    if (college.isNotEmpty) 'Col: $college',
-                                  ].join(' • '),
+                                  'School: $school',
                                   style: TextStyle(
-                                    color: AppColors.textSecondary.withOpacity(0.85),
-                                    fontSize: 10,
+                                    color: AppColors.textSecondary.withOpacity(0.9),
+                                    fontSize: 10.5,
+                                    height: 1.3,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (college.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 1),
+                                child: Icon(Icons.account_balance_outlined,
+                                    size: 12, color: AppColors.secondary),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'College: $college',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary.withOpacity(0.9),
+                                    fontSize: 10.5,
+                                    height: 1.3,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ],
                         if (joinedFormatted.isNotEmpty) ...[
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 3),
                           Row(
                             children: [
                               Icon(Icons.calendar_today_rounded,
-                                  size: 10, color: Colors.cyanAccent.withOpacity(0.8)),
+                                  size: 10.5, color: Colors.cyanAccent.withOpacity(0.8)),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   'Joined: $joinedFormatted',
                                   style: TextStyle(
                                     color: Colors.cyanAccent.withOpacity(0.85),
-                                    fontSize: 9.5,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.w500,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],

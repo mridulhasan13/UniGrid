@@ -91,6 +91,10 @@ class _ChatMsg {
         editedAt = (data['editedAt'] as Timestamp).toDate();
       } catch (_) {}
     }
+    final bool isUnsent = data['isUnsent'] ?? false;
+    final bool isDeleted = data['isDeleted'] ?? false;
+    final bool isEffectivelyDeleted = isUnsent || isDeleted;
+
     return _ChatMsg(
       docId: doc.id,
       id: data['id'] ?? doc.id,
@@ -100,17 +104,17 @@ class _ChatMsg {
       createdAt: createdAt,
       preciseTime:
           data['preciseTime'] ?? createdAt.millisecondsSinceEpoch * 1000,
-      text: data['text'] ?? '',
-      type: data['type'] ?? 'text',
+      text: isEffectivelyDeleted ? '' : (data['text'] ?? ''),
+      type: isEffectivelyDeleted ? 'text' : (data['type'] ?? 'text'),
       isCR: data['isCR'] ?? false,
       replyTo: replyTo,
       seenBy: seenBy,
-      isUnsent: data['isUnsent'] ?? false,
-      isDeleted: data['isDeleted'] ?? false,
-      editedAt: editedAt,
-      uri: data['uri'],
-      fileName: data['name'],
-      fileSize: data['size'],
+      isUnsent: isUnsent,
+      isDeleted: isDeleted,
+      editedAt: isEffectivelyDeleted ? null : editedAt,
+      uri: isEffectivelyDeleted ? null : data['uri'],
+      fileName: isEffectivelyDeleted ? null : data['name'],
+      fileSize: isEffectivelyDeleted ? null : data['size'],
     );
   }
 }
@@ -599,7 +603,7 @@ class _MessageBubble extends StatelessWidget {
           // Reply preview
           if (message.replyTo != null) _buildReplyPreview(textColor),
           // Content
-          if (message.isUnsent)
+          if (message.isUnsent || message.isDeleted)
             Text(
               'This message was unsent',
               style: TextStyle(
@@ -716,6 +720,9 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Widget _buildImageContent(BuildContext context) {
+    if (message.isUnsent || message.isDeleted || message.uri == null) {
+      return const SizedBox.shrink();
+    }
     final uri = message.uri!;
     Widget img;
     if (uri.startsWith('data:image')) {
@@ -1014,7 +1021,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (_replyingTo != null && i == 0) {
             msgData['replyTo'] = {
               'id': _replyingTo!.id,
-              'text': _replyingTo!.isUnsent
+              'text': (_replyingTo!.isUnsent || _replyingTo!.isDeleted)
                   ? 'This message was unsent'
                   : (_replyingTo!.type == 'image'
                       ? 'Image'
@@ -1072,7 +1079,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_replyingTo != null) {
       msgData['replyTo'] = {
         'id': _replyingTo!.id,
-        'text': _replyingTo!.isUnsent
+        'text': (_replyingTo!.isUnsent || _replyingTo!.isDeleted)
             ? 'This message was unsent'
             : (_replyingTo!.type == 'image' ? 'Image' : _replyingTo!.text),
         'authorName': _replyingTo!.authorName,
@@ -1211,7 +1218,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 // Message preview
-                if (!msg.isUnsent && msg.type == 'text' && msg.text.isNotEmpty)
+                if (!msg.isUnsent && !msg.isDeleted && msg.type == 'text' && msg.text.isNotEmpty)
                   Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -1225,19 +1232,20 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 Divider(color: AppColors.textPrimary.withOpacity(0.08)),
-                // Reply (always available)
-                _ActionTile(
-                  icon: Icons.reply_rounded,
-                  label: 'Reply',
-                  color: AppColors.primary,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    setState(() => _replyingTo = msg);
-                    _focusNode.requestFocus();
-                  },
-                ),
+                // Reply
+                if (!msg.isUnsent && !msg.isDeleted)
+                  _ActionTile(
+                    icon: Icons.reply_rounded,
+                    label: 'Reply',
+                    color: AppColors.primary,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() => _replyingTo = msg);
+                      _focusNode.requestFocus();
+                    },
+                  ),
                 // Copy Text (for non-empty text messages)
-                if (msg.text.isNotEmpty && !msg.isUnsent)
+                if (msg.text.isNotEmpty && !msg.isUnsent && !msg.isDeleted)
                   _ActionTile(
                     icon: Icons.copy_rounded,
                     label: 'Copy Text',
@@ -1255,7 +1263,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     },
                   ),
                 // Edit (own text messages only)
-                if (isOwn && !msg.isUnsent && msg.type == 'text')
+                if (isOwn && !msg.isUnsent && !msg.isDeleted && msg.type == 'text')
                   _ActionTile(
                     icon: Icons.edit_outlined,
                     label: 'Edit',
@@ -1273,7 +1281,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     },
                   ),
                 // Unsend (own messages only)
-                if (isOwn && !msg.isUnsent)
+                if (isOwn && !msg.isUnsent && !msg.isDeleted)
                   _ActionTile(
                     icon: Icons.undo_rounded,
                     label: 'Unsend',
@@ -1283,7 +1291,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       await _firestore
                           .collection(_chatPath)
                           .doc(msg.docId)
-                          .update({'isUnsent': true, 'text': ''});
+                          .update({
+                            'isUnsent': true,
+                            'text': '',
+                            'uri': FieldValue.delete(),
+                            'name': FieldValue.delete(),
+                            'size': FieldValue.delete(),
+                            'type': 'text',
+                          });
                     },
                   ),
                 // Delete
@@ -1337,7 +1352,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     },
                   ),
                 // Report Message (Play Store UGC Policy - other users' messages)
-                if (!isOwn)
+                if (!isOwn && !msg.isUnsent && !msg.isDeleted)
                   _ActionTile(
                     icon: Icons.flag_outlined,
                     label: 'Report Message',
@@ -2336,6 +2351,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (showDate) _dateSeparator(msg.createdAt),
                 _SwipeToReply(
                   onReply: () {
+                    if (msg.isUnsent || msg.isDeleted) return;
                     setState(() => _replyingTo = msg);
                     _focusNode.requestFocus();
                   },
@@ -2344,6 +2360,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     isOwn: isOwn,
                     currentUserId: appUser.id,
                     onTap: () {
+                      if (msg.isUnsent || msg.isDeleted) {
+                        if (isOwn) {
+                          _showSeenBy(msg);
+                        }
+                        return;
+                      }
                       if (msg.type == 'image' && msg.uri != null) {
                         if (!isOwn) {
                           _markAsSeen(msg, appUser.id);
@@ -2456,9 +2478,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _replyingTo!.isUnsent
-                          ? 'Unsent message'
-                          : (_replyingTo!.type == 'image'
+                      (_replyingTo!.isUnsent || _replyingTo!.isDeleted)
+                          ? 'This message was unsent'
+                          : (_replyingTo!.type == 'image' &&
+                                  _replyingTo!.text.isEmpty
                               ? 'Image'
                               : _replyingTo!.text),
                       style:
