@@ -72,12 +72,26 @@ service cloud.firestore {
       allow create: if isApprovedUser() && belongsToScope(dept, batch) && (
         collection == 'chat_messages' || collection == 'materials'
       );
-      allow update, delete: if isApprovedUser() && belongsToScope(dept, batch) && (
-        (collection == 'chat_messages' || collection == 'materials') && (
+      allow update: if isApprovedUser() && belongsToScope(dept, batch) && (
+        (collection == 'chat_messages' && (
           request.auth.uid == resource.data.authorId || 
+          isCR(request.auth.uid) ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenBy'])
+        )) ||
+        (collection == 'materials' && (
           request.auth.uid == resource.data.uploadedByUserId ||
           isCR(request.auth.uid)
-        )
+        ))
+      );
+      allow delete: if isApprovedUser() && belongsToScope(dept, batch) && (
+        (collection == 'chat_messages' && (
+          request.auth.uid == resource.data.authorId || 
+          isCR(request.auth.uid)
+        )) ||
+        (collection == 'materials' && (
+          request.auth.uid == resource.data.uploadedByUserId ||
+          isCR(request.auth.uid)
+        ))
       );
       
       // For CR-only collections: announcements, schedule, default_schedule, overrides, metadata, config, courses

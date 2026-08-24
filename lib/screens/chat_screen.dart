@@ -253,10 +253,78 @@ class _ActionTile extends StatelessWidget {
 // ============================================================
 // Seen By Bottom Sheet
 // ============================================================
-class _SeenBySheet extends StatelessWidget {
+class _SeenBySheet extends StatefulWidget {
   final List<String> viewerIds;
   final FirebaseFirestore firestore;
   const _SeenBySheet({required this.viewerIds, required this.firestore});
+
+  @override
+  State<_SeenBySheet> createState() => _SeenBySheetState();
+}
+
+class _SeenBySheetState extends State<_SeenBySheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  List<AppUser>? _cachedUsers;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsers();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchUsers() async {
+    final uniqueIds = widget.viewerIds
+        .where((id) => id.trim().isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (uniqueIds.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _cachedUsers = [];
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      final futures = uniqueIds.map((id) async {
+        try {
+          final doc = await widget.firestore.collection('users').doc(id).get();
+          if (doc.exists && doc.data() != null) {
+            return AppUser.fromMap(doc.data()!, doc.id);
+          }
+        } catch (_) {}
+        // Fallback user placeholder
+        return AppUser(id: id, email: '', name: 'Student');
+      });
+
+      final results = await Future.wait(futures);
+      if (mounted) {
+        setState(() {
+          _cachedUsers = results;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load viewers: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   ImageProvider? _imgProvider(String photo) {
     if (photo.isEmpty) return null;
@@ -270,19 +338,39 @@ class _SeenBySheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    final users = _cachedUsers ?? [];
+    final filteredUsers = _searchQuery.trim().isEmpty
+        ? users
+        : users.where((u) {
+            final query = _searchQuery.toLowerCase();
+            return u.name.toLowerCase().contains(query) ||
+                u.studentId.toLowerCase().contains(query) ||
+                u.batch.toLowerCase().contains(query) ||
+                u.department.toLowerCase().contains(query);
+          }).toList();
+
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
+          constraints: BoxConstraints(
+            maxHeight: (screenHeight * 0.75).clamp(320.0, 680.0),
+            minHeight: 240.0,
+          ),
           decoration: BoxDecoration(
-            color: AppColors.backgroundTop.withOpacity(0.92),
+            color: AppColors.backgroundTop.withOpacity(0.95),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Drag Handle
               Container(
                 width: 40,
                 height: 4,
@@ -292,73 +380,304 @@ class _SeenBySheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.done_all, color: AppColors.secondary, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Seen by ${viewerIds.length}',
-                    style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Divider(color: AppColors.textPrimary.withOpacity(0.08)),
-              FutureBuilder<List<DocumentSnapshot>>(
-                future: Future.wait(viewerIds
-                    .map((id) => firestore.collection('users').doc(id).get())),
-                builder: (ctx, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                  final docs = snap.data ?? [];
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).padding.bottom + 24,
+
+              // Title Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.done_all_rounded,
+                          color: AppColors.secondary, size: 18),
                     ),
-                    itemCount: docs.length,
-                    itemBuilder: (ctx, i) {
-                      final data =
-                          docs[i].data() as Map<String, dynamic>? ?? {};
-                      final photo = data['photoUrl'] ?? '';
-                      final name = data['name'] ?? 'Unknown';
-                      final batch = data['batch'] ?? '';
-                      final provider = _imgProvider(photo);
-                      return ListTile(
-                        leading: CircleAvatar(
-                          radius: 22,
-                          backgroundColor: AppColors.glassCardColor,
-                          backgroundImage: provider,
-                          child: provider == null
-                              ? Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                  style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontWeight: FontWeight.bold))
-                              : null,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Seen by ${_cachedUsers != null ? _cachedUsers!.length : widget.viewerIds.toSet().length}',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            'Members who viewed this message',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded,
+                          color: AppColors.textSecondary, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                      splashRadius: 20,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Search Bar (if more than 5 users)
+              if (users.length > 5) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                  child: Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.textPrimary.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppColors.textPrimary.withOpacity(0.08)),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search_rounded,
+                            color: AppColors.textSecondary, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (val) =>
+                                setState(() => _searchQuery = val),
+                            style: TextStyle(
+                                color: AppColors.textPrimary, fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: 'Search by name, ID or batch...',
+                              hintStyle: TextStyle(
+                                color: AppColors.textSecondary.withOpacity(0.7),
+                                fontSize: 13,
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
                         ),
-                        title: Text(name,
-                            style: TextStyle(color: AppColors.textPrimary)),
-                        subtitle: batch.isNotEmpty
-                            ? Text(batch,
+                        if (_searchQuery.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                            child: Icon(Icons.clear_rounded,
+                                color: AppColors.textSecondary, size: 16),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              Divider(
+                  color: AppColors.textPrimary.withOpacity(0.08), height: 12),
+
+              // Scrollable User List
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    : _errorMessage != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(
+                                _errorMessage!,
                                 style: TextStyle(
-                                    color: AppColors.textSecondary, fontSize: 12))
-                            : null,
-                        trailing: Icon(Icons.done_all,
-                            color: AppColors.secondary, size: 18),
-                      );
-                    },
-                  );
-                },
+                                    color: Colors.redAccent, fontSize: 13),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        : filteredUsers.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.person_search_rounded,
+                                          color: AppColors.textSecondary
+                                              .withOpacity(0.4),
+                                          size: 36),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _searchQuery.isNotEmpty
+                                            ? 'No matching members found'
+                                            : 'No viewers yet',
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                physics: const BouncingScrollPhysics(),
+                                padding: EdgeInsets.only(
+                                  left: 8,
+                                  right: 8,
+                                  top: 4,
+                                  bottom: bottomInset + bottomPadding + 16,
+                                ),
+                                itemCount: filteredUsers.length,
+                                separatorBuilder: (ctx, i) => Divider(
+                                  color:
+                                      AppColors.textPrimary.withOpacity(0.04),
+                                  height: 1,
+                                  indent: 64,
+                                ),
+                                itemBuilder: (ctx, i) {
+                                  final user = filteredUsers[i];
+                                  final photo = user.photoUrl;
+                                  final name = user.name.isNotEmpty
+                                      ? user.name
+                                      : 'Unknown User';
+                                  final provider = _imgProvider(photo);
+
+                                  final metaParts = <String>[];
+                                  if (user.department.isNotEmpty) {
+                                    metaParts.add(user.department);
+                                  }
+                                  if (user.batch.isNotEmpty) {
+                                    metaParts.add('Batch ${user.batch}');
+                                  }
+                                  if (user.studentId.isNotEmpty) {
+                                    metaParts.add(user.studentId);
+                                  }
+
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 2),
+                                    leading: CircleAvatar(
+                                      radius: 20,
+                                      backgroundColor: AppColors.glassCardColor,
+                                      backgroundImage: provider,
+                                      child: provider == null
+                                          ? Text(
+                                              name.isNotEmpty
+                                                  ? name[0].toUpperCase()
+                                                  : 'U',
+                                              style: TextStyle(
+                                                color: AppColors.textPrimary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                    title: Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            name,
+                                            style: TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (user.isCR) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.secondary
+                                                  .withOpacity(0.2),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                  color: AppColors.secondary
+                                                      .withOpacity(0.4),
+                                                  width: 0.5),
+                                            ),
+                                            child: Text(
+                                              'CR',
+                                              style: TextStyle(
+                                                color: AppColors.secondary,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                        if (user.isAdmin) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: Colors.amberAccent
+                                                  .withOpacity(0.2),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                  color: Colors.amberAccent
+                                                      .withOpacity(0.4),
+                                                  width: 0.5),
+                                            ),
+                                            child: const Text(
+                                              'Admin',
+                                              style: TextStyle(
+                                                color: Colors.amberAccent,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    subtitle: metaParts.isNotEmpty
+                                        ? Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 2),
+                                            child: Text(
+                                              metaParts.join(' • '),
+                                              style: TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 11.5,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          )
+                                        : null,
+                                    trailing: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.secondary
+                                            .withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.done_all_rounded,
+                                        color: AppColors.secondary,
+                                        size: 16,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
               ),
             ],
           ),
@@ -377,6 +696,7 @@ class _MessageBubble extends StatelessWidget {
   final String currentUserId;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onSeenTap;
 
   const _MessageBubble({
     required this.message,
@@ -384,6 +704,7 @@ class _MessageBubble extends StatelessWidget {
     required this.currentUserId,
     required this.onTap,
     required this.onLongPress,
+    this.onSeenTap,
   });
 
   static final Map<String, MemoryImage> _base64Cache = {};
@@ -455,25 +776,37 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Widget _buildSeenIndicator() {
-    final viewCount =
-        message.seenBy.where((id) => id != message.authorId).length;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          viewCount > 0 ? Icons.done_all : Icons.check,
-          size: 14,
-          color: viewCount > 0 ? AppColors.secondary : AppColors.textSecondary,
+    final uniqueViewers = message.seenBy
+        .where((id) => id.trim().isNotEmpty && id != message.authorId)
+        .toSet();
+    final viewCount = uniqueViewers.length;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onSeenTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              viewCount > 0 ? Icons.done_all_rounded : Icons.check_rounded,
+              size: 14,
+              color: viewCount > 0
+                  ? AppColors.secondary
+                  : AppColors.textSecondary.withOpacity(0.6),
+            ),
+            if (viewCount > 0)
+              Text(
+                '$viewCount',
+                style: TextStyle(
+                    color: AppColors.secondary,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold),
+              ),
+          ],
         ),
-        if (viewCount > 0)
-          Text(
-            '$viewCount',
-            style: TextStyle(
-                color: AppColors.secondary,
-                fontSize: 9,
-                fontWeight: FontWeight.bold),
-          ),
-      ],
+      ),
     );
   }
 
@@ -912,6 +1245,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    final user = Provider.of<AppUser?>(context, listen: false);
+    if (user != null) {
+      _flushSeenQueue(user.id);
+    }
+    _seenDebounceTimer?.cancel();
     _textController.removeListener(_handleMentionQuery);
     _textController.dispose();
     _scrollController.dispose();
@@ -952,6 +1290,9 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       return;
     }
+
+    // Ensure all loaded messages are marked as seen by this user when sending
+    _flushSeenQueue(user.id);
 
     final authService = Provider.of<AuthService>(context, listen: false);
 
@@ -1116,31 +1457,41 @@ class _ChatScreenState extends State<ChatScreen> {
   Timer? _seenDebounceTimer;
   final Set<String> _queuedSeenDocIds = {};
 
-  // ---- BATCH MARK AS SEEN (Debounced to prevent snapshot storm) ----
+  // ---- BATCH MARK AS SEEN (Fast throttle to update quickly & prevent starvation) ----
   void _queueMarkAsSeen(_ChatMsg msg, String userId) {
     if (msg.authorId == userId) return;
     if (msg.seenBy.contains(userId)) return;
     if (_pendingSeenDocIds.contains(msg.docId) || _queuedSeenDocIds.contains(msg.docId)) return;
 
     _queuedSeenDocIds.add(msg.docId);
-    _seenDebounceTimer?.cancel();
-    _seenDebounceTimer = Timer(const Duration(milliseconds: 600), () async {
-      if (_queuedSeenDocIds.isEmpty) return;
-      final docIdsToUpdate = Set<String>.from(_queuedSeenDocIds);
-      _queuedSeenDocIds.clear();
-      _pendingSeenDocIds.addAll(docIdsToUpdate);
+    if (_seenDebounceTimer == null || !_seenDebounceTimer!.isActive) {
+      _seenDebounceTimer = Timer(const Duration(milliseconds: 100), () {
+        _flushSeenQueue(userId);
+      });
+    }
+  }
 
-      final batch = _firestore.batch();
-      for (final docId in docIdsToUpdate) {
-        final ref = _firestore.collection(_chatPath).doc(docId);
-        batch.update(ref, {'seenBy': FieldValue.arrayUnion([userId])});
-      }
-      try {
-        await batch.commit();
-      } catch (e) {
-        debugPrint('[ChatScreen] Error committing seenBy batch: $e');
-      }
-    });
+  Future<void> _flushSeenQueue(String userId) async {
+    _seenDebounceTimer?.cancel();
+    _seenDebounceTimer = null;
+    if (_queuedSeenDocIds.isEmpty) return;
+
+    final docIdsToUpdate = Set<String>.from(_queuedSeenDocIds);
+    _queuedSeenDocIds.clear();
+    _pendingSeenDocIds.addAll(docIdsToUpdate);
+
+    final path = _chatPath;
+    final batch = _firestore.batch();
+    for (final docId in docIdsToUpdate) {
+      final ref = _firestore.collection(path).doc(docId);
+      batch.update(ref, {'seenBy': FieldValue.arrayUnion([userId])});
+    }
+    try {
+      await batch.commit();
+    } catch (e) {
+      debugPrint('[ChatScreen] Error committing seenBy batch: $e');
+      _pendingSeenDocIds.removeAll(docIdsToUpdate);
+    }
   }
 
   // ---- MANUAL MARK AS SEEN (On Tap) ----
@@ -1160,7 +1511,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ---- SHOW SEEN BY ----
   void _showSeenBy(_ChatMsg msg) {
-    final viewerIds = msg.seenBy.where((id) => id != msg.authorId).toList();
+    final viewerIds = msg.seenBy
+        .where((id) => id.trim().isNotEmpty && id != msg.authorId)
+        .toSet()
+        .toList();
     if (viewerIds.isEmpty) {
       InAppNotification.show(
         context,
@@ -1175,6 +1529,7 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (_) => _SeenBySheet(viewerIds: viewerIds, firestore: _firestore),
     );
   }
@@ -2359,6 +2714,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     message: msg,
                     isOwn: isOwn,
                     currentUserId: appUser.id,
+                    onSeenTap: isOwn ? () => _showSeenBy(msg) : null,
                     onTap: () {
                       if (msg.isUnsent || msg.isDeleted) {
                         if (isOwn) {
@@ -2575,14 +2931,23 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Option 2: Department members
     for (final member in _departmentMembers) {
-      final name = member.name.isNotEmpty ? member.name : member.email.split('@')[0];
+      final name = member.name.isNotEmpty ? member.name : (member.email.contains('@') ? member.email.split('@')[0] : 'Student');
       final cleanName = name.replaceAll(' ', '_');
-      if (name.toLowerCase().contains(query) || cleanName.toLowerCase().contains(query) || member.studentId.contains(query)) {
+      if (name.toLowerCase().contains(query) || cleanName.toLowerCase().contains(query) || (member.studentId.isNotEmpty && member.studentId.contains(query))) {
+        String subtitle;
+        if (member.studentId.isNotEmpty) {
+          subtitle = 'ID: ${member.studentId}';
+        } else if (member.department.isNotEmpty && member.batch.isNotEmpty) {
+          subtitle = '${member.department} · Batch ${member.batch}';
+        } else {
+          subtitle = 'Batch Member';
+        }
+
         items.add({
           'isSpecial': false,
           'tag': cleanName,
           'title': name,
-          'subtitle': member.studentId.isNotEmpty ? 'ID: ${member.studentId}' : member.email,
+          'subtitle': subtitle,
           'photo': member.photoUrl,
           'isCR': member.isCR,
           'color': member.isCR ? Colors.amber : AppColors.primary,
