@@ -19,6 +19,14 @@ class ConversationsScreen extends StatefulWidget {
 
 class _ConversationsScreenState extends State<ConversationsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final Map<String, Future<DocumentSnapshot>> _userDocFutures = {};
+
+  Future<DocumentSnapshot> _getUserDoc(String uid) {
+    return _userDocFutures.putIfAbsent(
+      uid,
+      () => _firestore.collection('users').doc(uid).get(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,8 +107,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     if (otherUserId.isEmpty) return const SizedBox.shrink();
 
                     return FutureBuilder<DocumentSnapshot>(
-                      future:
-                          _firestore.collection('users').doc(otherUserId).get(),
+                      future: _getUserDoc(otherUserId),
                       builder: (context, userSnapshot) {
                         if (!userSnapshot.hasData ||
                             userSnapshot.connectionState ==

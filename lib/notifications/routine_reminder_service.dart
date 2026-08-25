@@ -11,19 +11,21 @@ import 'fcm_service.dart';
 import 'notification_router.dart';
 
 /// Background service for scheduling and dispatching 10-minute class reminders.
+/// Uses in-memory caching and real-time subscription to avoid continuous Firestore polling.
 class RoutineReminderService {
   static Timer? _reminderTimer;
+  static StreamSubscription<QuerySnapshot>? _scheduleSubscription;
   static final Set<String> _notifiedSlotsToday = {};
 
   static String? _lastSyncedUserId;
+  static List<ClassSchedule> _cachedSchedule = [];
 
   /// Synchronizes class reminder notifications with current user preferences.
   /// No-op on web — timers and local notifications are not supported on the web platform.
   static Future<void> syncRoutineReminders(AppUser? user) async {
     if (kIsWeb) return;
     if (user == null || !user.hasDeptScope) {
-      _reminderTimer?.cancel();
-      _reminderTimer = null;
+      stop();
       _lastSyncedUserId = null;
       return;
     }
@@ -31,8 +33,7 @@ class RoutineReminderService {
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool('notif_routine') ?? true;
     if (!enabled) {
-      _reminderTimer?.cancel();
-      _reminderTimer = null;
+      stop();
       _lastSyncedUserId = null;
       debugPrint('[RoutineReminder] Disabled by user settings.');
       return;
@@ -44,89 +45,97 @@ class RoutineReminderService {
       return;
     }
 
-    _reminderTimer?.cancel();
+    stop();
     _lastSyncedUserId = user.id;
 
-    // Check for upcoming classes immediately and every 60 seconds
-    _checkUpcomingClasses(user);
+    final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
+
+    // Subscribe to schedule updates in real-time (reads once upon connection & on real schedule changes)
+    _scheduleSubscription = FirebaseFirestore.instance
+        .collection(schedulePath)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        _cachedSchedule = snapshot.docs
+            .map((doc) => ClassSchedule.fromMap(doc.data(), doc.id))
+            .toList();
+        // Check immediately when schedule loads or updates
+        _checkUpcomingClassesFromCache();
+      },
+      onError: (e) {
+        debugPrint('[RoutineReminder] Schedule stream error: $e');
+      },
+    );
+
+    // Periodic timer checks local memory ONLY — zero Firestore reads per minute
     _reminderTimer = Timer.periodic(const Duration(seconds: 60), (_) {
-      _checkUpcomingClasses(user);
+      _checkUpcomingClassesFromCache();
     });
-    debugPrint('[RoutineReminder] Timer active for user: ${user.email}');
+    debugPrint('[RoutineReminder] In-memory reminder timer active for user: ${user.email}');
   }
 
-  static Future<void> _checkUpcomingClasses(AppUser user) async {
+  static void _checkUpcomingClassesFromCache() {
+    if (_cachedSchedule.isEmpty) return;
+
     final now = DateTime.now();
     final todayDayName = DateFormat('EEEE').format(now); // e.g. "Monday"
 
-    try {
-      final schedulePath =
-          deptBatchCol(user.department, user.batch, 'schedule');
-      final query = await FirebaseFirestore.instance
-          .collection(schedulePath)
-          .where('dayOfWeek', isEqualTo: todayDayName)
-          .get();
+    final todayClasses = _cachedSchedule.where(
+      (cls) => cls.dayOfWeek.toLowerCase() == todayDayName.toLowerCase(),
+    );
 
-      final todayClasses = query.docs
-          .map((doc) =>
-              ClassSchedule.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-          .toList();
+    for (final cls in todayClasses) {
+      if (cls.status == 'cancelled') continue;
 
-      for (final cls in todayClasses) {
-        if (cls.status == 'cancelled') continue;
+      final startTime = _getStartTimeForClass(cls, now);
+      if (startTime == null) continue;
 
-        final startTime = _getStartTimeForClass(cls, now);
-        if (startTime == null) continue;
+      final difference = startTime.difference(now);
+      final classKey =
+          '${cls.id}_${now.year}_${now.month}_${now.day}_${cls.startSlot}';
 
-        final difference = startTime.difference(now);
-        final classKey =
-            '${cls.id}_${now.year}_${now.month}_${now.day}_${cls.startSlot}';
+      // Check if class starts within 10 minutes (between 0 and 10 minutes)
+      if (difference.inSeconds > 0 && difference.inSeconds <= 600) {
+        if (!_notifiedSlotsToday.contains(classKey)) {
+          _notifiedSlotsToday.add(classKey);
+          final minutesLeft = (difference.inSeconds / 60).ceil();
+          final titleText = 'Class Reminder: ${cls.subject}';
+          final bodyText =
+              'Starts in $minutesLeft mins at ${cls.room}${cls.teacher.isNotEmpty ? " · ${cls.teacher}" : ""}';
 
-        // Check if class starts within 10 minutes (between 0 and 10 minutes)
-        if (difference.inSeconds > 0 && difference.inSeconds <= 600) {
-          if (!_notifiedSlotsToday.contains(classKey)) {
-            _notifiedSlotsToday.add(classKey);
-            final minutesLeft = (difference.inSeconds / 60).ceil();
-            final titleText = 'Class Reminder: ${cls.subject}';
-            final bodyText =
-                'Starts in $minutesLeft mins at ${cls.room}${cls.teacher.isNotEmpty ? " · ${cls.teacher}" : ""}';
+          // 1. Direct System Notification to Phone (Tray / Lock Screen / Sound / Vibration)
+          FCMService.showLocalSystemNotification(
+            title: titleText,
+            body: bodyText,
+            data: {
+              'target': 'schedule',
+              'type': 'routine_reminder',
+              'route': '/schedule',
+              'tabIndex': '1',
+            },
+          );
 
-            // 1. Direct System Notification to Phone (Tray / Lock Screen / Sound / Vibration)
-            FCMService.showLocalSystemNotification(
+          // 2. In-App Glassmorphic Overlay Banner (if app is open)
+          try {
+            InAppNotification.showGlobal(
               title: titleText,
-              body: bodyText,
-              data: {
-                'target': 'schedule',
-                'type': 'routine_reminder',
-                'route': '/schedule',
-                'tabIndex': '1',
+              message: bodyText,
+              icon: Icons.schedule_rounded,
+              accentColor: const Color(0xFF3B82F6),
+              onTap: () {
+                NotificationRouter.handlePayload({
+                  'target': 'schedule',
+                  'type': 'routine_reminder',
+                  'route': '/schedule',
+                  'tabIndex': '1',
+                });
               },
             );
-
-            // 2. In-App Glassmorphic Overlay Banner (if app is open)
-            try {
-              InAppNotification.showGlobal(
-                title: titleText,
-                message: bodyText,
-                icon: Icons.schedule_rounded,
-                accentColor: const Color(0xFF3B82F6),
-                onTap: () {
-                  NotificationRouter.handlePayload({
-                    'target': 'schedule',
-                    'type': 'routine_reminder',
-                    'route': '/schedule',
-                    'tabIndex': '1',
-                  });
-                },
-              );
-            } catch (e) {
-              debugPrint('[RoutineReminder] Could not show in-app banner: $e');
-            }
+          } catch (e) {
+            debugPrint('[RoutineReminder] Could not show in-app banner: $e');
           }
         }
       }
-    } catch (e) {
-      debugPrint('[RoutineReminder] Error checking schedule: $e');
     }
   }
 
@@ -153,5 +162,7 @@ class RoutineReminderService {
   static void stop() {
     _reminderTimer?.cancel();
     _reminderTimer = null;
+    _scheduleSubscription?.cancel();
+    _scheduleSubscription = null;
   }
 }
