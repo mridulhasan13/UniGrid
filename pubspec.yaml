@@ -1,7 +1,7 @@
 name: unigrid_app
 description: "University Department App with Announcements, Schedule, Materials, and Chat."
 publish_to: 'none'
-version: 1.0.1+21
+version: 1.0.1+22
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
