@@ -110,12 +110,21 @@ function getAccessToken(serviceAccount) {
 function buildPayload(token, title, bodyText, senderUserId, notificationTag, targetPlatform, extraData = {}) {
   const targetUrl = extraData.url || "https://unigrid.netlify.app/";
   const targetRoute = extraData.route || "/";
+  const targetType = (extraData.target || extraData.type || extraData.route || "").toLowerCase();
+
+  let categoryTag = "unigrid_alerts";
+  if (targetType.includes("chat") || targetType.includes("private")) {
+    categoryTag = "unigrid_chats";
+  } else if (targetType.includes("schedule") || targetType.includes("routine") || targetType.includes("reminder")) {
+    categoryTag = "unigrid_routine";
+  }
 
   const data = {
     title: title,
     body: bodyText,
     senderUserId: senderUserId || "",
     messageId: notificationTag,
+    categoryTag: categoryTag,
     url: targetUrl,
     route: targetRoute,
   };
@@ -142,7 +151,7 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
             body: bodyText,
             icon: "https://unigrid.netlify.app/icons/Icon-maskable-192.png",
             badge: "https://unigrid.netlify.app/icons/Icon-maskable-192.png",
-            tag: notificationTag,
+            tag: categoryTag,
             renotify: true,
           },
           fcm_options: {
@@ -172,7 +181,7 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
             body: bodyText,
             sound: "default",
             channel_id: "unigrid_notifications",
-            tag: notificationTag,
+            tag: categoryTag,
             icon: "@mipmap/ic_launcher",
             click_action: "FLUTTER_NOTIFICATION_CLICK",
           },

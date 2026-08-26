@@ -146,11 +146,19 @@ class FcmDispatcher {
       final endpoint =
           'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
 
+      final target = (extraData?['target'] ?? extraData?['type'] ?? '').toString().toLowerCase();
+      final bool isChat = target.contains('chat') || target.contains('private');
+      final bool isRoutine = target.contains('schedule') || target.contains('routine');
+      final String categoryTag = isChat
+          ? 'unigrid_chats'
+          : (isRoutine ? 'unigrid_routine' : 'unigrid_alerts');
+
       final Map<String, String> dataPayload = {
         'title': title,
         'body': body,
         'senderUserId': senderUserId,
         'messageId': messageId,
+        'categoryTag': categoryTag,
         ...?extraData,
       };
 
@@ -174,7 +182,7 @@ class FcmDispatcher {
                     'body': body,
                     'sound': 'default',
                     'channel_id': 'unigrid_notifications',
-                    'tag': messageId,
+                    'tag': categoryTag,
                     'icon': '@mipmap/ic_launcher',
                     'click_action': 'FLUTTER_NOTIFICATION_CLICK',
                   },

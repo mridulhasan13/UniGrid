@@ -132,26 +132,53 @@ class WAReceiver {
       payloadMap['title'] ??= title;
       payloadMap['body'] ??= body;
 
-      // ── System tray notification (with sound) ────────────────────────────
+      // ── Resolve Category Group & Tag for Stacking (like WhatsApp/Messenger) ─
+      final bool isChat = target.contains('chat') ||
+          target.contains('private') ||
+          prefField == 'notifChat';
+      final bool isRoutine = target.contains('schedule') ||
+          target.contains('routine') ||
+          target.contains('reminder');
+
+      final String groupKey = isChat
+          ? 'com.unigrid.CHATS'
+          : (isRoutine ? 'com.unigrid.ROUTINE' : 'com.unigrid.ALERTS');
+      final String categoryTag = isChat
+          ? 'unigrid_chats'
+          : (isRoutine ? 'unigrid_routine' : 'unigrid_alerts');
+      final int notifId = isChat
+          ? 1001
+          : (isRoutine ? 3001 : 2001);
+
+      // ── System tray notification (stacked by category with sound) ────────
       await _local.show(
-        msgId.hashCode,
+        notifId,
         title,
         body,
         NotificationDetails(
           android: AndroidNotificationDetails(
-            'unigrid_notifications',       // same channel as FCMService
+            'unigrid_notifications', // same channel as FCMService
             'UniGrid Notifications',
             importance: Importance.max,
             priority: Priority.high,
-            playSound: true,               // ← default device sound
+            playSound: true, // ← default device sound
             enableVibration: true,
-            tag: msgId,                    // prevents OS-level duplicate
+            tag: categoryTag, // Stacks notifications into single category box
+            groupKey: groupKey,
+            autoCancel: true,
+            styleInformation: BigTextStyleInformation(
+              body,
+              contentTitle: title,
+              summaryText: isChat
+                  ? 'UniGrid Chat'
+                  : (isRoutine ? 'UniGrid Routine' : 'UniGrid Notice'),
+            ),
           ),
         ),
         payload: jsonEncode(payloadMap),
       );
 
-      // ── In-app banner ────────────────────────────────────────────────────
+      // ── In-app banner (cleanly replaces any active banner) ───────────────
       InAppNotification.showGlobal(
         title: title,
         message: body,

@@ -208,20 +208,39 @@ class FCMService {
     final senderUserId = message.data['senderUserId'] ?? '';
     if (senderUserId.isNotEmpty && senderUserId == currentUid) return;
 
-    // Show system tray notification only for data-only messages
-    // (messages WITH a `notification` block are already shown by FCM plugin
-    // in background; in foreground they are suppressed by Android — safe to show).
+    // Resolve category
+    final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
+    final bool isChat = target.contains('chat') || target.contains('private');
+    final bool isRoutine = target.contains('schedule') || target.contains('routine');
+    final String groupKey = isChat
+        ? 'com.unigrid.CHATS'
+        : (isRoutine ? 'com.unigrid.ROUTINE' : 'com.unigrid.ALERTS');
+    final String categoryTag = isChat
+        ? 'unigrid_chats'
+        : (isRoutine ? 'unigrid_routine' : 'unigrid_alerts');
+    final int notifId = isChat ? 1001 : (isRoutine ? 3001 : 2001);
+
     await _localNotifications.show(
-      message.hashCode,
+      notifId,
       title,
       body,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           'unigrid_notifications',
           'UniGrid Notifications',
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
+          tag: categoryTag,
+          groupKey: groupKey,
+          autoCancel: true,
+          styleInformation: BigTextStyleInformation(
+            body,
+            contentTitle: title,
+            summaryText: isChat
+                ? 'UniGrid Chat'
+                : (isRoutine ? 'UniGrid Routine' : 'UniGrid Notice'),
+          ),
         ),
       ),
     );
@@ -248,7 +267,7 @@ class FCMService {
       payloadData['body'] ??= body;
 
       await _localNotifications.show(
-        id ?? title.hashCode,
+        id ?? 3001,
         title,
         body,
         NotificationDetails(
@@ -260,9 +279,13 @@ class FCMService {
             playSound: true,
             ticker: body,
             subText: 'Class Reminder',
+            tag: 'unigrid_routine',
+            groupKey: 'com.unigrid.ROUTINE',
+            autoCancel: true,
             styleInformation: BigTextStyleInformation(
               body,
               contentTitle: title,
+              summaryText: 'UniGrid Routine',
             ),
           ),
         ),

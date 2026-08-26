@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/models.dart';
 import '../screens/main_screen.dart';
 import '../screens/private_chat_screen.dart';
@@ -13,15 +15,27 @@ import 'in_app_notification.dart';
 ///
 /// Handles deep-linking and directs the user to the exact screen or tab
 /// when a notification (push, local system tray, or in-app overlay) is tapped.
+/// Automatically wipes all notifications from the status bar on tap.
 /// ─────────────────────────────────────────────────────────────────────────────
 class NotificationRouter {
   NotificationRouter._();
 
   static Map<String, dynamic>? _pendingPayload;
+  static final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  /// Wipes all notifications from the Android / iOS notification bar
+  static Future<void> clearAllNotifications() async {
+    if (kIsWeb) return;
+    try {
+      await _localNotifications.cancelAll();
+    } catch (_) {}
+  }
 
   /// Handles incoming FCM RemoteMessage when notification was clicked
   static void handleRemoteMessage(RemoteMessage message) {
     debugPrint('[NotificationRouter] Received RemoteMessage data: ${message.data}');
+    clearAllNotifications();
     final data = Map<String, dynamic>.from(message.data);
     if (message.notification != null) {
       data['title'] ??= message.notification!.title;
@@ -46,6 +60,10 @@ class NotificationRouter {
   /// and opens the exact corresponding section.
   static Future<void> handlePayload(Map<String, dynamic> data) async {
     if (data.isEmpty) return;
+
+    // Immediately wipe notifications from the status bar (like Messenger/WhatsApp)
+    clearAllNotifications();
+    InAppNotification.dismiss();
 
     final target = (data['target'] ?? data['type'] ?? data['route'] ?? '').toString().toLowerCase();
     debugPrint('[NotificationRouter] Routing to target: "$target"');
