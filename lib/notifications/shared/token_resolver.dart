@@ -18,7 +18,17 @@ class _CachedUserEntry {
   _CachedUserEntry(this.data) : timestamp = DateTime.now();
 
   bool get isExpired =>
-      DateTime.now().difference(timestamp) > const Duration(minutes: 2);
+      DateTime.now().difference(timestamp) > const Duration(minutes: 5);
+}
+
+class _CachedGroupUsersEntry {
+  final List<Map<String, dynamic>> userDocs;
+  final DateTime timestamp;
+
+  _CachedGroupUsersEntry(this.userDocs) : timestamp = DateTime.now();
+
+  bool get isExpired =>
+      DateTime.now().difference(timestamp) > const Duration(minutes: 5);
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -37,6 +47,7 @@ class TokenResolver {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static final Map<String, _CachedGroupEntry> _groupCache = {};
   static final Map<String, _CachedUserEntry> _userCache = {};
+  static final Map<String, _CachedGroupUsersEntry> _groupUsersCache = {};
 
   static Future<Map<String, dynamic>?> _getUserData(String uid) async {
     final cached = _userCache[uid];
@@ -169,6 +180,29 @@ class TokenResolver {
     return tokens.toList();
   }
 
+  static Future<List<Map<String, dynamic>>> _getGroupUsers(String cleanDept) async {
+    final cached = _groupUsersCache[cleanDept];
+    if (cached != null && !cached.isExpired) {
+      return cached.userDocs;
+    }
+    try {
+      Query<Map<String, dynamic>> query = _db.collection('users');
+      if (cleanDept.isNotEmpty) {
+        query = query.where('department', isEqualTo: cleanDept);
+      }
+      var snap = await query.get();
+      if (snap.docs.isEmpty && cleanDept.isNotEmpty) {
+        snap = await _db.collection('users').get();
+      }
+      final docs = snap.docs.map((d) => {...d.data(), 'id': d.id}).toList();
+      _groupUsersCache[cleanDept] = _CachedGroupUsersEntry(docs);
+      return docs;
+    } catch (e) {
+      debugPrint('[TokenResolver] Error fetching group users: $e');
+      return [];
+    }
+  }
+
   static Future<List<String>> _queryGroup({
     required String department,
     required String batch,
@@ -188,22 +222,12 @@ class TokenResolver {
       final cleanDept = department.trim().toUpperCase();
       final cleanBatch = batch.replaceAll('Batch', '').trim();
 
-      Query<Map<String, dynamic>> query = _db.collection('users');
-      if (cleanDept.isNotEmpty) {
-        query = query.where('department', isEqualTo: cleanDept);
-      }
-
-      var snap = await query.get();
-      // Fallback in case department in Firestore has different casing
-      if (snap.docs.isEmpty && cleanDept.isNotEmpty) {
-        snap = await _db.collection('users').get();
-      }
-
+      final userDocs = await _getGroupUsers(cleanDept);
       final Set<String> tokens = {};
 
-      for (final doc in snap.docs) {
-        if (excludeUserId != null && doc.id == excludeUserId) continue;
-        final data = doc.data();
+      for (final data in userDocs) {
+        final String docId = (data['id'] ?? '').toString();
+        if (excludeUserId != null && docId == excludeUserId) continue;
 
         // 1. Department filter (case-insensitive)
         if (cleanDept.isNotEmpty) {

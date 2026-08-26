@@ -5,16 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
+import '../services/schedule_service.dart';
 import '../utils/dept_scope.dart';
 import 'in_app_notification.dart';
 import 'fcm_service.dart';
 import 'notification_router.dart';
 
 /// Background service for scheduling and dispatching 10-minute class reminders.
-/// Uses in-memory caching and real-time subscription to avoid continuous Firestore polling.
+/// Uses in-memory caching from shared ScheduleService to avoid duplicate Firestore queries.
 class RoutineReminderService {
   static Timer? _reminderTimer;
-  static StreamSubscription<QuerySnapshot>? _scheduleSubscription;
   static final Set<String> _notifiedSlotsToday = {};
 
   static String? _lastSyncedUserId;
@@ -48,30 +48,23 @@ class RoutineReminderService {
     stop();
     _lastSyncedUserId = user.id;
 
-    final schedulePath = deptBatchCol(user.department, user.batch, 'schedule');
+    // Ensure central schedule service is active for this scope
+    ScheduleService.instance.syncScope(user.department, user.batch);
 
-    // Subscribe to schedule updates in real-time (reads once upon connection & on real schedule changes)
-    _scheduleSubscription = FirebaseFirestore.instance
-        .collection(schedulePath)
-        .snapshots()
-        .listen(
-      (snapshot) {
-        _cachedSchedule = snapshot.docs
-            .map((doc) => ClassSchedule.fromMap(doc.data(), doc.id))
-            .toList();
-        // Check immediately when schedule loads or updates
-        _checkUpcomingClassesFromCache();
-      },
-      onError: (e) {
-        debugPrint('[RoutineReminder] Schedule stream error: $e');
-      },
-    );
+    // Read cached schedule from shared ScheduleService and listen to updates in-memory
+    _cachedSchedule = ScheduleService.instance.classes;
+    ScheduleService.instance.scheduleNotifier.addListener(_onScheduleUpdated);
 
     // Periodic timer checks local memory ONLY — zero Firestore reads per minute
     _reminderTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       _checkUpcomingClassesFromCache();
     });
     debugPrint('[RoutineReminder] In-memory reminder timer active for user: ${user.email}');
+  }
+
+  static void _onScheduleUpdated() {
+    _cachedSchedule = ScheduleService.instance.classes;
+    _checkUpcomingClassesFromCache();
   }
 
   static void _checkUpcomingClassesFromCache() {
@@ -162,7 +155,6 @@ class RoutineReminderService {
   static void stop() {
     _reminderTimer?.cancel();
     _reminderTimer = null;
-    _scheduleSubscription?.cancel();
-    _scheduleSubscription = null;
+    ScheduleService.instance.scheduleNotifier.removeListener(_onScheduleUpdated);
   }
 }

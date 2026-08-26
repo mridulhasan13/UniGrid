@@ -255,8 +255,18 @@ class _ActionTile extends StatelessWidget {
 // ============================================================
 class _SeenBySheet extends StatefulWidget {
   final List<String> viewerIds;
+  final String readReceiptsPath;
+  final int messagePreciseTime;
+  final String authorId;
   final FirebaseFirestore firestore;
-  const _SeenBySheet({required this.viewerIds, required this.firestore});
+
+  const _SeenBySheet({
+    required this.viewerIds,
+    required this.firestore,
+    this.readReceiptsPath = '',
+    this.messagePreciseTime = 0,
+    this.authorId = '',
+  });
 
   @override
   State<_SeenBySheet> createState() => _SeenBySheetState();
@@ -282,10 +292,26 @@ class _SeenBySheetState extends State<_SeenBySheet> {
   }
 
   Future<void> _fetchUsers() async {
-    final uniqueIds = widget.viewerIds
-        .where((id) => id.trim().isNotEmpty)
-        .toSet()
-        .toList();
+    final Set<String> allIds = widget.viewerIds
+        .where((id) => id.trim().isNotEmpty && id != widget.authorId)
+        .toSet();
+
+    // Query watermark receipts for this department/batch on-demand
+    if (widget.readReceiptsPath.isNotEmpty && widget.messagePreciseTime > 0) {
+      try {
+        final snap = await widget.firestore
+            .collection(widget.readReceiptsPath)
+            .where('preciseTime', isGreaterThanOrEqualTo: widget.messagePreciseTime)
+            .get();
+        for (final doc in snap.docs) {
+          if (doc.id != widget.authorId && doc.id.trim().isNotEmpty) {
+            allIds.add(doc.id);
+          }
+        }
+      } catch (_) {}
+    }
+
+    final uniqueIds = allIds.toList();
 
     if (uniqueIds.isEmpty) {
       if (mounted) {
@@ -1454,83 +1480,53 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Timer? _seenDebounceTimer;
-  final Set<String> _queuedSeenDocIds = {};
-
-  // ---- BATCH MARK AS SEEN (Fast throttle to update quickly & prevent starvation) ----
-  void _queueMarkAsSeen(_ChatMsg msg, String userId) {
-    if (msg.authorId == userId) return;
-    if (msg.seenBy.contains(userId)) return;
-    if (_pendingSeenDocIds.contains(msg.docId) || _queuedSeenDocIds.contains(msg.docId)) return;
-
-    _queuedSeenDocIds.add(msg.docId);
-    if (_seenDebounceTimer == null || !_seenDebounceTimer!.isActive) {
-      _seenDebounceTimer = Timer(const Duration(milliseconds: 100), () {
-        _flushSeenQueue(userId);
-      });
+  String get _readReceiptsPath {
+    final user = Provider.of<AppUser?>(context, listen: false);
+    if (user != null && user.hasDeptScope) {
+      return deptBatchCol(user.department, user.batch, 'read_receipts');
     }
+    return 'read_receipts';
   }
 
-  Future<void> _flushSeenQueue(String userId) async {
-    _seenDebounceTimer?.cancel();
-    _seenDebounceTimer = null;
-    if (_queuedSeenDocIds.isEmpty) return;
+  int _lastRecordedWatermark = 0;
+  Timer? _watermarkDebounceTimer;
 
-    final docIdsToUpdate = Set<String>.from(_queuedSeenDocIds);
-    _queuedSeenDocIds.clear();
-    _pendingSeenDocIds.addAll(docIdsToUpdate);
+  // ---- LIGHTWEIGHT WATERMARK MARK-AS-READ (1 single write per user session) ----
+  void _updateReadWatermark(AppUser user, int latestMessagePreciseTime) {
+    if (latestMessagePreciseTime <= _lastRecordedWatermark) return;
+    _lastRecordedWatermark = latestMessagePreciseTime;
 
-    final path = _chatPath;
-    final batch = _firestore.batch();
-    for (final docId in docIdsToUpdate) {
-      final ref = _firestore.collection(path).doc(docId);
-      batch.update(ref, {'seenBy': FieldValue.arrayUnion([userId])});
-    }
-    try {
-      await batch.commit();
-    } catch (e) {
-      debugPrint('[ChatScreen] Error committing seenBy batch: $e');
-      _pendingSeenDocIds.removeAll(docIdsToUpdate);
-    }
-  }
-
-  // ---- MANUAL MARK AS SEEN (On Tap) ----
-  Future<void> _markAsSeen(_ChatMsg msg, String userId) async {
-    if (msg.authorId == userId) return;
-    if (msg.seenBy.contains(userId)) return;
-    if (_pendingSeenDocIds.contains(msg.docId)) return;
-    _pendingSeenDocIds.add(msg.docId);
-    try {
-      await _firestore.collection(_chatPath).doc(msg.docId).update({
-        'seenBy': FieldValue.arrayUnion([userId]),
+    if (_watermarkDebounceTimer == null || !_watermarkDebounceTimer!.isActive) {
+      _watermarkDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
+        try {
+          await _firestore.collection(_readReceiptsPath).doc(user.id).set({
+            'preciseTime': _lastRecordedWatermark,
+            'lastReadTime': FieldValue.serverTimestamp(),
+            'userId': user.id,
+            'name': user.name,
+            'photoUrl': user.photoUrl,
+          }, SetOptions(merge: true));
+        } catch (e) {
+          debugPrint('[ChatScreen] Error updating read watermark: $e');
+        }
       });
-    } catch (e) {
-      _pendingSeenDocIds.remove(msg.docId);
     }
   }
 
   // ---- SHOW SEEN BY ----
   void _showSeenBy(_ChatMsg msg) {
-    final viewerIds = msg.seenBy
-        .where((id) => id.trim().isNotEmpty && id != msg.authorId)
-        .toSet()
-        .toList();
-    if (viewerIds.isEmpty) {
-      InAppNotification.show(
-        context,
-        title: 'Read Status',
-        message: 'Not seen by anyone yet.',
-        accentColor: AppColors.primary,
-        icon: Icons.done_all_rounded,
-      );
-      return;
-    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => _SeenBySheet(viewerIds: viewerIds, firestore: _firestore),
+      builder: (_) => _SeenBySheet(
+        viewerIds: msg.seenBy,
+        firestore: _firestore,
+        readReceiptsPath: _readReceiptsPath,
+        messagePreciseTime: msg.preciseTime,
+        authorId: msg.authorId,
+      ),
     );
   }
 
@@ -2654,12 +2650,10 @@ class _ChatScreenState extends State<ChatScreen> {
         final msgs = snap.data!.docs.map((d) => _ChatMsg.fromDoc(d)).toList()
           ..sort((a, b) => b.preciseTime.compareTo(a.preciseTime));
 
-        // Batch mark unread messages as seen in database post-frame
+        // Mark conversation read via 1 lightweight user watermark write (0 writes to message docs)
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          for (final msg in msgs) {
-            if (msg.authorId != appUser.id && !msg.seenBy.contains(appUser.id)) {
-              _queueMarkAsSeen(msg, appUser.id);
-            }
+          if (msgs.isNotEmpty) {
+            _updateReadWatermark(appUser, msgs.first.preciseTime);
           }
         });
 
@@ -2723,9 +2717,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         return;
                       }
                       if (msg.type == 'image' && msg.uri != null) {
-                        if (!isOwn) {
-                          _markAsSeen(msg, appUser.id);
-                        }
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -2739,7 +2730,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         if (isOwn) {
                           _showSeenBy(msg);
                         } else {
-                          _markAsSeen(msg, appUser.id);
                           HapticFeedback.selectionClick();
                         }
                       }

@@ -879,11 +879,14 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
               style: AppStyles.heading2,
             ),
             // Pending Approvals — visible to ALL CRs
-            // Pending Approvals — properly scoped and error-handled
             StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .snapshots(), // Query all users, filter in memory to avoid composite index errors
+              stream: isRootAdmin
+                  ? FirebaseFirestore.instance.collection('users').snapshots()
+                  : FirebaseFirestore.instance
+                      .collection('users')
+                      .where('department', isEqualTo: user.department)
+                      .where('batch', isEqualTo: user.batch)
+                      .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return GlassCard(
@@ -1088,9 +1091,14 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
               },
             ),
             const SizedBox(height: 16),
-            // Member Directory — visible to ALL CRs and Root Admins
             StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').snapshots(),
+              stream: isRootAdmin
+                  ? FirebaseFirestore.instance.collection('users').snapshots()
+                  : FirebaseFirestore.instance
+                      .collection('users')
+                      .where('department', isEqualTo: user.department)
+                      .where('batch', isEqualTo: user.batch)
+                      .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return GlassCard(

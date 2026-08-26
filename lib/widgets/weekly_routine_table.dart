@@ -14,6 +14,7 @@ import '../notifications/in_app_notification.dart';
 import '../screens/schedule_builder_screen.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
+import '../services/schedule_service.dart';
 
 final Set<String> _autoPopulatedWeeks = {};
 
@@ -219,58 +220,29 @@ class WeeklyRoutineTable extends StatelessWidget {
     // Mobile/narrow check: screens narrower than 920px are scaled/scrollable using InteractiveViewer
     final bool isMobile = screenWidth < 920;
     final user = Provider.of<AppUser?>(context);
-    final schedulePath = user != null && user.hasDeptScope
-        ? deptBatchCol(user.department, user.batch, 'schedule')
-        : 'schedule';
-    final metaPath = user != null && user.hasDeptScope
-        ? deptBatchCol(user.department, user.batch, 'routine_metadata')
-        : 'routine_metadata';
+    
+    if (user != null && user.hasDeptScope) {
+      ScheduleService.instance.syncScope(user.department, user.batch);
+    }
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection(metaPath).doc('day_statuses').snapshots(),
-      builder: (context, dayStatusesSnap) {
-        final Map<String, String> dayStatusesMap = {};
-        if (dayStatusesSnap.hasData && dayStatusesSnap.data!.exists) {
-          final data = dayStatusesSnap.data!.data() as Map<String, dynamic>?;
-          if (data != null) {
-            data.forEach((key, value) {
-              if (value is String && value.isNotEmpty) {
-                dayStatusesMap[key] = value.toLowerCase();
-              }
-            });
-          }
-        }
-
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection(schedulePath).snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'Error loading schedule: ${snapshot.error}',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
+    return ValueListenableBuilder<Map<String, String>>(
+      valueListenable: ScheduleService.instance.dayStatusesNotifier,
+      builder: (context, dayStatusesMap, _) {
+        return ValueListenableBuilder<List<ClassSchedule>>(
+          valueListenable: ScheduleService.instance.scheduleNotifier,
+          builder: (context, rawClassesList, _) {
+            final isInitialLoading = ScheduleService.instance.isLoadingNotifier.value && rawClassesList.isEmpty;
+            if (isInitialLoading) {
+              return const Center(
+                child: UniGridLoader(
+                  title: 'Loading Routine',
+                  subtitle: 'Rendering weekly class grid...',
+                  showBackground: false,
                 ),
               );
             }
 
-        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-          return const Center(
-            child: UniGridLoader(
-              title: 'Loading Routine',
-              subtitle: 'Rendering weekly class grid...',
-              showBackground: false,
-            ),
-          );
-        }
-
-        final rawClasses = (snapshot.data?.docs ?? [])
-            .map((doc) => ClassSchedule.fromMap(
-                doc.data() as Map<String, dynamic>, doc.id))
-            .where((cls) {
+            final rawClasses = rawClassesList.where((cls) {
               if (cls.scheduledDate != null) {
                 final clsDate = cls.scheduledDate!;
                 final saturdayDate = sundayDate.add(const Duration(days: 6));

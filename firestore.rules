@@ -68,9 +68,9 @@ service cloud.firestore {
     match /depts/{dept}/batches/{batch}/{collection}/{docId} {
       allow read: if isApprovedUser() && belongsToScope(dept, batch);
       
-      // For general chat and student uploads (materials)
+      // For general chat, student uploads (materials), and user read receipts
       allow create: if isApprovedUser() && belongsToScope(dept, batch) && (
-        collection == 'chat_messages' || collection == 'materials'
+        collection == 'chat_messages' || collection == 'materials' || (collection == 'read_receipts' && request.auth.uid == docId)
       );
       allow update: if isApprovedUser() && belongsToScope(dept, batch) && (
         (collection == 'chat_messages' && (
@@ -81,7 +81,8 @@ service cloud.firestore {
         (collection == 'materials' && (
           request.auth.uid == resource.data.uploadedByUserId ||
           isCR(request.auth.uid)
-        ))
+        )) ||
+        (collection == 'read_receipts' && request.auth.uid == docId)
       );
       allow delete: if isApprovedUser() && belongsToScope(dept, batch) && (
         (collection == 'chat_messages' && (
@@ -91,7 +92,8 @@ service cloud.firestore {
         (collection == 'materials' && (
           request.auth.uid == resource.data.uploadedByUserId ||
           isCR(request.auth.uid)
-        ))
+        )) ||
+        (collection == 'read_receipts' && request.auth.uid == docId)
       );
       
       // For CR-only collections: announcements, schedule, default_schedule, overrides, metadata, config, courses

@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
 import '../services/auth_service.dart';
@@ -29,15 +30,35 @@ class GeneralAnnouncementService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _collection = 'general_announcements';
 
+  static final Set<String> _localSeenIds = {};
+  static bool _localSeenLoaded = false;
+
+  static Future<Set<String>> _loadLocalSeenIds() async {
+    if (_localSeenLoaded) return _localSeenIds;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('seen_general_announcements') ?? [];
+      _localSeenIds.addAll(list);
+    } catch (_) {}
+    _localSeenLoaded = true;
+    return _localSeenIds;
+  }
+
+  static bool isLocallySeen(String docId) => _localSeenIds.contains(docId);
+
   /// Stream of unseen general announcement count for a specific [userId], filtered by audience.
   static Stream<int> unseenCountStream(
     String userId, {
     String? userDept,
     String? userBatch,
     bool isRoot = false,
-  }) {
-    if (userId.isEmpty) return Stream.value(0);
-    return _db
+  }) async* {
+    if (userId.isEmpty) {
+      yield 0;
+      return;
+    }
+    await _loadLocalSeenIds();
+    yield* _db
         .collection(_collection)
         .snapshots()
         .map((snap) {
@@ -77,7 +98,7 @@ class GeneralAnnouncementService {
 
         final List seenBy =
             data['seenBy'] is List ? (data['seenBy'] as List) : [];
-        if (!seenBy.contains(userId)) {
+        if (!_localSeenIds.contains(doc.id) && !seenBy.contains(userId)) {
           unseen++;
         }
       }
@@ -85,15 +106,17 @@ class GeneralAnnouncementService {
     });
   }
 
-  /// Mark a specific general announcement doc as seen by [userId].
+  /// Mark a specific general announcement doc as seen locally by [userId].
+  /// Saves to local SharedPreferences with zero Firestore writes.
   static Future<void> markAsSeen(String docId, String userId) async {
-    if (docId.isEmpty || userId.isEmpty) return;
+    if (docId.isEmpty) return;
+    _localSeenIds.add(docId);
     try {
-      await _db.collection(_collection).doc(docId).set({
-        'seenBy': FieldValue.arrayUnion([userId]),
-      }, SetOptions(merge: true));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+          'seen_general_announcements', _localSeenIds.toList());
     } catch (e) {
-      debugPrint('[GeneralAnnouncementService] Error marking as seen: $e');
+      debugPrint('[GeneralAnnouncementService] Error saving local seen: $e');
     }
   }
 
@@ -416,7 +439,7 @@ class GeneralAnnouncementsSheet extends StatelessWidget {
                           final List seenBy = data['seenBy'] is List
                               ? (data['seenBy'] as List)
                               : [];
-                          final bool isSeen = seenBy.contains(user.id);
+                          final bool isSeen = GeneralAnnouncementService.isLocallySeen(d.id) || seenBy.contains(user.id);
 
                           return {
                             'id': d.id,
