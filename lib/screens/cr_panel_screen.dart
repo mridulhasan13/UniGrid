@@ -884,8 +884,8 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                   ? FirebaseFirestore.instance.collection('users').snapshots()
                   : FirebaseFirestore.instance
                       .collection('users')
-                      .where('department', isEqualTo: user.department)
-                      .where('batch', isEqualTo: user.batch)
+                      .where('department', isEqualTo: user?.department ?? '')
+                      .where('batch', isEqualTo: user?.batch ?? '')
                       .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
@@ -1096,8 +1096,8 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                   ? FirebaseFirestore.instance.collection('users').snapshots()
                   : FirebaseFirestore.instance
                       .collection('users')
-                      .where('department', isEqualTo: user.department)
-                      .where('batch', isEqualTo: user.batch)
+                      .where('department', isEqualTo: user?.department ?? '')
+                      .where('batch', isEqualTo: user?.batch ?? '')
                       .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {

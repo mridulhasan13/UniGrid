@@ -1271,11 +1271,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    final user = Provider.of<AppUser?>(context, listen: false);
-    if (user != null) {
-      _flushSeenQueue(user.id);
-    }
-    _seenDebounceTimer?.cancel();
+    _watermarkDebounceTimer?.cancel();
     _textController.removeListener(_handleMentionQuery);
     _textController.dispose();
     _scrollController.dispose();
@@ -1316,9 +1312,6 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       return;
     }
-
-    // Ensure all loaded messages are marked as seen by this user when sending
-    _flushSeenQueue(user.id);
 
     final authService = Provider.of<AuthService>(context, listen: false);
 
