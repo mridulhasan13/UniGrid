@@ -259,6 +259,7 @@ class _SeenBySheet extends StatefulWidget {
   final int messagePreciseTime;
   final String authorId;
   final FirebaseFirestore firestore;
+  final Map<String, AppUser>? knownReceiptUsers;
 
   const _SeenBySheet({
     required this.viewerIds,
@@ -266,6 +267,7 @@ class _SeenBySheet extends StatefulWidget {
     this.readReceiptsPath = '',
     this.messagePreciseTime = 0,
     this.authorId = '',
+    this.knownReceiptUsers,
   });
 
   @override
@@ -292,63 +294,57 @@ class _SeenBySheetState extends State<_SeenBySheet> {
   }
 
   Future<void> _fetchUsers() async {
-    final Set<String> allIds = widget.viewerIds
-        .where((id) => id.trim().isNotEmpty && id != widget.authorId)
-        .toSet();
+    final Map<String, AppUser> foundUsers = {};
 
-    // Query watermark receipts for this department/batch on-demand
-    if (widget.readReceiptsPath.isNotEmpty && widget.messagePreciseTime > 0) {
+    // 1. First add any known receipt users passed from active listener
+    if (widget.knownReceiptUsers != null && widget.knownReceiptUsers!.isNotEmpty) {
+      for (final entry in widget.knownReceiptUsers!.entries) {
+        if (entry.key != widget.authorId && entry.key.trim().isNotEmpty) {
+          foundUsers[entry.key] = entry.value;
+        }
+      }
+    }
+
+    // 2. Query read_receipts collection for this batch to get all receipts directly
+    if (widget.readReceiptsPath.isNotEmpty) {
       try {
-        final snap = await widget.firestore
-            .collection(widget.readReceiptsPath)
-            .where('preciseTime', isGreaterThanOrEqualTo: widget.messagePreciseTime)
-            .get();
+        final snap = await widget.firestore.collection(widget.readReceiptsPath).get();
         for (final doc in snap.docs) {
-          if (doc.id != widget.authorId && doc.id.trim().isNotEmpty) {
-            allIds.add(doc.id);
+          if (doc.id == widget.authorId || doc.id.trim().isEmpty) continue;
+          final data = doc.data();
+          final num preciseTime = data['preciseTime'] ?? 0;
+          if (widget.messagePreciseTime <= 0 || preciseTime >= widget.messagePreciseTime) {
+            final user = AppUser(
+              id: doc.id,
+              email: data['email'] ?? '',
+              name: data['name'] ?? 'Student',
+              photoUrl: data['photoUrl'] ?? '',
+              department: data['department'] ?? '',
+              batch: (data['batch'] ?? '').toString(),
+              studentId: (data['studentId'] ?? '').toString(),
+              isCR: data['isCR'] == true,
+              isAdmin: data['isAdmin'] == true,
+            );
+            foundUsers[doc.id] = user;
           }
         }
-      } catch (_) {}
-    }
-
-    final uniqueIds = allIds.toList();
-
-    if (uniqueIds.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _cachedUsers = [];
-          _isLoading = false;
-        });
+      } catch (e) {
+        debugPrint('[SeenBySheet] Error fetching read receipts: $e');
       }
-      return;
     }
 
-    try {
-      final futures = uniqueIds.map((id) async {
-        try {
-          final doc = await widget.firestore.collection('users').doc(id).get();
-          if (doc.exists && doc.data() != null) {
-            return AppUser.fromMap(doc.data()!, doc.id);
-          }
-        } catch (_) {}
-        // Fallback user placeholder
-        return AppUser(id: id, email: '', name: 'Student');
+    // 3. Include any legacy viewerIds (if any)
+    for (final id in widget.viewerIds) {
+      if (id.trim().isNotEmpty && id != widget.authorId && !foundUsers.containsKey(id)) {
+        foundUsers[id] = AppUser(id: id, email: '', name: 'Student');
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _cachedUsers = foundUsers.values.toList();
+        _isLoading = false;
       });
-
-      final results = await Future.wait(futures);
-      if (mounted) {
-        setState(() {
-          _cachedUsers = results;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Failed to load viewers: $e';
-          _isLoading = false;
-        });
-      }
     }
   }
 
@@ -723,6 +719,7 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback? onSeenTap;
+  final Map<String, int>? userWatermarks;
 
   const _MessageBubble({
     required this.message,
@@ -731,6 +728,7 @@ class _MessageBubble extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     this.onSeenTap,
+    this.userWatermarks,
   });
 
   static final Map<String, MemoryImage> _base64Cache = {};
@@ -802,10 +800,20 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Widget _buildSeenIndicator() {
-    final uniqueViewers = message.seenBy
-        .where((id) => id.trim().isNotEmpty && id != message.authorId)
-        .toSet();
-    final viewCount = uniqueViewers.length;
+    int viewCount = 0;
+    if (userWatermarks != null && userWatermarks!.isNotEmpty) {
+      for (final entry in userWatermarks!.entries) {
+        if (entry.key != message.authorId && entry.value >= message.preciseTime) {
+          viewCount++;
+        }
+      }
+    }
+    if (viewCount == 0 && message.seenBy.isNotEmpty) {
+      viewCount = message.seenBy
+          .where((id) => id.trim().isNotEmpty && id != message.authorId)
+          .toSet()
+          .length;
+    }
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1153,6 +1161,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isUploadingFiles = false;
   final Set<String> _pendingSeenDocIds = {};
 
+  StreamSubscription<QuerySnapshot>? _readReceiptsSub;
+  Map<String, int> _userWatermarks = {};
+  Map<String, AppUser> _receiptUsers = {};
+
   List<AppUser> _departmentMembers = [];
   String? _mentionQuery;
   int? _mentionStartIndex;
@@ -1188,6 +1200,41 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AuthService>(context, listen: false).updateOnlineStatus(true);
       _loadDepartmentMembers();
+      _initReceiptsListener();
+    });
+  }
+
+  void _initReceiptsListener() {
+    _readReceiptsSub?.cancel();
+    final user = Provider.of<AppUser?>(context, listen: false);
+    if (user == null || !user.hasDeptScope) return;
+    final path = deptBatchCol(user.department, user.batch, 'read_receipts');
+    _readReceiptsSub = _firestore.collection(path).snapshots().listen((snap) {
+      if (!mounted) return;
+      final Map<String, int> marks = {};
+      final Map<String, AppUser> users = {};
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final num pt = data['preciseTime'] ?? 0;
+        marks[doc.id] = pt.toInt();
+        users[doc.id] = AppUser(
+          id: doc.id,
+          email: data['email'] ?? '',
+          name: data['name'] ?? 'Student',
+          photoUrl: data['photoUrl'] ?? '',
+          department: data['department'] ?? '',
+          batch: (data['batch'] ?? '').toString(),
+          studentId: (data['studentId'] ?? '').toString(),
+          isCR: data['isCR'] == true,
+          isAdmin: data['isAdmin'] == true,
+        );
+      }
+      setState(() {
+        _userWatermarks = marks;
+        _receiptUsers = users;
+      });
+    }, onError: (e) {
+      debugPrint('[ChatScreen] read_receipts stream notice: $e');
     });
   }
 
@@ -1271,6 +1318,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _readReceiptsSub?.cancel();
     _watermarkDebounceTimer?.cancel();
     _textController.removeListener(_handleMentionQuery);
     _textController.dispose();
@@ -1498,6 +1546,11 @@ class _ChatScreenState extends State<ChatScreen> {
             'userId': user.id,
             'name': user.name,
             'photoUrl': user.photoUrl,
+            'department': user.department,
+            'batch': user.batch,
+            'studentId': user.studentId,
+            'isCR': user.isCR,
+            'isAdmin': user.isAdmin,
           }, SetOptions(merge: true));
         } catch (e) {
           debugPrint('[ChatScreen] Error updating read watermark: $e');
@@ -1508,6 +1561,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ---- SHOW SEEN BY ----
   void _showSeenBy(_ChatMsg msg) {
+    final Map<String, AppUser> viewersMap = {};
+    for (final entry in _userWatermarks.entries) {
+      if (entry.key != msg.authorId && entry.value >= msg.preciseTime) {
+        if (_receiptUsers.containsKey(entry.key)) {
+          viewersMap[entry.key] = _receiptUsers[entry.key]!;
+        }
+      }
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1519,6 +1581,7 @@ class _ChatScreenState extends State<ChatScreen> {
         readReceiptsPath: _readReceiptsPath,
         messagePreciseTime: msg.preciseTime,
         authorId: msg.authorId,
+        knownReceiptUsers: viewersMap,
       ),
     );
   }
@@ -2701,6 +2764,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     message: msg,
                     isOwn: isOwn,
                     currentUserId: appUser.id,
+                    userWatermarks: _userWatermarks,
                     onSeenTap: isOwn ? () => _showSeenBy(msg) : null,
                     onTap: () {
                       if (msg.isUnsent || msg.isDeleted) {

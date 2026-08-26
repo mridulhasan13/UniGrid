@@ -19,12 +19,21 @@ class ConversationsScreen extends StatefulWidget {
 
 class _ConversationsScreenState extends State<ConversationsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final Map<String, Future<DocumentSnapshot>> _userDocFutures = {};
+  static final Map<String, Future<DocumentSnapshot>> _userDocFutures = {};
+  static final Map<String, DocumentSnapshot> _resolvedUserDocs = {};
 
   Future<DocumentSnapshot> _getUserDoc(String uid) {
+    if (_resolvedUserDocs.containsKey(uid)) {
+      return Future.value(_resolvedUserDocs[uid]!);
+    }
     return _userDocFutures.putIfAbsent(
       uid,
-      () => _firestore.collection('users').doc(uid).get(),
+      () => _firestore.collection('users').doc(uid).get().then((doc) {
+        if (doc.exists) {
+          _resolvedUserDocs[uid] = doc;
+        }
+        return doc;
+      }),
     );
   }
 

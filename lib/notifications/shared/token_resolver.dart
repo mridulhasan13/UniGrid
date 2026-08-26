@@ -8,7 +8,7 @@ class _CachedGroupEntry {
   _CachedGroupEntry(this.tokens) : timestamp = DateTime.now();
 
   bool get isExpired =>
-      DateTime.now().difference(timestamp) > const Duration(minutes: 2);
+      DateTime.now().difference(timestamp) > const Duration(minutes: 30);
 }
 
 class _CachedUserEntry {
@@ -18,7 +18,7 @@ class _CachedUserEntry {
   _CachedUserEntry(this.data) : timestamp = DateTime.now();
 
   bool get isExpired =>
-      DateTime.now().difference(timestamp) > const Duration(minutes: 5);
+      DateTime.now().difference(timestamp) > const Duration(minutes: 30);
 }
 
 class _CachedGroupUsersEntry {
@@ -28,7 +28,7 @@ class _CachedGroupUsersEntry {
   _CachedGroupUsersEntry(this.userDocs) : timestamp = DateTime.now();
 
   bool get isExpired =>
-      DateTime.now().difference(timestamp) > const Duration(minutes: 5);
+      DateTime.now().difference(timestamp) > const Duration(minutes: 30);
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
