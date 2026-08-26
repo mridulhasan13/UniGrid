@@ -66,11 +66,12 @@ class WAReceiver {
       final senderUid = (message.data['senderUserId'] as String?) ?? '';
       if (senderUid.isNotEmpty && senderUid == currentUid) return;
 
+      final prefField = (message.data['preferenceField'] as String?) ?? '';
+      final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
+
       // ── User notification preference check (Settings toggle) ─────────────
       try {
         final prefs = await SharedPreferences.getInstance();
-        final prefField = (message.data['preferenceField'] as String?) ?? '';
-        final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
 
         if (prefField == 'notifChat' || target.contains('chat') || target.contains('private')) {
           final notifChat = prefs.getBool('notif_chat') ?? true;
