@@ -119,14 +119,23 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
     categoryTag = "unigrid_routine";
   }
 
+  const stringifiedExtra = {};
+  for (const [k, v] of Object.entries(extraData)) {
+    if (v !== undefined && v !== null && typeof v !== "object") {
+      stringifiedExtra[k] = String(v);
+    }
+  }
+
   const data = {
-    title: title,
-    body: bodyText,
-    senderUserId: senderUserId || "",
-    messageId: notificationTag,
+    title: String(title || ""),
+    body: String(bodyText || ""),
+    senderUserId: String(senderUserId || ""),
+    messageId: String(notificationTag || ""),
     categoryTag: categoryTag,
-    url: targetUrl,
+    target: String(extraData.target || extraData.type || (categoryTag === "unigrid_chats" ? "group_chat" : (categoryTag === "unigrid_routine" ? "schedule" : "announcements"))),
     route: targetRoute,
+    url: targetUrl,
+    ...stringifiedExtra,
   };
 
   const isWeb = targetPlatform ? targetPlatform === "web" : isWebToken(token);
@@ -181,7 +190,7 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
             body: bodyText,
             sound: "default",
             channel_id: "unigrid_notifications",
-            tag: categoryTag,
+            tag: (data && data.messageId) ? String(data.messageId) : undefined,
             icon: "@mipmap/ic_launcher",
             click_action: "FLUTTER_NOTIFICATION_CLICK",
           },
@@ -315,7 +324,17 @@ exports.handler = async (event) => {
   let sentCount = 0;
   let failCount = 0;
   const deadTokens = [];
-  const extraData = { url, route };
+  
+  const incomingExtra = (typeof body.extraData === "object" && body.extraData !== null) ? body.extraData : {};
+  const extraData = {
+    ...body,
+    ...incomingExtra,
+    url: url || incomingExtra.url,
+    route: route || incomingExtra.route,
+  };
+  delete extraData.tokens;
+  delete extraData.title;
+  delete extraData.bodyText;
 
   const uniqueTokens = [...new Set(tokens.filter((t) => typeof t === "string" && t.trim().length > 0))];
 

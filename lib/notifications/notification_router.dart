@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -9,6 +8,7 @@ import '../models/models.dart';
 import '../screens/main_screen.dart';
 import '../screens/private_chat_screen.dart';
 import 'in_app_notification.dart';
+import 'web_to_app/wa_receiver.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// NotificationRouter
@@ -28,6 +28,7 @@ class NotificationRouter {
   static Future<void> clearAllNotifications() async {
     if (kIsWeb) return;
     try {
+      WAReceiver.clearHistory();
       await _localNotifications.cancelAll();
     } catch (_) {}
   }
@@ -65,8 +66,10 @@ class NotificationRouter {
     clearAllNotifications();
     InAppNotification.dismiss();
 
-    final target = (data['target'] ?? data['type'] ?? data['route'] ?? '').toString().toLowerCase();
-    debugPrint('[NotificationRouter] Routing to target: "$target"');
+    final categoryTag = (data['categoryTag'] ?? '').toString().toLowerCase();
+    final prefField = (data['preferenceField'] ?? '').toString();
+    final target = (data['target'] ?? data['type'] ?? data['route'] ?? categoryTag ?? prefField ?? '').toString().toLowerCase();
+    debugPrint('[NotificationRouter] Routing to target: "$target" (categoryTag: "$categoryTag", prefField: "$prefField")');
 
     final navState = globalNavigatorKey.currentState;
     if (navState == null || FirebaseAuth.instance.currentUser == null) {
@@ -117,14 +120,14 @@ class NotificationRouter {
       }
 
       // 2. Group Chat (Department Room)
-      if (target.contains('chat') || target.contains('group')) {
+      if (target.contains('chat') || target.contains('group') || categoryTag == 'unigrid_chats' || prefField == 'notifChat') {
         navState.popUntil((route) => route.isFirst);
         MainScreen.switchTab(3); // Tab 3: Chat
         return;
       }
 
       // 3. Class Schedule / Timetable / Routine Reminders
-      if (target.contains('schedule') || target.contains('routine') || target.contains('reminder')) {
+      if (target.contains('schedule') || target.contains('routine') || target.contains('reminder') || categoryTag == 'unigrid_routine') {
         navState.popUntil((route) => route.isFirst);
         MainScreen.switchTab(1); // Tab 1: Schedule
         return;
@@ -145,7 +148,7 @@ class NotificationRouter {
       }
 
       // 6. Announcements / Notices / General Campus Broadcasts / Home
-      if (target.contains('announcement') || target.contains('notice') || target.contains('home')) {
+      if (target.contains('announcement') || target.contains('notice') || target.contains('home') || categoryTag == 'unigrid_alerts' || prefField == 'notifAlerts') {
         navState.popUntil((route) => route.isFirst);
         MainScreen.switchTab(0); // Tab 0: Home
         return;

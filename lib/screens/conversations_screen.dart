@@ -9,6 +9,7 @@ import 'chat_screen.dart'; // Department Chat
 import 'private_chat_screen.dart'; // Private Chat
 import 'user_selection_screen.dart'; // New chat picker
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../notifications/notification_router.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -21,6 +22,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final Map<String, Future<DocumentSnapshot>> _userDocFutures = {};
   static final Map<String, DocumentSnapshot> _resolvedUserDocs = {};
+
+  @override
+  void initState() {
+    super.initState();
+    NotificationRouter.clearAllNotifications();
+  }
 
   Future<DocumentSnapshot> _getUserDoc(String uid) {
     if (_resolvedUserDocs.containsKey(uid)) {

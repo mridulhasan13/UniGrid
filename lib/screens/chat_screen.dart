@@ -24,6 +24,7 @@ import '../notifications/fcm_service.dart';
 import '../utils/dept_scope.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../notifications/in_app_notification.dart';
+import '../notifications/notification_router.dart';
 
 // ============================================================
 // Data Model
@@ -1196,6 +1197,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    NotificationRouter.clearAllNotifications();
     _textController.addListener(_handleMentionQuery);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AuthService>(context, listen: false).updateOnlineStatus(true);

@@ -30,6 +30,15 @@ class WAReceiver {
   static final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
 
+  static final List<String> _recentChatLines = [];
+  static final List<String> _recentAlertLines = [];
+
+  /// Clears recent lines buffer when user opens chats / clears notifications
+  static void clearHistory() {
+    _recentChatLines.clear();
+    _recentAlertLines.clear();
+  }
+
   static Future<void> init() async {
     if (kIsWeb || _initialized) return;
     _initialized = true;
@@ -133,7 +142,7 @@ class WAReceiver {
       payloadMap['title'] ??= title;
       payloadMap['body'] ??= body;
 
-      // ── Resolve Category Group & Tag for Stacking (like WhatsApp/Messenger) ─
+      // ── Resolve Category Group for Bundling (Messenger/WhatsApp Style) ────
       final bool isChat = target.contains('chat') ||
           target.contains('private') ||
           prefField == 'notifChat';
@@ -141,43 +150,140 @@ class WAReceiver {
           target.contains('routine') ||
           target.contains('reminder');
 
-      final String groupKey = isChat
-          ? 'com.unigrid.CHATS'
-          : (isRoutine ? 'com.unigrid.ROUTINE' : 'com.unigrid.ALERTS');
-      final String categoryTag = isChat
-          ? 'unigrid_chats'
-          : (isRoutine ? 'unigrid_routine' : 'unigrid_alerts');
-      final int notifId = isChat
-          ? 1001
-          : (isRoutine ? 3001 : 2001);
+      if (isChat) {
+        final line = title.isNotEmpty ? '$title: $body' : body;
+        _recentChatLines.add(line);
+        if (_recentChatLines.length > 7) _recentChatLines.removeAt(0);
 
-      // ── System tray notification (stacked by category with sound) ────────
-      await _local.show(
-        notifId,
-        title,
-        body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'unigrid_notifications', // same channel as FCMService
-            'UniGrid Notifications',
-            importance: Importance.max,
-            priority: Priority.high,
-            playSound: true, // ← default device sound
-            enableVibration: true,
-            tag: categoryTag, // Stacks notifications into single category box
-            groupKey: groupKey,
-            autoCancel: true,
-            styleInformation: BigTextStyleInformation(
-              body,
-              contentTitle: title,
-              summaryText: isChat
-                  ? 'UniGrid Chat'
-                  : (isRoutine ? 'UniGrid Routine' : 'UniGrid Notice'),
+        // 1. Post child notification
+        await _local.show(
+          msgId.hashCode,
+          title,
+          body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'unigrid_notifications',
+              'UniGrid Notifications',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
+              groupKey: 'com.unigrid.CHATS',
+              autoCancel: true,
+              styleInformation: BigTextStyleInformation(
+                body,
+                contentTitle: title,
+                summaryText: 'UniGrid Chat',
+              ),
             ),
           ),
-        ),
-        payload: jsonEncode(payloadMap),
-      );
+          payload: jsonEncode(payloadMap),
+        );
+
+        // 2. Post / Update Group Summary Bundle (collapses all chats into 1 shade)
+        await _local.show(
+          1000,
+          'UniGrid Chats',
+          '${_recentChatLines.length} new messages',
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'unigrid_notifications',
+              'UniGrid Notifications',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: false,
+              groupKey: 'com.unigrid.CHATS',
+              setAsGroupSummary: true,
+              autoCancel: true,
+              styleInformation: InboxStyleInformation(
+                _recentChatLines,
+                contentTitle: 'UniGrid Chats',
+                summaryText: '${_recentChatLines.length} new messages',
+              ),
+            ),
+          ),
+          payload: jsonEncode(payloadMap),
+        );
+      } else if (isRoutine) {
+        await _local.show(
+          msgId.hashCode,
+          title,
+          body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'unigrid_notifications',
+              'UniGrid Notifications',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
+              groupKey: 'com.unigrid.ROUTINE',
+              autoCancel: true,
+              styleInformation: BigTextStyleInformation(
+                body,
+                contentTitle: title,
+                summaryText: 'UniGrid Routine',
+              ),
+            ),
+          ),
+          payload: jsonEncode(payloadMap),
+        );
+      } else {
+        // Notices / Announcements
+        final line = title.isNotEmpty ? '$title: $body' : body;
+        _recentAlertLines.add(line);
+        if (_recentAlertLines.length > 7) _recentAlertLines.removeAt(0);
+
+        // 1. Post child notification
+        await _local.show(
+          msgId.hashCode,
+          title,
+          body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'unigrid_notifications',
+              'UniGrid Notifications',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
+              groupKey: 'com.unigrid.ALERTS',
+              autoCancel: true,
+              styleInformation: BigTextStyleInformation(
+                body,
+                contentTitle: title,
+                summaryText: 'UniGrid Notice',
+              ),
+            ),
+          ),
+          payload: jsonEncode(payloadMap),
+        );
+
+        // 2. Post / Update Group Summary Bundle (collapses all notices into 1 shade)
+        await _local.show(
+          2000,
+          'UniGrid Notices',
+          '${_recentAlertLines.length} new notices',
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'unigrid_notifications',
+              'UniGrid Notifications',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: false,
+              groupKey: 'com.unigrid.ALERTS',
+              setAsGroupSummary: true,
+              autoCancel: true,
+              styleInformation: InboxStyleInformation(
+                _recentAlertLines,
+                contentTitle: 'UniGrid Notices',
+                summaryText: '${_recentAlertLines.length} new notices',
+              ),
+            ),
+          ),
+          payload: jsonEncode(payloadMap),
+        );
+      }
 
       // ── In-app banner (cleanly replaces any active banner) ───────────────
       InAppNotification.showGlobal(

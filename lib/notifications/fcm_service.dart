@@ -189,6 +189,18 @@ class FCMService {
       }
     });
 
+    _localNotifications.getNotificationAppLaunchDetails().then((details) {
+      if (details != null && details.didNotificationLaunchApp && details.notificationResponse?.payload != null) {
+        try {
+          final data = jsonDecode(details.notificationResponse!.payload!) as Map<String, dynamic>;
+          debugPrint('[FCMService] App launched from local notification: $data');
+          NotificationRouter.handlePayload(data);
+        } catch (e) {
+          debugPrint('[FCMService] Error parsing local launch payload: $e');
+        }
+      }
+    });
+
     // Note: Foreground messages are handled by NotificationCoordinator (WAReceiver / AAReceiver).
   }
 
@@ -215,10 +227,7 @@ class FCMService {
     final String groupKey = isChat
         ? 'com.unigrid.CHATS'
         : (isRoutine ? 'com.unigrid.ROUTINE' : 'com.unigrid.ALERTS');
-    final String categoryTag = isChat
-        ? 'unigrid_chats'
-        : (isRoutine ? 'unigrid_routine' : 'unigrid_alerts');
-    final int notifId = isChat ? 1001 : (isRoutine ? 3001 : 2001);
+    final int notifId = message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch;
 
     await _localNotifications.show(
       notifId,
@@ -231,7 +240,6 @@ class FCMService {
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
-          tag: categoryTag,
           groupKey: groupKey,
           autoCancel: true,
           styleInformation: BigTextStyleInformation(

@@ -19,6 +19,7 @@ import '../services/auth_service.dart';
 import '../notifications/fcm_service.dart';
 
 import '../notifications/in_app_notification.dart';
+import '../notifications/notification_router.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
@@ -43,6 +44,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   @override
   void initState() {
     super.initState();
+    NotificationRouter.clearAllNotifications();
     final user = Provider.of<AppUser?>(context, listen: false);
     if (user != null) {
       _conversationId = _getConversationId(user.id, widget.recipient.id);

@@ -182,7 +182,7 @@ class FcmDispatcher {
                     'body': body,
                     'sound': 'default',
                     'channel_id': 'unigrid_notifications',
-                    'tag': categoryTag,
+                    'tag': messageId,
                     'icon': '@mipmap/ic_launcher',
                     'click_action': 'FLUTTER_NOTIFICATION_CLICK',
                   },
