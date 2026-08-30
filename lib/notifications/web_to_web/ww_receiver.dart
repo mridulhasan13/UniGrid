@@ -1,8 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
-import 'package:flutter/material.dart' show Icons;
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../utils/constants.dart';
 import '../in_app_notification.dart';
 import '../notification_router.dart';
 import '../shared/duplicate_guard.dart';
@@ -113,6 +114,7 @@ class WWReceiver {
       final type = (message.data['type'] ?? '').toString().toLowerCase();
       final route = (message.data['route'] ?? '').toString().toLowerCase();
       final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
+      final prefField = (message.data['preferenceField'] ?? '').toString();
 
       final bool isPrivate = target.contains('private') || type.contains('private') || route.contains('private');
       final bool isChat = isPrivate ||
