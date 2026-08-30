@@ -33,6 +33,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  String? _lastSyncedUserId;
 
   @override
   void initState() {
@@ -67,20 +68,21 @@ class _MainScreenState extends State<MainScreen> {
     final authService = Provider.of<AuthService>(context, listen: false);
     final isRootAdmin = user != null && authService.isRootAdmin(user.email);
 
-    if (user != null) {
+    if (user != null && _lastSyncedUserId != user.id) {
+      _lastSyncedUserId = user.id;
       RoutineReminderService.syncRoutineReminders(user);
     }
 
     final List<Widget> screens = [
-      const HomeScreen(),
-      const ScheduleScreen(),
-      const MaterialsScreen(),
-      const ChatScreen(),
+      const RepaintBoundary(child: HomeScreen()),
+      const RepaintBoundary(child: ScheduleScreen()),
+      const RepaintBoundary(child: MaterialsScreen()),
+      const RepaintBoundary(child: ChatScreen()),
       if (user != null && (user.isCR || isRootAdmin))
-        const CRPanelScreen(),
+        const RepaintBoundary(child: CRPanelScreen()),
       if (isRootAdmin)
-        const MasterPanelScreen(),
-      const ProfileScreen(),
+        const RepaintBoundary(child: MasterPanelScreen()),
+      const RepaintBoundary(child: ProfileScreen()),
     ];
 
     final List<BottomNavigationBarItem> navItems = [

@@ -753,47 +753,49 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        top: 3,
-        bottom: 3,
-        left: isOwn ? 48 : 0,
-        right: isOwn ? 0 : 48,
-      ),
-      child: Align(
-        alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          onLongPress: onLongPress,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (!isOwn) ...[
-                CircleAvatar(
-                  radius: 15,
-                  backgroundColor: AppColors.glassCardColor,
-                  backgroundImage: _imgProvider(message.authorPhoto),
-                  child: _imgProvider(message.authorPhoto) == null
-                      ? Text(
-                          message.authorName.isNotEmpty
-                              ? message.authorName[0].toUpperCase()
-                              : 'U',
-                          style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold))
-                      : null,
-                ),
-                const SizedBox(width: 8),
+    return RepaintBoundary(
+      child: Padding(
+        padding: EdgeInsets.only(
+          top: 3,
+          bottom: 3,
+          left: isOwn ? 48 : 0,
+          right: isOwn ? 0 : 48,
+        ),
+        child: Align(
+          alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (!isOwn) ...[
+                  CircleAvatar(
+                    radius: 15,
+                    backgroundColor: AppColors.glassCardColor,
+                    backgroundImage: _imgProvider(message.authorPhoto),
+                    child: _imgProvider(message.authorPhoto) == null
+                        ? Text(
+                            message.authorName.isNotEmpty
+                                ? message.authorName[0].toUpperCase()
+                                : 'U',
+                            style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold))
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Flexible(child: _buildBubble(context)),
+                if (isOwn) ...[
+                  const SizedBox(width: 4),
+                  _buildSeenIndicator(),
+                ],
               ],
-              Flexible(child: _buildBubble(context)),
-              if (isOwn) ...[
-                const SizedBox(width: 4),
-                _buildSeenIndicator(),
-              ],
-            ],
+            ),
           ),
         ),
       ),

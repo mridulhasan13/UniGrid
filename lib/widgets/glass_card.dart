@@ -71,16 +71,12 @@ class GlassCard extends StatelessWidget {
 
     Widget cardContent = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: useBlur
-          ? BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-              child: cardContainer,
-            )
-          : cardContainer,
+      child: cardContainer,
     );
 
+    Widget result;
     if (onTap != null) {
-      return Padding(
+      result = Padding(
         padding: margin,
         child: Material(
           color: Colors.transparent,
@@ -93,12 +89,14 @@ class GlassCard extends StatelessWidget {
           ),
         ),
       );
+    } else {
+      result = Padding(
+        padding: margin,
+        child: cardContent,
+      );
     }
 
-    return Padding(
-      padding: margin,
-      child: cardContent,
-    );
+    return RepaintBoundary(child: result);
   }
 
   static Future<T?> showGlassDialog<T>({
