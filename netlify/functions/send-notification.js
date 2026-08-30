@@ -162,14 +162,6 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
       Urgency: "high",
       TTL: "86400",
     },
-    notification: {
-      title: title,
-      body: bodyText,
-      icon: "https://unigrid.netlify.app/icons/Icon-maskable-192.png",
-      badge: "https://unigrid.netlify.app/icons/Icon-maskable-192.png",
-      tag: categoryTag,
-      renotify: true,
-    },
     fcm_options: {
       link: targetUrl,
     },
