@@ -83,6 +83,9 @@ class NotificationRouter {
       if (target.contains('private') || target.contains('pm_')) {
         final senderUserId = (data['senderUserId'] ?? data['recipientId'] ?? data['userId'] ?? '').toString();
         if (senderUserId.isNotEmpty) {
+          // Clear active notification thread for this specific user
+          await WAReceiver.clearHistory(senderUserId);
+
           // Pop any open modals/screens to reach base
           navState.popUntil((route) => route.isFirst);
 

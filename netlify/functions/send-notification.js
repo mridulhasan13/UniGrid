@@ -129,6 +129,7 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
   const data = {
     title: String(title || ""),
     body: String(bodyText || ""),
+    senderName: String(extraData.senderName || title || ""),
     senderUserId: String(senderUserId || ""),
     messageId: String(notificationTag || ""),
     categoryTag: categoryTag,

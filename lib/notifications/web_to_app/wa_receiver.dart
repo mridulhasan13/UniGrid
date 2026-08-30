@@ -21,6 +21,7 @@ import '../shared/duplicate_guard.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../notification_router.dart';
+import '../shared/notif_thread_store.dart';
 
 class WAReceiver {
   WAReceiver._();
@@ -30,13 +31,22 @@ class WAReceiver {
   static final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
 
-  static final List<String> _recentChatLines = [];
   static final List<String> _recentAlertLines = [];
 
   /// Clears recent lines buffer when user opens chats / clears notifications
-  static void clearHistory() {
-    _recentChatLines.clear();
-    _recentAlertLines.clear();
+  static Future<void> clearHistory([String? specificThreadKey]) async {
+    if (specificThreadKey != null && specificThreadKey.isNotEmpty) {
+      await NotifThreadStore.clearThread(specificThreadKey);
+      try {
+        await _local.cancel(specificThreadKey.hashCode);
+      } catch (_) {}
+    } else {
+      _recentAlertLines.clear();
+      await NotifThreadStore.clearAll();
+      try {
+        await _local.cancelAll();
+      } catch (_) {}
+    }
   }
 
   static Future<void> init() async {
@@ -143,22 +153,48 @@ class WAReceiver {
       payloadMap['body'] ??= body;
 
       // ── Resolve Category Group for Bundling (Messenger/WhatsApp Style) ────
+      final categoryTag = (message.data['categoryTag'] ?? '').toString().toLowerCase();
+      final type = (message.data['type'] ?? '').toString().toLowerCase();
+      final route = (message.data['route'] ?? '').toString().toLowerCase();
+
       final bool isChat = target.contains('chat') ||
           target.contains('private') ||
+          type.contains('chat') ||
+          type.contains('private') ||
+          categoryTag.contains('chat') ||
+          route.contains('chat') ||
+          route.contains('private') ||
           prefField == 'notifChat';
+
       final bool isRoutine = target.contains('schedule') ||
           target.contains('routine') ||
-          target.contains('reminder');
+          target.contains('reminder') ||
+          type.contains('schedule') ||
+          type.contains('routine') ||
+          categoryTag.contains('routine') ||
+          route.contains('schedule');
 
       if (isChat) {
-        final line = title.isNotEmpty ? '$title: $body' : body;
-        _recentChatLines.add(line);
-        if (_recentChatLines.length > 7) _recentChatLines.removeAt(0);
+        // Resolve conversation thread key (group chat vs 1-on-1 private chat)
+        final bool isPrivate = target.contains('private') || (senderUid.isNotEmpty && senderUid != 'group');
+        final String threadKey = isPrivate
+            ? senderUid
+            : ((message.data['chatId'] as String?) ?? 'batch_chat');
+        final String senderDisplayName = title.isNotEmpty ? title : 'UniGrid User';
 
-        // 1. Post child notification
+        // 1. Stack message lines under this sender in persistent store (WhatsApp Style)
+        final stackedLines = await NotifThreadStore.addMessage(
+          threadKey: threadKey,
+          senderName: senderDisplayName,
+          messageText: body,
+        );
+
+        final int conversationNotifId = threadKey.hashCode;
+
+        // 2. Post / Update conversation notification for THIS specific person/chat
         await _local.show(
-          msgId.hashCode,
-          title,
+          conversationNotifId,
+          senderDisplayName,
           body,
           NotificationDetails(
             android: AndroidNotificationDetails(
@@ -170,21 +206,34 @@ class WAReceiver {
               enableVibration: true,
               groupKey: 'com.unigrid.CHATS',
               autoCancel: true,
-              styleInformation: BigTextStyleInformation(
-                body,
-                contentTitle: title,
-                summaryText: 'UniGrid Chat',
+              styleInformation: InboxStyleInformation(
+                stackedLines,
+                contentTitle: senderDisplayName,
+                summaryText: '${stackedLines.length} message${stackedLines.length > 1 ? "s" : ""}',
               ),
             ),
           ),
           payload: jsonEncode(payloadMap),
         );
 
-        // 2. Post / Update Group Summary Bundle (collapses all chats into 1 shade)
+        // 3. Post / Update Master Group Summary Bundle across all chats (e.g. "7 new messages from 3 chats")
+        final allThreads = await NotifThreadStore.getAllThreads();
+        final int totalUnreadMessages = await NotifThreadStore.getTotalUnreadCount();
+        final int totalChats = allThreads.length;
+
+        final List<String> summaryLines = [];
+        allThreads.forEach((_, tData) {
+          final sName = (tData['senderName'] as String?) ?? 'Chat';
+          final sLines = (tData['lines'] as List<dynamic>?) ?? [];
+          if (sLines.isNotEmpty) {
+            summaryLines.add('$sName: ${sLines.last}');
+          }
+        });
+
         await _local.show(
           1000,
           'UniGrid Chats',
-          '${_recentChatLines.length} new messages',
+          '$totalUnreadMessages new messages from $totalChats ${totalChats > 1 ? "chats" : "chat"}',
           NotificationDetails(
             android: AndroidNotificationDetails(
               'unigrid_notifications',
@@ -196,9 +245,9 @@ class WAReceiver {
               setAsGroupSummary: true,
               autoCancel: true,
               styleInformation: InboxStyleInformation(
-                _recentChatLines,
+                summaryLines,
                 contentTitle: 'UniGrid Chats',
-                summaryText: '${_recentChatLines.length} new messages',
+                summaryText: '$totalUnreadMessages message${totalUnreadMessages > 1 ? "s" : ""} from $totalChats ${totalChats > 1 ? "chats" : "chat"}',
               ),
             ),
           ),
@@ -299,3 +348,4 @@ class WAReceiver {
     debugPrint('[WAReceiver] ✓ Initialized — listening for foreground native pushes');
   }
 }
+

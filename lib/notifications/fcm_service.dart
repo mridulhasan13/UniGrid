@@ -221,9 +221,29 @@ class FCMService {
     if (senderUserId.isNotEmpty && senderUserId == currentUid) return;
 
     // Resolve category
-    final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
-    final bool isChat = target.contains('chat') || target.contains('private');
-    final bool isRoutine = target.contains('schedule') || target.contains('routine');
+    final categoryTag = (message.data['categoryTag'] ?? '').toString().toLowerCase();
+    final prefField = (message.data['preferenceField'] ?? '').toString();
+    final target = (message.data['target'] ?? '').toString().toLowerCase();
+    final type = (message.data['type'] ?? '').toString().toLowerCase();
+    final route = (message.data['route'] ?? '').toString().toLowerCase();
+
+    final bool isChat = target.contains('chat') ||
+        target.contains('private') ||
+        type.contains('chat') ||
+        type.contains('private') ||
+        categoryTag.contains('chat') ||
+        route.contains('chat') ||
+        route.contains('private') ||
+        prefField == 'notifChat';
+
+    final bool isRoutine = target.contains('schedule') ||
+        target.contains('routine') ||
+        target.contains('reminder') ||
+        type.contains('schedule') ||
+        type.contains('routine') ||
+        categoryTag.contains('routine') ||
+        route.contains('schedule');
+
     final String groupKey = isChat
         ? 'com.unigrid.CHATS'
         : (isRoutine ? 'com.unigrid.ROUTINE' : 'com.unigrid.ALERTS');
@@ -638,6 +658,9 @@ class FCMService {
         'route': '/chat',
         'tabIndex': '3',
         'preferenceField': 'notifChat',
+        'senderName': senderName,
+        'senderUserId': senderUserId,
+        'chatId': 'batch_chat',
       },
     );
   }

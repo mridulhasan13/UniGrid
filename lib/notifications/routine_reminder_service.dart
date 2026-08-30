@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/schedule_service.dart';
-import '../utils/dept_scope.dart';
 import 'in_app_notification.dart';
 import 'fcm_service.dart';
 import 'notification_router.dart';
