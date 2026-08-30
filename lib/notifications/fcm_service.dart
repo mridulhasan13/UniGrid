@@ -50,6 +50,25 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         route.contains('private') ||
         prefField == 'notifChat';
 
+    // ── Check user preferences in background ──────────────────────────────
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefField == 'notifChat' || isChat) {
+        final notifChat = prefs.getBool('notif_chat') ?? true;
+        if (!notifChat) return;
+      }
+
+      if (prefField == 'notifRoutine' || target.contains('schedule') || target.contains('routine') || target.contains('reminder') || categoryTag.contains('routine')) {
+        final notifRoutine = prefs.getBool('notif_routine') ?? true;
+        if (!notifRoutine) return;
+      }
+
+      if (prefField == 'notifAlerts' || target.contains('announcement') || target.contains('material') || target.contains('notice') || categoryTag.contains('alerts')) {
+        final notifAlerts = prefs.getBool('notif_alerts') ?? true;
+        if (!notifAlerts) return;
+      }
+    } catch (_) {}
+
     // Initialise flutter_local_notifications in the background isolate.
     final localNotif = FlutterLocalNotificationsPlugin();
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -138,13 +157,22 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           ),
         ),
       );
-    } else {
-      // Non-chat (notices, routine) — show a simple BigText card.
+    } else if (target.contains('schedule') || target.contains('routine') || categoryTag.contains('routine')) {
+      final line = title.isNotEmpty ? '$title: $body' : body;
+      final stackedLines = await NotifThreadStore.addMessage(
+        threadKey: 'unigrid_routine',
+        senderName: '📅 Routine Reminders',
+        messageText: line,
+      );
+      final finalTitle = stackedLines.length > 1
+          ? '📅 Routine (${stackedLines.length} updates)'
+          : (title.isNotEmpty ? title : '📅 Routine');
+
       await localNotif.show(
-        (message.data['messageId'] as String? ?? 'bg_${DateTime.now().millisecondsSinceEpoch}').hashCode,
-        title,
-        body,
-        const NotificationDetails(
+        3000,
+        finalTitle,
+        stackedLines.last,
+        NotificationDetails(
           android: AndroidNotificationDetails(
             'unigrid_notifications',
             'UniGrid Notifications',
@@ -152,7 +180,85 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             priority: Priority.high,
             playSound: true,
             enableVibration: true,
+            tag: 'unigrid_routine',
+            groupKey: 'com.unigrid.ROUTINE',
             autoCancel: true,
+            styleInformation: InboxStyleInformation(
+              stackedLines,
+              contentTitle: finalTitle,
+              summaryText: '${stackedLines.length} reminder${stackedLines.length > 1 ? "s" : ""}',
+            ),
+          ),
+        ),
+        payload: jsonEncode(Map<String, dynamic>.from(message.data)),
+      );
+    } else if (target.contains('material') || type.contains('material') || categoryTag.contains('material') || route.contains('material')) {
+      final line = title.isNotEmpty && title != 'UniGrid' ? '$title: $body' : body;
+      final stackedLines = await NotifThreadStore.addMessage(
+        threadKey: 'unigrid_materials',
+        senderName: '📁 Study Materials',
+        messageText: line,
+      );
+      final finalTitle = stackedLines.length > 1
+          ? '📁 Study Materials (${stackedLines.length} files)'
+          : (title.isNotEmpty ? title : '📁 Study Materials');
+
+      await localNotif.show(
+        4000,
+        finalTitle,
+        stackedLines.last,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'unigrid_notifications',
+            'UniGrid Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            tag: 'unigrid_materials',
+            groupKey: 'com.unigrid.MATERIALS',
+            autoCancel: true,
+            styleInformation: InboxStyleInformation(
+              stackedLines,
+              contentTitle: finalTitle,
+              summaryText: '${stackedLines.length} file${stackedLines.length > 1 ? "s" : ""}',
+            ),
+          ),
+        ),
+        payload: jsonEncode(Map<String, dynamic>.from(message.data)),
+      );
+    } else {
+      // Non-chat (notices, general announcements) -> ONE single stacked partition
+      final line = title.isNotEmpty && title != 'UniGrid' ? '$title: $body' : body;
+      final stackedLines = await NotifThreadStore.addMessage(
+        threadKey: 'unigrid_alerts',
+        senderName: '📢 Announcements',
+        messageText: line,
+      );
+      final finalTitle = stackedLines.length > 1
+          ? '📢 Announcements (${stackedLines.length} updates)'
+          : (title.isNotEmpty ? title : '📢 Announcements');
+
+      await localNotif.show(
+        2000,
+        finalTitle,
+        stackedLines.last,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'unigrid_notifications',
+            'UniGrid Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            tag: 'unigrid_alerts',
+            groupKey: 'com.unigrid.ALERTS',
+            autoCancel: true,
+            styleInformation: InboxStyleInformation(
+              stackedLines,
+              contentTitle: finalTitle,
+              summaryText: '${stackedLines.length} update${stackedLines.length > 1 ? "s" : ""}',
+            ),
           ),
         ),
         payload: jsonEncode(Map<String, dynamic>.from(message.data)),

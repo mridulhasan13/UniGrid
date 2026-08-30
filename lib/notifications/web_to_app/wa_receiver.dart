@@ -100,6 +100,14 @@ class WAReceiver {
           }
         }
 
+        if (prefField == 'notifRoutine' || target.contains('schedule') || target.contains('routine') || target.contains('reminder')) {
+          final notifRoutine = prefs.getBool('notif_routine') ?? true;
+          if (!notifRoutine) {
+            debugPrint('[WAReceiver] Suppressing foreground routine notification (notif_routine is OFF)');
+            return;
+          }
+        }
+
         if (prefField == 'notifAlerts' || target.contains('announcement') || target.contains('material') || target.contains('notice')) {
           final notifAlerts = prefs.getBool('notif_alerts') ?? true;
           if (!notifAlerts) {
@@ -197,13 +205,16 @@ class WAReceiver {
           messageText: lineText,
         );
 
-        final int conversationNotifId = threadKey.hashCode;
+        final int conversationNotifId = isPrivate ? threadKey.hashCode : 1001;
+        final finalChatTitle = stackedLines.length > 1
+            ? '$conversationTitle (${stackedLines.length} messages)'
+            : conversationTitle;
 
         // 2. Post / Update conversation notification for THIS specific person/chat
         await _local.show(
           conversationNotifId,
-          conversationTitle,
-          body,
+          finalChatTitle,
+          stackedLines.last,
           NotificationDetails(
             android: AndroidNotificationDetails(
               'unigrid_notifications',
@@ -217,57 +228,28 @@ class WAReceiver {
               autoCancel: true,
               styleInformation: InboxStyleInformation(
                 stackedLines,
-                contentTitle: conversationTitle,
+                contentTitle: finalChatTitle,
                 summaryText: '${stackedLines.length} message${stackedLines.length > 1 ? "s" : ""}',
               ),
             ),
           ),
           payload: jsonEncode(payloadMap),
         );
-
-        // 3. Post / Update Master Group Summary Bundle across all chats (e.g. "7 new messages from 3 chats")
-        final allThreads = await NotifThreadStore.getAllThreads();
-        final int totalUnreadMessages = await NotifThreadStore.getTotalUnreadCount();
-        final int totalChats = allThreads.length;
-
-        final List<String> summaryLines = [];
-        allThreads.forEach((_, tData) {
-          final sName = (tData['senderName'] as String?) ?? 'Chat';
-          final sLines = (tData['lines'] as List<dynamic>?) ?? [];
-          if (sLines.isNotEmpty) {
-            summaryLines.add('$sName: ${sLines.last}');
-          }
-        });
-
-        await _local.show(
-          1000,
-          'UniGrid Chats',
-          '$totalUnreadMessages new messages from $totalChats ${totalChats > 1 ? "chats" : "chat"}',
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              'unigrid_notifications',
-              'UniGrid Notifications',
-              importance: Importance.max,
-              priority: Priority.high,
-              playSound: false,
-              tag: 'unigrid_chats_summary',
-              groupKey: 'com.unigrid.CHATS',
-              setAsGroupSummary: true,
-              autoCancel: true,
-              styleInformation: InboxStyleInformation(
-                summaryLines,
-                contentTitle: 'UniGrid Chats',
-                summaryText: '$totalUnreadMessages message${totalUnreadMessages > 1 ? "s" : ""} from $totalChats ${totalChats > 1 ? "chats" : "chat"}',
-              ),
-            ),
-          ),
-          payload: jsonEncode(payloadMap),
-        );
       } else if (isRoutine) {
+        final line = title.isNotEmpty ? '$title: $body' : body;
+        final stackedLines = await NotifThreadStore.addMessage(
+          threadKey: 'unigrid_routine',
+          senderName: '📅 Routine Reminders',
+          messageText: line,
+        );
+        final finalTitle = stackedLines.length > 1
+            ? '📅 Routine (${stackedLines.length} updates)'
+            : (title.isNotEmpty ? title : '📅 Routine');
+
         await _local.show(
-          msgId.hashCode,
-          title,
-          body,
+          3000,
+          finalTitle,
+          stackedLines.last,
           NotificationDetails(
             android: AndroidNotificationDetails(
               'unigrid_notifications',
@@ -276,28 +258,69 @@ class WAReceiver {
               priority: Priority.high,
               playSound: true,
               enableVibration: true,
+              tag: 'unigrid_routine',
               groupKey: 'com.unigrid.ROUTINE',
               autoCancel: true,
-              styleInformation: BigTextStyleInformation(
-                body,
-                contentTitle: title,
-                summaryText: 'UniGrid Routine',
+              styleInformation: InboxStyleInformation(
+                stackedLines,
+                contentTitle: finalTitle,
+                summaryText: '${stackedLines.length} reminder${stackedLines.length > 1 ? "s" : ""}',
+              ),
+            ),
+          ),
+          payload: jsonEncode(payloadMap),
+        );
+      } else if (isMaterial) {
+        final line = title.isNotEmpty && title != 'UniGrid' ? '$title: $body' : body;
+        final stackedLines = await NotifThreadStore.addMessage(
+          threadKey: 'unigrid_materials',
+          senderName: '📁 Study Materials',
+          messageText: line,
+        );
+        final finalTitle = stackedLines.length > 1
+            ? '📁 Study Materials (${stackedLines.length} files)'
+            : (title.isNotEmpty ? title : '📁 Study Materials');
+
+        await _local.show(
+          4000,
+          finalTitle,
+          stackedLines.last,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'unigrid_notifications',
+              'UniGrid Notifications',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
+              tag: 'unigrid_materials',
+              groupKey: 'com.unigrid.MATERIALS',
+              autoCancel: true,
+              styleInformation: InboxStyleInformation(
+                stackedLines,
+                contentTitle: finalTitle,
+                summaryText: '${stackedLines.length} file${stackedLines.length > 1 ? "s" : ""}',
               ),
             ),
           ),
           payload: jsonEncode(payloadMap),
         );
       } else {
-        // Notices / Announcements
-        final line = title.isNotEmpty ? '$title: $body' : body;
-        _recentAlertLines.add(line);
-        if (_recentAlertLines.length > 7) _recentAlertLines.removeAt(0);
+        // Notices / Announcements / General Notices -> ONE single stacked partition
+        final line = title.isNotEmpty && title != 'UniGrid' ? '$title: $body' : body;
+        final stackedLines = await NotifThreadStore.addMessage(
+          threadKey: 'unigrid_alerts',
+          senderName: '📢 Announcements',
+          messageText: line,
+        );
+        final finalTitle = stackedLines.length > 1
+            ? '📢 Announcements (${stackedLines.length} updates)'
+            : (title.isNotEmpty ? title : '📢 Announcements');
 
-        // 1. Post child notification
         await _local.show(
-          msgId.hashCode,
-          title,
-          body,
+          2000,
+          finalTitle,
+          stackedLines.last,
           NotificationDetails(
             android: AndroidNotificationDetails(
               'unigrid_notifications',
@@ -306,37 +329,13 @@ class WAReceiver {
               priority: Priority.high,
               playSound: true,
               enableVibration: true,
+              tag: 'unigrid_alerts',
               groupKey: 'com.unigrid.ALERTS',
-              autoCancel: true,
-              styleInformation: BigTextStyleInformation(
-                body,
-                contentTitle: title,
-                summaryText: 'UniGrid Notice',
-              ),
-            ),
-          ),
-          payload: jsonEncode(payloadMap),
-        );
-
-        // 2. Post / Update Group Summary Bundle (collapses all notices into 1 shade)
-        await _local.show(
-          2000,
-          'UniGrid Notices',
-          '${_recentAlertLines.length} new notices',
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              'unigrid_notifications',
-              'UniGrid Notifications',
-              importance: Importance.max,
-              priority: Priority.high,
-              playSound: false,
-              groupKey: 'com.unigrid.ALERTS',
-              setAsGroupSummary: true,
               autoCancel: true,
               styleInformation: InboxStyleInformation(
-                _recentAlertLines,
-                contentTitle: 'UniGrid Notices',
-                summaryText: '${_recentAlertLines.length} new notices',
+                stackedLines,
+                contentTitle: finalTitle,
+                summaryText: '${stackedLines.length} update${stackedLines.length > 1 ? "s" : ""}',
               ),
             ),
           ),
