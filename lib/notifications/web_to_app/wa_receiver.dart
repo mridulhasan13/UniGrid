@@ -176,17 +176,25 @@ class WAReceiver {
 
       if (isChat) {
         // Resolve conversation thread key (group chat vs 1-on-1 private chat)
-        final bool isPrivate = target.contains('private') || (senderUid.isNotEmpty && senderUid != 'group');
+        final bool isPrivate = target.contains('private') || type.contains('private') || route.contains('private');
         final String threadKey = isPrivate
-            ? senderUid
+            ? (senderUid.isNotEmpty ? senderUid : 'dm_chat')
             : ((message.data['chatId'] as String?) ?? 'batch_chat');
-        final String senderDisplayName = title.isNotEmpty ? title : 'UniGrid User';
+        final String conversationTitle = isPrivate
+            ? (title.isNotEmpty ? title : 'Student')
+            : ((message.data['groupTitle'] as String?) ?? 'Department Chat');
+        final String lineText = isPrivate
+            ? body
+            : (title.isNotEmpty ? '$title: $body' : body);
+        final String androidTag = isPrivate
+            ? 'unigrid_dm_$threadKey'
+            : 'unigrid_batch_chat';
 
-        // 1. Stack message lines under this sender in persistent store (WhatsApp Style)
+        // 1. Stack message lines under this sender/chat in persistent store (WhatsApp Style)
         final stackedLines = await NotifThreadStore.addMessage(
           threadKey: threadKey,
-          senderName: senderDisplayName,
-          messageText: body,
+          senderName: conversationTitle,
+          messageText: lineText,
         );
 
         final int conversationNotifId = threadKey.hashCode;
@@ -194,7 +202,7 @@ class WAReceiver {
         // 2. Post / Update conversation notification for THIS specific person/chat
         await _local.show(
           conversationNotifId,
-          senderDisplayName,
+          conversationTitle,
           body,
           NotificationDetails(
             android: AndroidNotificationDetails(
@@ -204,11 +212,12 @@ class WAReceiver {
               priority: Priority.high,
               playSound: true,
               enableVibration: true,
+              tag: androidTag,
               groupKey: 'com.unigrid.CHATS',
               autoCancel: true,
               styleInformation: InboxStyleInformation(
                 stackedLines,
-                contentTitle: senderDisplayName,
+                contentTitle: conversationTitle,
                 summaryText: '${stackedLines.length} message${stackedLines.length > 1 ? "s" : ""}',
               ),
             ),
@@ -241,6 +250,7 @@ class WAReceiver {
               importance: Importance.max,
               priority: Priority.high,
               playSound: false,
+              tag: 'unigrid_chats_summary',
               groupKey: 'com.unigrid.CHATS',
               setAsGroupSummary: true,
               autoCancel: true,

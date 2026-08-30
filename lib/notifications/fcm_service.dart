@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'in_app_notification.dart';
 import 'notification_router.dart';
 import 'notification_coordinator.dart';
+import 'shared/notif_thread_store.dart';
 
 // ─── Web Push VAPID Key ──────────────────────────────────────────────────────
 // Generate this in Firebase Console → Project Settings → Cloud Messaging
@@ -25,8 +26,53 @@ const String _webVapidKey =
 /// Called by Firebase when a notification arrives while the app is terminated or in background.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Nothing to do here — Android shows the notification automatically from the FCM payload.
   debugPrint('Background FCM message received: ${message.messageId}');
+  try {
+    final title = message.notification?.title ??
+        (message.data['title'] as String?) ??
+        'UniGrid';
+    final body = message.notification?.body ??
+        (message.data['body'] as String?) ??
+        '';
+    if (title.isEmpty && body.isEmpty) return;
+
+    final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
+    final categoryTag = (message.data['categoryTag'] ?? '').toString().toLowerCase();
+    final type = (message.data['type'] ?? '').toString().toLowerCase();
+    final route = (message.data['route'] ?? '').toString().toLowerCase();
+    final prefField = (message.data['preferenceField'] ?? '').toString();
+    final senderUid = (message.data['senderUserId'] ?? '').toString();
+
+    final bool isChat = target.contains('chat') ||
+        target.contains('private') ||
+        type.contains('chat') ||
+        type.contains('private') ||
+        categoryTag.contains('chat') ||
+        route.contains('chat') ||
+        route.contains('private') ||
+        prefField == 'notifChat';
+
+    if (isChat) {
+      final bool isPrivate = target.contains('private') || type.contains('private') || route.contains('private');
+      final String threadKey = isPrivate
+          ? (senderUid.isNotEmpty ? senderUid : 'dm_chat')
+          : ((message.data['chatId'] as String?) ?? 'batch_chat');
+      final String conversationTitle = isPrivate
+          ? (title.isNotEmpty ? title : 'Student')
+          : ((message.data['groupTitle'] as String?) ?? 'Department Chat');
+      final String lineText = isPrivate
+          ? body
+          : (title.isNotEmpty ? '$title: $body' : body);
+
+      await NotifThreadStore.addMessage(
+        threadKey: threadKey,
+        senderName: conversationTitle,
+        messageText: lineText,
+      );
+    }
+  } catch (e) {
+    debugPrint('Background FCM processing notice: $e');
+  }
 }
 
 class FCMService {

@@ -124,6 +124,7 @@ class NotificationRouter {
 
       // 2. Group Chat (Department Room)
       if (target.contains('chat') || target.contains('group') || categoryTag == 'unigrid_chats' || prefField == 'notifChat') {
+        await WAReceiver.clearHistory('batch_chat');
         navState.popUntil((route) => route.isFirst);
         MainScreen.switchTab(3); // Tab 3: Chat
         return;

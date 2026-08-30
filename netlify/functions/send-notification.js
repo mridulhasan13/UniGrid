@@ -171,11 +171,17 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
       },
     };
   } else {
-    // ── Android / iOS Native App ──────────────────────────────────────────────
-    // Top-level `notification` tells FCM to display system tray notification
-    // when the app is in background/terminated.
-    // `data` carries extra info for our foreground handler.
-    // NO `webpush` block — it would confuse FCM when targeting native tokens.
+    const isPrivate = targetType.includes("private");
+    const isChat = isPrivate || targetType.includes("chat") || categoryTag === "unigrid_chats";
+    let androidTag = "unigrid_alerts";
+    if (isPrivate && senderUserId) {
+      androidTag = `unigrid_dm_${senderUserId}`;
+    } else if (isChat) {
+      androidTag = "unigrid_batch_chat";
+    } else if (categoryTag === "unigrid_routine") {
+      androidTag = "unigrid_routine";
+    }
+
     return {
       message: {
         token: token,
@@ -191,7 +197,7 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
             body: bodyText,
             sound: "default",
             channel_id: "unigrid_notifications",
-            tag: (data && data.messageId) ? String(data.messageId) : undefined,
+            tag: androidTag,
             icon: "@mipmap/ic_launcher",
             click_action: "FLUTTER_NOTIFICATION_CLICK",
           },
