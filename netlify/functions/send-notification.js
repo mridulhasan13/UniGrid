@@ -21,14 +21,16 @@ const CORS = {
 };
 
 // ─── Detect if a token belongs to a Web Push subscription ───────────────────
-// FCM Web tokens start with a very long base64url string (152+ chars).
-// Native tokens are shorter.  Most reliable check is length (web tokens ≥ 140).
+// Web Push subscription tokens (from browser PushManager.subscribe) start with
+// "https://" because they are endpoint URLs.
+// Android/iOS FCM registration tokens are opaque alphanumeric strings that
+// do NOT start with "http". The old length >= 100 check was wrong because
+// Android tokens are also 150+ chars — remove it.
 function isWebToken(token) {
   if (!token || typeof token !== "string") return false;
   return (
     token.startsWith("http") ||
-    token.includes("fcm.googleapis.com") ||
-    token.length >= 100
+    token.includes("fcm.googleapis.com")
   );
 }
 
@@ -182,32 +184,36 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
       androidTag = "unigrid_routine";
     }
 
+    // DATA-ONLY for Android native: omit top-level `notification` block.
+    // This forces FCM to invoke our @pragma('vm:entry-point') background handler
+    // in Dart, which builds a proper InboxStyle stacked notification.
+    // Without this, Android OS auto-shows a plain single-line card and
+    // bypasses all our WhatsApp-style stacking logic entirely.
+    const androidPayload = {
+      ...data,
+      androidTag: androidTag,
+    };
+
     return {
       message: {
         token: token,
-        notification: {
-          title: title,
-          body: bodyText,
-        },
-        data: data,
+        // NOTE: No top-level `notification` block — DATA-ONLY on purpose!
+        data: androidPayload,
         android: {
           priority: "high",
-          notification: {
-            title: title,
-            body: bodyText,
-            sound: "default",
-            channel_id: "unigrid_notifications",
-            tag: androidTag,
-            icon: "@mipmap/ic_launcher",
-            click_action: "FLUTTER_NOTIFICATION_CLICK",
-          },
+          // No android.notification block either — keeps it fully data-only.
         },
         apns: {
+          // iOS still needs the `aps.alert` for system-level display since iOS
+          // doesn't have the same data-only flexibility as Android.
           payload: {
             aps: {
               alert: { title: title, body: bodyText },
               sound: "default",
             },
+          },
+          headers: {
+            "apns-priority": "10",
           },
         },
       },

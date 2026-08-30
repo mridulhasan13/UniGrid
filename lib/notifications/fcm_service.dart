@@ -28,12 +28,9 @@ const String _webVapidKey =
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Background FCM message received: ${message.messageId}');
   try {
-    final title = message.notification?.title ??
-        (message.data['title'] as String?) ??
-        'UniGrid';
-    final body = message.notification?.body ??
-        (message.data['body'] as String?) ??
-        '';
+    // Pull title and body from data-only payload (no notification block).
+    final title = (message.data['title'] as String?) ?? 'UniGrid';
+    final body = (message.data['body'] as String?) ?? '';
     if (title.isEmpty && body.isEmpty) return;
 
     final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
@@ -42,6 +39,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final route = (message.data['route'] ?? '').toString().toLowerCase();
     final prefField = (message.data['preferenceField'] ?? '').toString();
     final senderUid = (message.data['senderUserId'] ?? '').toString();
+    final androidTag = (message.data['androidTag'] ?? '').toString();
 
     final bool isChat = target.contains('chat') ||
         target.contains('private') ||
@@ -51,6 +49,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         route.contains('chat') ||
         route.contains('private') ||
         prefField == 'notifChat';
+
+    // Initialise flutter_local_notifications in the background isolate.
+    final localNotif = FlutterLocalNotificationsPlugin();
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    await localNotif.initialize(const InitializationSettings(android: androidSettings));
 
     if (isChat) {
       final bool isPrivate = target.contains('private') || type.contains('private') || route.contains('private');
@@ -64,14 +67,99 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           ? body
           : (title.isNotEmpty ? '$title: $body' : body);
 
-      await NotifThreadStore.addMessage(
+      // Persist lines across messages.
+      final stackedLines = await NotifThreadStore.addMessage(
         threadKey: threadKey,
         senderName: conversationTitle,
         messageText: lineText,
       );
+
+      final String resolvedTag = androidTag.isNotEmpty
+          ? androidTag
+          : (isPrivate ? 'unigrid_dm_$threadKey' : 'unigrid_batch_chat');
+
+      // Show InboxStyle stacked notification card for this conversation thread.
+      await localNotif.show(
+        threadKey.hashCode,
+        conversationTitle,
+        stackedLines.last,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'unigrid_notifications',
+            'UniGrid Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            tag: resolvedTag,
+            groupKey: 'com.unigrid.CHATS',
+            autoCancel: true,
+            styleInformation: InboxStyleInformation(
+              stackedLines,
+              contentTitle: conversationTitle,
+              summaryText: '${stackedLines.length} message${stackedLines.length > 1 ? "s" : ""}',
+            ),
+          ),
+        ),
+        payload: jsonEncode(Map<String, dynamic>.from(message.data)),
+      );
+
+      // Update master group summary card.
+      final allThreads = await NotifThreadStore.getAllThreads();
+      final int totalUnread = await NotifThreadStore.getTotalUnreadCount();
+      final int totalChats = allThreads.length;
+      final List<String> summaryLines = [];
+      allThreads.forEach((_, tData) {
+        final sName = (tData['senderName'] as String?) ?? 'Chat';
+        final sLines = (tData['lines'] as List<dynamic>?) ?? [];
+        if (sLines.isNotEmpty) summaryLines.add('$sName: ${sLines.last}');
+      });
+
+      await localNotif.show(
+        1000,
+        'UniGrid Chats',
+        '$totalUnread new message${totalUnread > 1 ? "s" : ""} from $totalChats ${totalChats > 1 ? "chats" : "chat"}',
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'unigrid_notifications',
+            'UniGrid Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: false,
+            tag: 'unigrid_chats_summary',
+            groupKey: 'com.unigrid.CHATS',
+            setAsGroupSummary: true,
+            autoCancel: true,
+            styleInformation: InboxStyleInformation(
+              summaryLines,
+              contentTitle: 'UniGrid Chats',
+              summaryText: '$totalUnread message${totalUnread > 1 ? "s" : ""} from $totalChats ${totalChats > 1 ? "chats" : "chat"}',
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Non-chat (notices, routine) — show a simple BigText card.
+      await localNotif.show(
+        (message.data['messageId'] as String? ?? 'bg_${DateTime.now().millisecondsSinceEpoch}').hashCode,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'unigrid_notifications',
+            'UniGrid Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            autoCancel: true,
+          ),
+        ),
+        payload: jsonEncode(Map<String, dynamic>.from(message.data)),
+      );
     }
   } catch (e) {
-    debugPrint('Background FCM processing notice: $e');
+    debugPrint('Background FCM handler error: $e');
   }
 }
 
