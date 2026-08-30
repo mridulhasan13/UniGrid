@@ -182,6 +182,11 @@ class WAReceiver {
           categoryTag.contains('routine') ||
           route.contains('schedule');
 
+      final bool isMaterial = target.contains('material') ||
+          type.contains('material') ||
+          categoryTag.contains('material') ||
+          route.contains('material');
+
       if (isChat) {
         // Resolve conversation thread key (group chat vs 1-on-1 private chat)
         final bool isPrivate = target.contains('private') || type.contains('private') || route.contains('private');

@@ -14,6 +14,7 @@ import 'in_app_notification.dart';
 import 'notification_router.dart';
 import 'notification_coordinator.dart';
 import 'shared/notif_thread_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Web Push VAPID Key ──────────────────────────────────────────────────────
 // Generate this in Firebase Console → Project Settings → Cloud Messaging
