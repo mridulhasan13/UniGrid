@@ -1359,8 +1359,23 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    _readReceiptsSub?.cancel();
     _watermarkDebounceTimer?.cancel();
+    final user = Provider.of<AppUser?>(context, listen: false);
+    if (user != null && user.hasDeptScope && _lastRecordedWatermark > 0) {
+      _firestore.collection(_readReceiptsPath).doc(user.id).set({
+        'preciseTime': _lastRecordedWatermark,
+        'lastReadTime': FieldValue.serverTimestamp(),
+        'userId': user.id,
+        'name': user.name,
+        'photoUrl': user.photoUrl,
+        'department': user.department,
+        'batch': user.batch,
+        'studentId': user.studentId,
+        'isCR': user.isCR,
+        'isAdmin': user.isAdmin,
+      }, SetOptions(merge: true)).catchError((_) {});
+    }
+    _readReceiptsSub?.cancel();
     _textController.removeListener(_handleMentionQuery);
     _textController.dispose();
     _scrollController.dispose();
@@ -1578,33 +1593,41 @@ class _ChatScreenState extends State<ChatScreen> {
     if (latestMessagePreciseTime <= _lastRecordedWatermark) return;
     _lastRecordedWatermark = latestMessagePreciseTime;
 
-    if (_watermarkDebounceTimer == null || !_watermarkDebounceTimer!.isActive) {
-      _watermarkDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
-        try {
-          await _firestore.collection(_readReceiptsPath).doc(user.id).set({
-            'preciseTime': _lastRecordedWatermark,
-            'lastReadTime': FieldValue.serverTimestamp(),
-            'userId': user.id,
-            'name': user.name,
-            'photoUrl': user.photoUrl,
-            'department': user.department,
-            'batch': user.batch,
-            'studentId': user.studentId,
-            'isCR': user.isCR,
-            'isAdmin': user.isAdmin,
-          }, SetOptions(merge: true));
-        } catch (e) {
-          debugPrint('[ChatScreen] Error updating read watermark: $e');
-        }
-      });
-    }
+    _watermarkDebounceTimer?.cancel();
+    _watermarkDebounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      try {
+        await _firestore.collection(_readReceiptsPath).doc(user.id).set({
+          'preciseTime': _lastRecordedWatermark,
+          'lastReadTime': FieldValue.serverTimestamp(),
+          'userId': user.id,
+          'name': user.name,
+          'photoUrl': user.photoUrl,
+          'department': user.department,
+          'batch': user.batch,
+          'studentId': user.studentId,
+          'isCR': user.isCR,
+          'isAdmin': user.isAdmin,
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('[ChatScreen] Error updating read watermark: $e');
+      }
+    });
   }
 
   // ---- SHOW SEEN BY ----
   void _showSeenBy(_ChatMsg msg) {
     final Map<String, AppUser> viewersMap = {};
+    final Set<String> allViewerIds = {};
+
+    for (final id in msg.seenBy) {
+      if (id.trim().isNotEmpty && id != msg.authorId) {
+        allViewerIds.add(id);
+      }
+    }
+
     for (final entry in _userWatermarks.entries) {
       if (entry.key != msg.authorId && entry.value >= msg.preciseTime) {
+        allViewerIds.add(entry.key);
         if (_receiptUsers.containsKey(entry.key)) {
           viewersMap[entry.key] = _receiptUsers[entry.key]!;
         }
@@ -1617,7 +1640,7 @@ class _ChatScreenState extends State<ChatScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       builder: (_) => _SeenBySheet(
-        viewerIds: msg.seenBy,
+        viewerIds: allViewerIds.toList(),
         firestore: _firestore,
         readReceiptsPath: _readReceiptsPath,
         messagePreciseTime: msg.preciseTime,
