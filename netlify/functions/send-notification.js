@@ -141,71 +141,58 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
     ...stringifiedExtra,
   };
 
-  const isWeb = targetPlatform ? targetPlatform === "web" : isWebToken(token);
+  const isPrivate = targetType.includes("private");
+  const isChat = isPrivate || targetType.includes("chat") || categoryTag === "unigrid_chats";
+  let androidTag = "unigrid_alerts";
+  if (isPrivate && senderUserId) {
+    androidTag = `unigrid_dm_${senderUserId}`;
+  } else if (isChat) {
+    androidTag = "unigrid_batch_chat";
+  } else if (categoryTag === "unigrid_routine") {
+    androidTag = "unigrid_routine";
+  }
 
-  if (isWeb) {
-    // ── Web Browser (PWA / Flutter Web) ──────────────────────────────────────
-    // Do NOT include top-level `notification` — it causes Firebase Web SDK to
-    // auto-display a system popup AND our onBackgroundMessage SW handler to
-    // also call showNotification → double notification.
-    // Instead, we use `webpush.notification` only, which is delivered exclusively
-    // by the browser's Push API and shown once by our SW.
+  const androidPayload = {
+    ...data,
+    androidTag: androidTag,
+  };
+
+  const webpushConfig = {
+    headers: {
+      Urgency: "high",
+      TTL: "86400",
+    },
+    notification: {
+      title: title,
+      body: bodyText,
+      icon: "https://unigrid.netlify.app/icons/Icon-maskable-192.png",
+      badge: "https://unigrid.netlify.app/icons/Icon-maskable-192.png",
+      tag: categoryTag,
+      renotify: true,
+    },
+    fcm_options: {
+      link: targetUrl,
+    },
+  };
+
+  if (targetPlatform === "web") {
     return {
       message: {
         token: token,
         data: data,
-        webpush: {
-          headers: {
-            Urgency: "high",
-          },
-          notification: {
-            title: title,
-            body: bodyText,
-            icon: "https://unigrid.netlify.app/icons/Icon-maskable-192.png",
-            badge: "https://unigrid.netlify.app/icons/Icon-maskable-192.png",
-            tag: categoryTag,
-            renotify: true,
-          },
-          fcm_options: {
-            link: "https://unigrid.netlify.app/",
-          },
-        },
+        webpush: webpushConfig,
       },
     };
-  } else {
-    const isPrivate = targetType.includes("private");
-    const isChat = isPrivate || targetType.includes("chat") || categoryTag === "unigrid_chats";
-    let androidTag = "unigrid_alerts";
-    if (isPrivate && senderUserId) {
-      androidTag = `unigrid_dm_${senderUserId}`;
-    } else if (isChat) {
-      androidTag = "unigrid_batch_chat";
-    } else if (categoryTag === "unigrid_routine") {
-      androidTag = "unigrid_routine";
-    }
-
-    // DATA-ONLY for Android native: omit top-level `notification` block.
-    // This forces FCM to invoke our @pragma('vm:entry-point') background handler
-    // in Dart, which builds a proper InboxStyle stacked notification.
-    // Without this, Android OS auto-shows a plain single-line card and
-    // bypasses all our WhatsApp-style stacking logic entirely.
-    const androidPayload = {
-      ...data,
-      androidTag: androidTag,
-    };
-
+  } else if (targetPlatform === "native") {
     return {
       message: {
         token: token,
-        // NOTE: No top-level `notification` block — DATA-ONLY on purpose!
+        // DATA-ONLY for Android native so Dart background handler builds InboxStyle
         data: androidPayload,
         android: {
           priority: "high",
-          // No android.notification block either — keeps it fully data-only.
         },
         apns: {
-          // iOS still needs the `aps.alert` for system-level display since iOS
-          // doesn't have the same data-only flexibility as Android.
           payload: {
             aps: {
               alert: { title: title, body: bodyText },
@@ -216,6 +203,29 @@ function buildPayload(token, title, bodyText, senderUserId, notificationTag, tar
             "apns-priority": "10",
           },
         },
+      },
+    };
+  } else {
+    // Universal payload: includes data, android (data-only), apns, and webpush.
+    return {
+      message: {
+        token: token,
+        data: androidPayload,
+        android: {
+          priority: "high",
+        },
+        apns: {
+          payload: {
+            aps: {
+              alert: { title: title, body: bodyText },
+              sound: "default",
+            },
+          },
+          headers: {
+            "apns-priority": "10",
+          },
+        },
+        webpush: webpushConfig,
       },
     };
   }

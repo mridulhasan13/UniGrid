@@ -35,23 +35,29 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message received:', JSON.stringify(payload));
 
-  // Chromium, Safari, Firefox, and Samsung Internet automatically display notifications
-  // when `payload.notification` or `payload.webpush.notification` is present in the WebPush payload.
-  // Returning early here prevents browsers from showing a second duplicate popup.
-  if (payload.notification || (payload.webpush && payload.webpush.notification)) {
-    console.log('[SW] Notification block present — handled automatically by browser native engine.');
-    return;
-  }
+  const notificationTitle =
+    (payload.data && payload.data.title) ||
+    (payload.notification && payload.notification.title) ||
+    (payload.webpush && payload.webpush.notification && payload.webpush.notification.title) ||
+    'UniGrid Notification';
 
-  const notificationTitle = (payload.data && payload.data.title) || (payload.notification && payload.notification.title) || 'UniGrid Notification';
-  const notificationBody = (payload.data && payload.data.body) || (payload.notification && payload.notification.body) || '';
+  const notificationBody =
+    (payload.data && payload.data.body) ||
+    (payload.notification && payload.notification.body) ||
+    (payload.webpush && payload.webpush.notification && payload.webpush.notification.body) ||
+    '';
+
+  const notificationTag =
+    (payload.data && (payload.data.messageId || payload.data.androidTag || payload.data.categoryTag)) ||
+    (payload.notification && payload.notification.tag) ||
+    ('unigrid_' + Date.now());
 
   const notificationOptions = {
     body: notificationBody,
     icon: '/icons/Icon-192.png',
     badge: '/icons/Icon-192.png',
-    tag: (payload.data && payload.data.messageId) || (payload.notification && payload.notification.tag) || ('unigrid_' + Date.now()),
-    renotify: false,
+    tag: notificationTag,
+    renotify: true,
     requireInteraction: false,
     timestamp: Date.now(),
     data: payload.data || {},
