@@ -32,6 +32,7 @@ class GeneralAnnouncementService {
 
   static final Set<String> _localSeenIds = {};
   static bool _localSeenLoaded = false;
+  static final ValueNotifier<int> unseenCountNotifier = ValueNotifier<int>(0);
 
   static Future<Set<String>> _loadLocalSeenIds() async {
     if (_localSeenLoaded) return _localSeenIds;
@@ -54,6 +55,7 @@ class GeneralAnnouncementService {
     bool isRoot = false,
   }) async* {
     if (userId.isEmpty) {
+      unseenCountNotifier.value = 0;
       yield 0;
       return;
     }
@@ -102,22 +104,57 @@ class GeneralAnnouncementService {
           unseen++;
         }
       }
+      unseenCountNotifier.value = unseen;
       return unseen;
     });
   }
 
   /// Mark a specific general announcement doc as seen locally by [userId].
-  /// Saves to local SharedPreferences with zero Firestore writes.
+  /// Saves to local SharedPreferences and updates the badge count instantly.
   static Future<void> markAsSeen(String docId, String userId) async {
     if (docId.isEmpty) return;
+    if (_localSeenIds.contains(docId)) return;
     _localSeenIds.add(docId);
+    if (unseenCountNotifier.value > 0) {
+      unseenCountNotifier.value = (unseenCountNotifier.value - 1).clamp(0, 999);
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList(
           'seen_general_announcements', _localSeenIds.toList());
+      if (userId.isNotEmpty) {
+        _db.collection(_collection).doc(docId).update({
+          'seenBy': FieldValue.arrayUnion([userId]),
+        }).catchError((_) {});
+      }
     } catch (e) {
       debugPrint('[GeneralAnnouncementService] Error saving local seen: $e');
     }
+  }
+
+  /// Mark all docIds as seen immediately — drops the unseen badge to 0 instantly!
+  static Future<void> markAllAsSeen(List<String> docIds, String userId) async {
+    if (docIds.isEmpty) return;
+    _localSeenIds.addAll(docIds);
+    unseenCountNotifier.value = 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+          'seen_general_announcements', _localSeenIds.toList());
+      if (userId.isNotEmpty) {
+        for (final id in docIds) {
+          _db.collection(_collection).doc(id).update({
+            'seenBy': FieldValue.arrayUnion([userId]),
+          }).catchError((_) {});
+        }
+      }
+    } catch (e) {
+      debugPrint('[GeneralAnnouncementService] Error saving all seen: $e');
+    }
+  }
+
+  static void clearUnseenBadge() {
+    unseenCountNotifier.value = 0;
   }
 
   /// Post a new General Announcement (Root Admin only) and dispatch FCM push.
@@ -234,69 +271,73 @@ class GeneralNotificationBell extends StatelessWidget {
         isRoot: isRoot,
       ),
       builder: (context, snapshot) {
-        final unseenCount = snapshot.data ?? 0;
-
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            IconButton(
-              icon: Icon(
-                unseenCount > 0
-                    ? Icons.notifications_active_rounded
-                    : Icons.notifications_outlined,
-                color: unseenCount > 0
-                    ? Colors.amberAccent
-                    : AppColors.textSecondary,
-                size: 24,
-              ),
-              tooltip: 'General Announcements',
-              onPressed: () {
-                if (user != null) {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    useSafeArea: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => GeneralAnnouncementsSheet(user: user!),
-                  );
-                }
-              },
-            ),
-
-            // Unseen badge counter
-            if (unseenCount > 0)
-              Positioned(
-                top: 6,
-                right: 6,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.redAccent,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.redAccent,
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ],
+        return ValueListenableBuilder<int>(
+          valueListenable: GeneralAnnouncementService.unseenCountNotifier,
+          builder: (context, unseenCount, _) {
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    unseenCount > 0
+                        ? Icons.notifications_active_rounded
+                        : Icons.notifications_outlined,
+                    color: unseenCount > 0
+                        ? Colors.amberAccent
+                        : AppColors.textSecondary,
+                    size: 24,
                   ),
-                  constraints: const BoxConstraints(
-                    minWidth: 18,
-                    minHeight: 18,
-                  ),
-                  child: Text(
-                    unseenCount > 99 ? '99+' : '$unseenCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                  tooltip: 'General Announcements',
+                  onPressed: () {
+                    if (user != null) {
+                      GeneralAnnouncementService.clearUnseenBadge();
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => GeneralAnnouncementsSheet(user: user!),
+                      );
+                    }
+                  },
                 ),
-              ),
-          ],
+
+                // Unseen badge counter
+                if (unseenCount > 0)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.redAccent,
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        unseenCount > 99 ? '99+' : '$unseenCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         );
       },
     );
@@ -515,14 +556,14 @@ class GeneralAnnouncementsSheet extends StatelessWidget {
                       );
                     }
 
-                    // Schedule mark-as-seen post-frame to prevent infinite build/stream loops
+                    // Schedule mark-all-as-seen post-frame for instant badge drop and sync
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                      for (final item in items) {
-                        final bool isSeen = item['isSeen'] as bool;
-                        final String id = item['id'] as String;
-                        if (!isSeen) {
-                          GeneralAnnouncementService.markAsSeen(id, user.id);
-                        }
+                      final unseenDocIds = items
+                          .where((item) => !(item['isSeen'] as bool))
+                          .map((item) => item['id'] as String)
+                          .toList();
+                      if (unseenDocIds.isNotEmpty) {
+                        GeneralAnnouncementService.markAllAsSeen(unseenDocIds, user.id);
                       }
                     });
 

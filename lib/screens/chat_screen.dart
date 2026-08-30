@@ -318,7 +318,7 @@ class _SeenBySheetState extends State<_SeenBySheet> {
             final user = AppUser(
               id: doc.id,
               email: data['email'] ?? '',
-              name: data['name'] ?? 'Student',
+              name: data['name'] ?? '',
               photoUrl: data['photoUrl'] ?? '',
               department: data['department'] ?? '',
               batch: (data['batch'] ?? '').toString(),
@@ -334,16 +334,53 @@ class _SeenBySheetState extends State<_SeenBySheet> {
       }
     }
 
-    // 3. Include any legacy viewerIds (if any)
-    for (final id in widget.viewerIds) {
-      if (id.trim().isNotEmpty && id != widget.authorId && !foundUsers.containsKey(id)) {
+    // 3. For any viewer in viewerIds or foundUsers where details are missing,
+    // batch fetch their full profile from 'users' collection so real names and avatars show properly
+    final Set<String> allViewerIds = {
+      ...widget.viewerIds.where((id) => id.trim().isNotEmpty && id != widget.authorId),
+      ...foundUsers.keys,
+    };
+
+    final List<String> needsFetchIds = allViewerIds.where((id) {
+      final u = foundUsers[id];
+      return u == null || u.name.isEmpty || u.name == 'Student' || u.photoUrl.isEmpty;
+    }).toList();
+
+    if (needsFetchIds.isNotEmpty) {
+      for (int i = 0; i < needsFetchIds.length; i += 10) {
+        final chunk = needsFetchIds.sublist(i, (i + 10).clamp(0, needsFetchIds.length));
+        try {
+          final usersSnap = await widget.firestore
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: chunk)
+              .get();
+          for (final doc in usersSnap.docs) {
+            final data = doc.data();
+            foundUsers[doc.id] = AppUser.fromMap(data, doc.id);
+          }
+        } catch (e) {
+          debugPrint('[SeenBySheet] Error batch fetching users: $e');
+        }
+      }
+    }
+
+    // Fallback for any leftover ID
+    for (final id in allViewerIds) {
+      if (!foundUsers.containsKey(id)) {
         foundUsers[id] = AppUser(id: id, email: '', name: 'Student');
       }
     }
 
+    final userList = foundUsers.values.toList()
+      ..sort((a, b) {
+        if (a.isCR && !b.isCR) return -1;
+        if (!a.isCR && b.isCR) return 1;
+        return a.name.compareTo(b.name);
+      });
+
     if (mounted) {
       setState(() {
-        _cachedUsers = foundUsers.values.toList();
+        _cachedUsers = userList;
         _isLoading = false;
       });
     }

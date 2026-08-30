@@ -108,6 +108,49 @@ class WWReceiver {
       payloadMap['title'] ??= title;
       payloadMap['body'] ??= body;
 
+      // ── Resolve Category Group for In-App Banner ─────────────────────────
+      final categoryTag = (message.data['categoryTag'] ?? '').toString().toLowerCase();
+      final type = (message.data['type'] ?? '').toString().toLowerCase();
+      final route = (message.data['route'] ?? '').toString().toLowerCase();
+      final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
+
+      final bool isPrivate = target.contains('private') || type.contains('private') || route.contains('private');
+      final bool isChat = isPrivate ||
+          target.contains('chat') ||
+          type.contains('chat') ||
+          categoryTag.contains('chat') ||
+          route.contains('chat') ||
+          prefField == 'notifChat';
+
+      final bool isRoutine = target.contains('schedule') ||
+          target.contains('routine') ||
+          target.contains('reminder') ||
+          type.contains('schedule') ||
+          type.contains('routine') ||
+          categoryTag.contains('routine') ||
+          route.contains('schedule');
+
+      final bool isMaterial = target.contains('material') ||
+          type.contains('material') ||
+          categoryTag.contains('material') ||
+          route.contains('material');
+
+      final IconData notifIcon = isPrivate
+          ? Icons.person_rounded
+          : (isChat
+              ? Icons.chat_bubble_rounded
+              : (isRoutine
+                  ? Icons.calendar_today_rounded
+                  : (isMaterial ? Icons.folder_rounded : Icons.campaign_rounded)));
+
+      final Color notifAccentColor = isPrivate
+          ? Colors.deepPurpleAccent
+          : (isChat
+              ? AppColors.primary
+              : (isRoutine
+                  ? Colors.blueAccent
+                  : (isMaterial ? AppColors.primary : Colors.amberAccent)));
+
       // ── Sound (Web Audio API ding-dong) ──────────────────────────────────
       playNotificationSound();
 
@@ -115,7 +158,9 @@ class WWReceiver {
       InAppNotification.showGlobal(
         title: title,
         message: body,
-        icon: Icons.notifications_active_rounded,
+        icon: notifIcon,
+        accentColor: notifAccentColor,
+        photoUrl: (message.data['authorPhoto'] ?? message.data['photoUrl'] ?? message.data['senderPhoto']) as String?,
         onTap: () {
           NotificationRouter.handlePayload(payloadMap);
         },
