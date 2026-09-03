@@ -269,28 +269,25 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
             return dept != 'DEMO' && b != '01' && !email.contains('demo.reviewer');
           }).toList();
 
-          // ── Calculate Login & Activity Telemetry ─────────────────────────
+          // ── Calculate Login & Activity Telemetry (Unique Active Users) ───
           final now = DateTime.now();
-          int todayLogins = 0;
-          int weekLogins = 0;
-          int monthLogins = 0;
-          int lifetimeLogins = 0;
-          final int totalLifetime = allDocs.length;
+          int todayActive = 0;
+          int weekActive = 0;
+          int monthActive = 0;
+          final int lifetimeUsers = allDocs.length;
 
           for (final doc in allDocs) {
             final data = doc.data() as Map<String, dynamic>? ?? {};
-            final int count = ((data['loginCount'] as num?)?.toInt() ?? 1).clamp(1, 10000);
-            lifetimeLogins += count;
 
             DateTime? activeDate;
-            if (data['lastLogin'] is Timestamp) {
-              activeDate = (data['lastLogin'] as Timestamp).toDate();
-            } else if (data['lastLogin'] is String) {
-              activeDate = DateTime.tryParse(data['lastLogin']);
-            } else if (data['lastActive'] is Timestamp) {
+            if (data['lastActive'] is Timestamp) {
               activeDate = (data['lastActive'] as Timestamp).toDate();
             } else if (data['lastActive'] is String) {
               activeDate = DateTime.tryParse(data['lastActive']);
+            } else if (data['lastLogin'] is Timestamp) {
+              activeDate = (data['lastLogin'] as Timestamp).toDate();
+            } else if (data['lastLogin'] is String) {
+              activeDate = DateTime.tryParse(data['lastLogin']);
             } else if (data['createdAt'] is Timestamp) {
               activeDate = (data['createdAt'] as Timestamp).toDate();
             } else if (data['createdAt'] is String) {
@@ -303,29 +300,27 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   activeDate.month == now.month &&
                   activeDate.day == now.day;
 
-              if (isToday || diff.inHours <= 24) {
-                todayLogins += count;
+              if (isToday || diff.inHours <= 24 || data['isOnline'] == true) {
+                todayActive++;
               }
-              if (diff.inDays <= 7) {
-                weekLogins += count;
+              if (diff.inDays <= 7 || data['isOnline'] == true) {
+                weekActive++;
               }
-              if (diff.inDays <= 30) {
-                monthLogins += count;
+              if (diff.inDays <= 30 || data['isOnline'] == true) {
+                monthActive++;
               }
             } else {
               if (data['isOnline'] == true) {
-                todayLogins += count;
-                weekLogins += count;
-                monthLogins += count;
+                todayActive++;
+                weekActive++;
+                monthActive++;
               }
             }
           }
 
-          // Ensure minimum realistic baseline if dataset is fresh
-          if (todayLogins == 0 && totalLifetime > 0) todayLogins = 1;
-          if (weekLogins < todayLogins) weekLogins = todayLogins;
-          if (monthLogins < weekLogins) monthLogins = weekLogins;
-          if (lifetimeLogins < monthLogins) lifetimeLogins = monthLogins;
+          // Consistent window hierarchies: Today <= 7 Days <= 30 Days <= Lifetime
+          if (weekActive < todayActive) weekActive = todayActive;
+          if (monthActive < weekActive) monthActive = weekActive;
 
           // ── Filtered Users List ──────────────────────────────────────────
           final filteredUsers = allDocs.where((doc) {
@@ -417,10 +412,10 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
                   child: _buildLoginTelemetryCard(
-                    today: todayLogins,
-                    week: weekLogins,
-                    month: monthLogins,
-                    lifetime: lifetimeLogins,
+                    today: todayActive,
+                    week: weekActive,
+                    month: monthActive,
+                    lifetime: lifetimeUsers,
                   ),
                 ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1, end: 0),
 
@@ -725,7 +720,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         Expanded(
                           child: _buildMetricPill(
                             title: 'Today',
-                            subtitle: 'Last 24 Hours',
+                            subtitle: '24h Active',
                             value: '$today',
                             color: const Color(0xFF10B981),
                             icon: Icons.flash_on_rounded,
@@ -735,7 +730,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         Expanded(
                           child: _buildMetricPill(
                             title: '7 Days',
-                            subtitle: 'Weekly Traffic',
+                            subtitle: 'Weekly Active',
                             value: '$week',
                             color: const Color(0xFF38BDF8),
                             icon: Icons.date_range_rounded,
@@ -749,7 +744,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         Expanded(
                           child: _buildMetricPill(
                             title: '30 Days',
-                            subtitle: 'Monthly Traffic',
+                            subtitle: 'Monthly Active',
                             value: '$month',
                             color: const Color(0xFFA855F7),
                             icon: Icons.calendar_month_rounded,
@@ -759,7 +754,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         Expanded(
                           child: _buildMetricPill(
                             title: 'Lifetime',
-                            subtitle: 'Total Logins',
+                            subtitle: 'Total Users',
                             value: '$lifetime',
                             color: const Color(0xFFF59E0B),
                             icon: Icons.people_alt_rounded,
@@ -776,7 +771,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   Expanded(
                     child: _buildMetricPill(
                       title: 'Today',
-                      subtitle: '24h Touches',
+                      subtitle: '24h Active',
                       value: '$today',
                       color: const Color(0xFF10B981),
                       icon: Icons.flash_on_rounded,
@@ -786,7 +781,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   Expanded(
                     child: _buildMetricPill(
                       title: '7 Days',
-                      subtitle: 'Weekly Logins',
+                      subtitle: 'Weekly Active',
                       value: '$week',
                       color: const Color(0xFF38BDF8),
                       icon: Icons.date_range_rounded,
@@ -796,7 +791,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   Expanded(
                     child: _buildMetricPill(
                       title: '30 Days',
-                      subtitle: 'Monthly Logins',
+                      subtitle: 'Monthly Active',
                       value: '$month',
                       color: const Color(0xFFA855F7),
                       icon: Icons.calendar_month_rounded,
@@ -806,7 +801,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   Expanded(
                     child: _buildMetricPill(
                       title: 'Lifetime',
-                      subtitle: 'Total Logins',
+                      subtitle: 'Total Users',
                       value: '$lifetime',
                       color: const Color(0xFFF59E0B),
                       icon: Icons.people_alt_rounded,
