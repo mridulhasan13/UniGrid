@@ -30,6 +30,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
   String _searchQuery = '';
   String _selectedDeptFilter = 'All';
   String _selectedBatchFilter = 'All';
+  String _selectedActivityFilter = 'All'; // 'All', 'Today', '7d', '30d'
   bool? _localMaintenanceMode;
   Map<String, double>? _liveSupabaseMetrics;
   bool _isFetchingLiveStorage = false;
@@ -288,10 +289,6 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
               activeDate = (data['lastLogin'] as Timestamp).toDate();
             } else if (data['lastLogin'] is String) {
               activeDate = DateTime.tryParse(data['lastLogin']);
-            } else if (data['createdAt'] is Timestamp) {
-              activeDate = (data['createdAt'] as Timestamp).toDate();
-            } else if (data['createdAt'] is String) {
-              activeDate = DateTime.tryParse(data['createdAt']);
             }
 
             if (activeDate != null) {
@@ -300,19 +297,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   activeDate.month == now.month &&
                   activeDate.day == now.day;
 
-              if (isToday || diff.inHours <= 24 || data['isOnline'] == true) {
+              if (isToday || (diff.inSeconds >= 0 && diff.inHours <= 24)) {
                 todayActive++;
               }
-              if (diff.inDays <= 7 || data['isOnline'] == true) {
+              if (diff.inSeconds >= 0 && diff.inDays <= 7) {
                 weekActive++;
               }
-              if (diff.inDays <= 30 || data['isOnline'] == true) {
-                monthActive++;
-              }
-            } else {
-              if (data['isOnline'] == true) {
-                todayActive++;
-                weekActive++;
+              if (diff.inSeconds >= 0 && diff.inDays <= 30) {
                 monthActive++;
               }
             }
@@ -347,7 +338,38 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
             final matchesBatch = _selectedBatchFilter == 'All' ||
                 (data['batch'] ?? '') == _selectedBatchFilter;
 
-            return matchesSearch && matchesDept && matchesBatch;
+            bool matchesActivity = true;
+            if (_selectedActivityFilter != 'All') {
+              DateTime? uDate;
+              if (data['lastActive'] is Timestamp) {
+                uDate = (data['lastActive'] as Timestamp).toDate();
+              } else if (data['lastActive'] is String) {
+                uDate = DateTime.tryParse(data['lastActive']);
+              } else if (data['lastLogin'] is Timestamp) {
+                uDate = (data['lastLogin'] as Timestamp).toDate();
+              } else if (data['lastLogin'] is String) {
+                uDate = DateTime.tryParse(data['lastLogin']);
+              }
+
+              if (uDate == null) {
+                matchesActivity = false;
+              } else {
+                final diff = now.difference(uDate);
+                final isToday = uDate.year == now.year &&
+                    uDate.month == now.month &&
+                    uDate.day == now.day;
+
+                if (_selectedActivityFilter == 'Today') {
+                  matchesActivity = isToday || (diff.inSeconds >= 0 && diff.inHours <= 24);
+                } else if (_selectedActivityFilter == '7d') {
+                  matchesActivity = diff.inSeconds >= 0 && diff.inDays <= 7;
+                } else if (_selectedActivityFilter == '30d') {
+                  matchesActivity = diff.inSeconds >= 0 && diff.inDays <= 30;
+                }
+              }
+            }
+
+            return matchesSearch && matchesDept && matchesBatch && matchesActivity;
           }).toList()
             ..sort((a, b) {
               final aName =
@@ -422,7 +444,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                 // ── 2. TOTAL STORAGE SPACE MONITOR CARD ───────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-                  child: _buildStorageMonitorCard(totalUsers: totalLifetime),
+                  child: _buildStorageMonitorCard(totalUsers: lifetimeUsers),
                 ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.1, end: 0),
 
                 // ── 3. CLOUD SERVICE HEALTH & PING DASHBOARD ──────────────────
@@ -573,37 +595,85 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                 ] else ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _selectedDeptFilter == 'All' && _selectedBatchFilter == 'All'
-                              ? 'All Registered Members'
-                              : '${_selectedDeptFilter == 'All' ? 'All Depts' : _selectedDeptFilter} · ${_selectedBatchFilter == 'All' ? 'All Batches' : 'Batch $_selectedBatchFilter'}',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: AppColors.primary.withOpacity(0.3),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _selectedDeptFilter == 'All' && _selectedBatchFilter == 'All'
+                                  ? 'All Registered Members'
+                                  : '${_selectedDeptFilter == 'All' ? 'All Depts' : _selectedDeptFilter} · ${_selectedBatchFilter == 'All' ? 'All Batches' : 'Batch $_selectedBatchFilter'}',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            '${filteredUsers.length} Member${filteredUsers.length == 1 ? "" : "s"}',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppColors.primary.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Text(
+                                '${filteredUsers.length} Member${filteredUsers.length == 1 ? "" : "s"}',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
+                        if (_selectedActivityFilter != 'All') ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.greenAccent.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.greenAccent.withOpacity(0.4)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.filter_alt_rounded, size: 12, color: Colors.greenAccent),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Filtered by: ${_selectedActivityFilter == "Today" ? "Active in Last 24 Hours" : (_selectedActivityFilter == "7d" ? "Active in Last 7 Days" : "Active in Last 30 Days")}',
+                                      style: const TextStyle(
+                                        color: Colors.greenAccent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => setState(() => _selectedActivityFilter = 'All'),
+                                child: Text(
+                                  'Clear Filter',
+                                  style: TextStyle(
+                                    color: Colors.redAccent.shade100,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -724,6 +794,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             value: '$today',
                             color: const Color(0xFF10B981),
                             icon: Icons.flash_on_rounded,
+                            isSelected: _selectedActivityFilter == 'Today',
+                            onTap: () {
+                              setState(() {
+                                _selectedActivityFilter =
+                                    _selectedActivityFilter == 'Today' ? 'All' : 'Today';
+                              });
+                            },
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -734,6 +811,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             value: '$week',
                             color: const Color(0xFF38BDF8),
                             icon: Icons.date_range_rounded,
+                            isSelected: _selectedActivityFilter == '7d',
+                            onTap: () {
+                              setState(() {
+                                _selectedActivityFilter =
+                                    _selectedActivityFilter == '7d' ? 'All' : '7d';
+                              });
+                            },
                           ),
                         ),
                       ],
@@ -748,6 +832,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             value: '$month',
                             color: const Color(0xFFA855F7),
                             icon: Icons.calendar_month_rounded,
+                            isSelected: _selectedActivityFilter == '30d',
+                            onTap: () {
+                              setState(() {
+                                _selectedActivityFilter =
+                                    _selectedActivityFilter == '30d' ? 'All' : '30d';
+                              });
+                            },
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -758,6 +849,12 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             value: '$lifetime',
                             color: const Color(0xFFF59E0B),
                             icon: Icons.people_alt_rounded,
+                            isSelected: _selectedActivityFilter == 'All',
+                            onTap: () {
+                              setState(() {
+                                _selectedActivityFilter = 'All';
+                              });
+                            },
                           ),
                         ),
                       ],
@@ -775,6 +872,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       value: '$today',
                       color: const Color(0xFF10B981),
                       icon: Icons.flash_on_rounded,
+                      isSelected: _selectedActivityFilter == 'Today',
+                      onTap: () {
+                        setState(() {
+                          _selectedActivityFilter =
+                              _selectedActivityFilter == 'Today' ? 'All' : 'Today';
+                        });
+                      },
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -785,6 +889,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       value: '$week',
                       color: const Color(0xFF38BDF8),
                       icon: Icons.date_range_rounded,
+                      isSelected: _selectedActivityFilter == '7d',
+                      onTap: () {
+                        setState(() {
+                          _selectedActivityFilter =
+                              _selectedActivityFilter == '7d' ? 'All' : '7d';
+                        });
+                      },
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -795,6 +906,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       value: '$month',
                       color: const Color(0xFFA855F7),
                       icon: Icons.calendar_month_rounded,
+                      isSelected: _selectedActivityFilter == '30d',
+                      onTap: () {
+                        setState(() {
+                          _selectedActivityFilter =
+                              _selectedActivityFilter == '30d' ? 'All' : '30d';
+                        });
+                      },
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -805,6 +923,12 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       value: '$lifetime',
                       color: const Color(0xFFF59E0B),
                       icon: Icons.people_alt_rounded,
+                      isSelected: _selectedActivityFilter == 'All',
+                      onTap: () {
+                        setState(() {
+                          _selectedActivityFilter = 'All';
+                        });
+                      },
                     ),
                   ),
                 ],
@@ -822,52 +946,72 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
     required String value,
     required Color color,
     required IconData icon,
+    bool isSelected = false,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.22) : color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : color.withOpacity(0.2),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  )
+                ]
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
                 ),
+                Icon(icon, color: color.withOpacity(0.8), size: 13),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Text(
+              value,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
               ),
-              Icon(icon, color: color.withOpacity(0.8), size: 13),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
             ),
-          ),
-          const SizedBox(height: 1),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 9.5,
+            const SizedBox(height: 1),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                fontSize: 9.5,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -2997,7 +3141,49 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
             dt = DateTime.tryParse(data['createdAt'] as String);
           }
           if (dt != null) {
-            joinedFormatted = DateFormat('MMM d, yyyy • h:mm a').format(dt);
+            joinedFormatted = DateFormat('MMM d, yyyy').format(dt);
+          }
+        }
+
+        DateTime? lastActiveDt;
+        if (data['lastActive'] is Timestamp) {
+          lastActiveDt = (data['lastActive'] as Timestamp).toDate();
+        } else if (data['lastActive'] is String) {
+          lastActiveDt = DateTime.tryParse(data['lastActive']);
+        } else if (data['lastLogin'] is Timestamp) {
+          lastActiveDt = (data['lastLogin'] as Timestamp).toDate();
+        } else if (data['lastLogin'] is String) {
+          lastActiveDt = DateTime.tryParse(data['lastLogin']);
+        }
+
+        final int userLogins = ((data['loginCount'] as num?)?.toInt() ?? 1).clamp(1, 10000);
+
+        String lastActiveFormatted = 'Never / Unknown';
+        Color activeColor = Colors.grey.shade400;
+        if (lastActiveDt != null) {
+          final now = DateTime.now();
+          final diff = now.difference(lastActiveDt);
+          if (diff.isNegative || diff.inSeconds < 60) {
+            lastActiveFormatted = 'Just now';
+            activeColor = Colors.greenAccent;
+          } else if (diff.inMinutes < 60) {
+            lastActiveFormatted = '${diff.inMinutes}m ago';
+            activeColor = Colors.greenAccent;
+          } else if (diff.inHours < 24 && lastActiveDt.day == now.day) {
+            lastActiveFormatted = 'Today at ${DateFormat('h:mm a').format(lastActiveDt)}';
+            activeColor = Colors.greenAccent;
+          } else if (diff.inHours < 24) {
+            lastActiveFormatted = '${diff.inHours}h ago';
+            activeColor = Colors.greenAccent;
+          } else if (diff.inDays <= 7) {
+            lastActiveFormatted = '${diff.inDays}d ago (${DateFormat('E, h:mm a').format(lastActiveDt)})';
+            activeColor = Colors.lightBlueAccent;
+          } else if (diff.inDays <= 30) {
+            lastActiveFormatted = '${diff.inDays}d ago (${DateFormat('MMM d').format(lastActiveDt)})';
+            activeColor = Colors.purpleAccent.shade100;
+          } else {
+            lastActiveFormatted = DateFormat('MMM d, yyyy • h:mm a').format(lastActiveDt);
+            activeColor = Colors.grey.shade500;
           }
         }
 
@@ -3186,8 +3372,41 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             ],
                           ),
                         ],
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Container(
+                              width: 6.5,
+                              height: 6.5,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: activeColor,
+                                boxShadow: activeColor == Colors.greenAccent
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.greenAccent.withOpacity(0.6),
+                                          blurRadius: 4,
+                                          spreadRadius: 1,
+                                        )
+                                      ]
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                'Last Active: $lastActiveFormatted • $userLogins login${userLogins == 1 ? "" : "s"}',
+                                style: TextStyle(
+                                  color: activeColor,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                         if (joinedFormatted.isNotEmpty) ...[
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Row(
                             children: [
                               Icon(Icons.calendar_today_rounded,
