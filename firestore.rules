@@ -70,7 +70,7 @@ service cloud.firestore {
       
       // For general chat, student uploads (materials), and user read receipts
       allow create: if isApprovedUser() && belongsToScope(dept, batch) && (
-        collection == 'chat_messages' || collection == 'materials' || (collection == 'read_receipts' && request.auth.uid == docId)
+        collection == 'chat_messages' || collection == 'materials' || (collection == 'read_receipts' && (request.auth.uid == docId || isRootAdmin(request.auth)))
       );
       allow update: if isApprovedUser() && belongsToScope(dept, batch) && (
         (collection == 'chat_messages' && (
@@ -82,7 +82,7 @@ service cloud.firestore {
           request.auth.uid == resource.data.uploadedByUserId ||
           isCR(request.auth.uid)
         )) ||
-        (collection == 'read_receipts' && request.auth.uid == docId)
+        (collection == 'read_receipts' && (request.auth.uid == docId || isRootAdmin(request.auth)))
       );
       allow delete: if isApprovedUser() && belongsToScope(dept, batch) && (
         (collection == 'chat_messages' && (
@@ -93,7 +93,7 @@ service cloud.firestore {
           request.auth.uid == resource.data.uploadedByUserId ||
           isCR(request.auth.uid)
         )) ||
-        (collection == 'read_receipts' && request.auth.uid == docId)
+        (collection == 'read_receipts' && (request.auth.uid == docId || isRootAdmin(request.auth)))
       );
       
       // For CR-only collections: announcements, schedule, default_schedule, overrides, metadata, config, courses
@@ -151,6 +151,12 @@ service cloud.firestore {
     match /app_config/{doc} {
       allow read: if true;
       allow write: if isAuthenticated();
+    }
+    
+    // Top-level fallback read receipts
+    match /read_receipts/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == docId || isRootAdmin(request.auth));
     }
     
     // General / Global announcements (University-wide notices)
