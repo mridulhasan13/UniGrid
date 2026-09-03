@@ -293,30 +293,62 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
             // Perform one-time matching in edit mode to set the dropdown selection
             if (_selectedCourseId == null && courses.isNotEmpty) {
               if (widget.classToEdit != null) {
-                final match = courses.firstWhere(
-                  (c) =>
-                      '${c.courseCode}: ${c.courseName}'.toLowerCase() ==
-                          widget.classToEdit!.subject.toLowerCase() ||
-                      c.courseCode.toLowerCase() ==
-                          widget.classToEdit!.subject
-                              .split(':')
-                              .first
-                              .trim()
-                              .toLowerCase(),
-                  orElse: () => CourseDetail(
-                      id: '',
-                      courseCode: '',
-                      courseName: '',
-                      teacherName: '',
-                      teacherShort: '',
-                      levelTerm: '',
-                      totalCredit: ''),
-                );
-                if (match.id.isNotEmpty) {
-                  _selectedCourseId = match.id;
-                } else {
-                  _selectedCourseId = 'custom';
+                final editSubject = widget.classToEdit!.subject.trim().toLowerCase();
+                final editTeacher = widget.classToEdit!.teacher.trim().toLowerCase();
+                final editCode = editSubject.split(':').first.trim().toLowerCase();
+
+                CourseDetail? bestCourse;
+
+                // Priority 1: Exact courseCode + courseName match
+                for (var c in courses) {
+                  if ('${c.courseCode}: ${c.courseName}'.toLowerCase() == editSubject) {
+                    bestCourse = c;
+                    break;
+                  }
                 }
+
+                // Priority 2: courseCode match + teacher initials match
+                if (bestCourse == null && editTeacher.isNotEmpty) {
+                  for (var c in courses) {
+                    if (c.courseCode.toLowerCase() == editCode &&
+                        c.teacherShort.toLowerCase() == editTeacher) {
+                      bestCourse = c;
+                      break;
+                    }
+                  }
+                }
+
+                // Priority 3: courseCode match + Part A/B match in subject
+                if (bestCourse == null) {
+                  for (var c in courses) {
+                    if (c.courseCode.toLowerCase() == editCode) {
+                      final cNameLower = c.courseName.toLowerCase();
+                      if ((editSubject.contains('- a') || editSubject.contains('(a)')) &&
+                          (cNameLower.contains('- a') || cNameLower.contains('(a)'))) {
+                        bestCourse = c;
+                        break;
+                      } else if ((editSubject.contains('- b') || editSubject.contains('(b)')) &&
+                          (cNameLower.contains('- b') || cNameLower.contains('(b)'))) {
+                        bestCourse = c;
+                        break;
+                      }
+                    }
+                  }
+                }
+
+                // Priority 4: Fallback to first courseCode match
+                if (bestCourse == null) {
+                  for (var c in courses) {
+                    if (c.courseCode.toLowerCase() == editCode) {
+                      bestCourse = c;
+                      break;
+                    }
+                  }
+                }
+
+                _selectedCourseId = bestCourse != null && bestCourse.id.isNotEmpty
+                    ? bestCourse.id
+                    : 'custom';
               } else {
                 _selectedCourseId = 'custom';
               }

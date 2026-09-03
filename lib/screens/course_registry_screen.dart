@@ -44,7 +44,28 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
     required String activeLevelTerm,
   }) async {
     final codeCtrl = TextEditingController(text: courseToEdit?.courseCode);
-    final nameCtrl = TextEditingController(text: courseToEdit?.courseName);
+
+    String initialPart = 'None';
+    String rawName = courseToEdit?.courseName.trim() ?? '';
+    if (rawName.isNotEmpty) {
+      final partMatch = RegExp(r'[\s\-_(]+([AB])[\s\-_)]*$', caseSensitive: false).firstMatch(rawName);
+      if (partMatch != null) {
+        initialPart = partMatch.group(1)!.toUpperCase();
+        rawName = rawName.substring(0, partMatch.start).trim();
+      }
+    }
+    final nameCtrl = TextEditingController(text: rawName);
+    String selectedPart = initialPart;
+
+    String getEffectiveCourseName() {
+      final base = nameCtrl.text.trim();
+      if (base.isEmpty) return '';
+      if (selectedPart == 'A' || selectedPart == 'B') {
+        return '$base - $selectedPart';
+      }
+      return base;
+    }
+
     final teacherNameCtrl =
         TextEditingController(text: courseToEdit?.teacherName);
     final teacherShortCtrl =
@@ -124,20 +145,67 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                           val == null || val.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: nameCtrl,
-                      style: TextStyle(color: AppColors.textPrimary),
-                      decoration: InputDecoration(
-                        labelText: 'Course Name (e.g. Introduction to IPE)',
-                        labelStyle: TextStyle(color: AppColors.textSecondary),
-                        enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.glassCardBorder)),
-                        focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.primary)),
-                      ),
-                      validator: (val) =>
-                          val == null || val.trim().isEmpty ? 'Required' : null,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextFormField(
+                            controller: nameCtrl,
+                            onChanged: (_) => setDialogState(() {}),
+                            style: TextStyle(color: AppColors.textPrimary),
+                            decoration: InputDecoration(
+                              labelText: 'Course Name (e.g. TTQC)',
+                              labelStyle: TextStyle(color: AppColors.textSecondary),
+                              enabledBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: AppColors.glassCardBorder)),
+                              focusedBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: AppColors.primary)),
+                            ),
+                            validator: (val) =>
+                                val == null || val.trim().isEmpty ? 'Required' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: DropdownButtonFormField<String>(
+                            value: selectedPart,
+                            dropdownColor: AppColors.backgroundTop,
+                            style: TextStyle(color: AppColors.textPrimary),
+                            decoration: InputDecoration(
+                              labelText: 'Part / Section',
+                              labelStyle: TextStyle(color: AppColors.textSecondary),
+                              enabledBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: AppColors.glassCardBorder)),
+                              focusedBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: AppColors.primary)),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'None', child: Text('None (Lab/Single)')),
+                              DropdownMenuItem(value: 'A', child: Text('A (- A)')),
+                              DropdownMenuItem(value: 'B', child: Text('B (- B)')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDialogState(() => selectedPart = val);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
+                    if (selectedPart != 'None' && nameCtrl.text.trim().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Course will be saved as: ${getEffectiveCourseName()}',
+                        style: TextStyle(
+                          color: AppColors.secondary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: teacherNameCtrl,
@@ -339,9 +407,10 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                         ElevatedButton(
                           onPressed: () async {
                             if (!formKey.currentState!.validate()) return;
+                            final finalCourseName = getEffectiveCourseName();
                             final newCourseData = {
                               'courseCode': codeCtrl.text.trim(),
-                              'courseName': nameCtrl.text.trim(),
+                              'courseName': finalCourseName,
                               'teacherName': teacherNameCtrl.text.trim(),
                               'teacherShort': teacherShortCtrl.text.trim(),
                               'totalCredit': creditCtrl.text.trim(),
@@ -382,7 +451,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                               final oldTName = courseToEdit.teacherName.trim();
 
                               final newCode = codeCtrl.text.trim();
-                              final newName = nameCtrl.text.trim();
+                              final newName = finalCourseName.trim();
                               final newTShort = teacherShortCtrl.text.trim();
                               final newTName = teacherNameCtrl.text.trim();
 
@@ -393,74 +462,83 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                               final batch = FirebaseFirestore.instance.batch();
                               bool hasUpdates = false;
 
+                              // Check if this course itself is a lab course
+                              final isThisCourseLab = oldName.toLowerCase().contains('lab') ||
+                                  oldName.toLowerCase().contains('practical') ||
+                                  newName.toLowerCase().contains('lab') ||
+                                  newName.toLowerCase().contains('practical') ||
+                                  oldCode.toLowerCase().contains('lab') ||
+                                  newCode.toLowerCase().contains('lab');
+
                               for (var doc in schedSnap.docs) {
                                 final data = doc.data();
                                 final schedSubject =
-                                    (data['subject'] ?? '').toString();
+                                    (data['subject'] ?? '').toString().trim();
                                 final schedTeacher =
-                                    (data['teacher'] ?? '').toString();
-                                final schedSubname =
-                                    (data['subname'] ?? '').toString();
+                                    (data['teacher'] ?? '').toString().trim();
+                                final schedGroup =
+                                    (data['group'] ?? '').toString().trim();
+
+                                // Protection for labs: "for the lab anything should not be changed"
+                                final isSchedLab = schedSubject.toLowerCase().contains('lab') ||
+                                    schedSubject.toLowerCase().contains('practical') ||
+                                    schedGroup.isNotEmpty;
+
+                                // Never alter a lab slot if editing a theory course, and vice versa
+                                if (isThisCourseLab != isSchedLab) {
+                                  continue;
+                                }
 
                                 bool isMatch = false;
+                                final subjLower = schedSubject.toLowerCase();
+                                final oldCodeLower = oldCode.toLowerCase();
+                                final oldTShortLower = oldTShort.toLowerCase();
+                                final oldTNameLower = oldTName.toLowerCase();
+                                final schedTeacherLower = schedTeacher.toLowerCase();
 
-                                // Check if schedule matches old course code, old course name, or old teacher
-                                if (oldCode.isNotEmpty &&
-                                    (schedSubject.toLowerCase().contains(
-                                            oldCode.toLowerCase()) ||
-                                        schedSubname.toLowerCase().contains(
-                                            oldCode.toLowerCase()))) {
-                                  isMatch = true;
-                                } else if (oldName.isNotEmpty &&
-                                    (schedSubject.toLowerCase().contains(
-                                            oldName.toLowerCase()) ||
-                                        schedSubname.toLowerCase().contains(
-                                            oldName.toLowerCase()))) {
-                                  isMatch = true;
-                                } else if (oldTShort.isNotEmpty &&
-                                    schedTeacher.toLowerCase().contains(
-                                        oldTShort.toLowerCase())) {
-                                  isMatch = true;
-                                } else if (oldTName.isNotEmpty &&
-                                    schedTeacher.toLowerCase().contains(
-                                        oldTName.toLowerCase())) {
+                                if (oldCodeLower.isNotEmpty && subjLower.contains(oldCodeLower)) {
+                                  if (isThisCourseLab) {
+                                    isMatch = true;
+                                  } else {
+                                    // For theory courses: match by teacher or matching part/name
+                                    if (oldTShortLower.isNotEmpty && schedTeacherLower.isNotEmpty) {
+                                      if (schedTeacherLower == oldTShortLower ||
+                                          (oldTNameLower.isNotEmpty && schedTeacherLower == oldTNameLower)) {
+                                        isMatch = true;
+                                      }
+                                    }
+                                    if (!isMatch && oldName.isNotEmpty && subjLower.contains(oldName.toLowerCase())) {
+                                      isMatch = true;
+                                    }
+                                    if (!isMatch) {
+                                      if (selectedPart == 'A' &&
+                                          (subjLower.contains('(a)') || subjLower.contains('- a') || subjLower.endsWith(' a'))) {
+                                        isMatch = true;
+                                      } else if (selectedPart == 'B' &&
+                                          (subjLower.contains('(b)') || subjLower.contains('- b') || subjLower.endsWith(' b'))) {
+                                        isMatch = true;
+                                      } else if (selectedPart == 'None' &&
+                                          !subjLower.contains('(a)') &&
+                                          !subjLower.contains('(b)') &&
+                                          !subjLower.contains('- a') &&
+                                          !subjLower.contains('- b')) {
+                                        isMatch = true;
+                                      }
+                                    }
+                                  }
+                                } else if (oldName.isNotEmpty && subjLower.contains(oldName.toLowerCase())) {
                                   isMatch = true;
                                 }
 
                                 if (isMatch) {
                                   final updates = <String, dynamic>{
+                                    'subject': '$newCode: $newName',
                                     'teacher': newTShort.isNotEmpty
                                         ? newTShort
                                         : newTName,
                                     'lastUpdatedDate':
                                         FieldValue.serverTimestamp(),
                                   };
-
-                                  if (oldCode.isNotEmpty &&
-                                      newCode.isNotEmpty &&
-                                      oldCode != newCode) {
-                                    String updatedSubject =
-                                        schedSubject.replaceAll(
-                                      RegExp(RegExp.escape(oldCode),
-                                          caseSensitive: false),
-                                      newCode,
-                                    );
-                                    updates['subject'] = updatedSubject;
-                                  }
-                                  if (oldName.isNotEmpty &&
-                                      newName.isNotEmpty &&
-                                      oldName != newName) {
-                                    String currentSub =
-                                        (updates['subject'] as String?) ??
-                                            schedSubject;
-                                    String updatedSubject =
-                                        currentSub.replaceAll(
-                                      RegExp(RegExp.escape(oldName),
-                                          caseSensitive: false),
-                                      newName,
-                                    );
-                                    updates['subject'] = updatedSubject;
-                                  }
 
                                   batch.update(doc.reference, updates);
                                   hasUpdates = true;
@@ -902,32 +980,63 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                   return false; // One is lab, one is theory
                                 }
 
-                                // 2. Strict Section check (A vs B vs C)
+                                // 2. Strict Section / Part check (A vs B vs C)
                                 String? courseSection;
-                                final courseSecMatch =
-                                    RegExp(r'-\s*([a-c])\b|\bsec(tion)?\s*([a-c])\b')
-                                        .firstMatch(cName);
+                                final courseSecMatch = RegExp(
+                                        r'-\s*([a-c])\b|\(([a-c])\)|\bsec(tion)?\s*([a-c])\b|[\s\-_(]+([a-c])[\s\-_)]*$',
+                                        caseSensitive: false)
+                                    .firstMatch(cName);
                                 if (courseSecMatch != null) {
                                   courseSection = (courseSecMatch.group(1) ??
-                                          courseSecMatch.group(3))
+                                          courseSecMatch.group(2) ??
+                                          courseSecMatch.group(4) ??
+                                          courseSecMatch.group(5))
                                       ?.toLowerCase();
                                 }
 
-                                if (courseSection != null) {
-                                  final schedSecMatch =
-                                      RegExp(r'-\s*([a-c])\b|\bsec(tion)?\s*([a-c])\b')
-                                          .firstMatch(sSub);
-                                  if (schedSecMatch != null) {
-                                    final schedSection = (schedSecMatch.group(1) ??
-                                            schedSecMatch.group(3))
-                                        ?.toLowerCase();
-                                    if (schedSection != courseSection) {
-                                      return false; // Different section!
+                                String? schedSection;
+                                final schedSecMatch = RegExp(
+                                        r'-\s*([a-c])\b|\(([a-c])\)|\bsec(tion)?\s*([a-c])\b|[\s\-_(]+([a-c])[\s\-_)]*$',
+                                        caseSensitive: false)
+                                    .firstMatch(sSub);
+                                if (schedSecMatch != null) {
+                                  schedSection = (schedSecMatch.group(1) ??
+                                          schedSecMatch.group(2) ??
+                                          schedSecMatch.group(4) ??
+                                          schedSecMatch.group(5))
+                                      ?.toLowerCase();
+                                }
+
+                                if (courseSection != null && schedSection != null) {
+                                  if (courseSection != schedSection) {
+                                    return false; // Explicitly different sections (e.g. A vs B)
+                                  }
+                                }
+
+                                // 3. Teacher mismatch check if both have teachers defined
+                                if (tShort.isNotEmpty && sTeacher.isNotEmpty) {
+                                  final sTeacherTokens = sTeacher
+                                      .split(RegExp(r'[\s/,-]+'))
+                                      .where((t) => t.isNotEmpty)
+                                      .toList();
+                                  final tShortTokens = tShort
+                                      .split(RegExp(r'[\s/,-]+'))
+                                      .where((t) => t.isNotEmpty)
+                                      .toList();
+
+                                  bool hasTeacherOverlap = tShortTokens.any((tok) => sTeacher.contains(tok)) ||
+                                      (tName.isNotEmpty && (sTeacher.contains(tName) || tName.contains(sTeacher)));
+
+                                  // If sections didn't distinguish them and teacher explicitly differs, don't mix them
+                                  if (!hasTeacherOverlap && sTeacherTokens.isNotEmpty) {
+                                    if (courseSection == null || schedSection == null) {
+                                      // Only reject if schedule teacher doesn't match this course's teacher
+                                      return false;
                                     }
                                   }
                                 }
 
-                                // 3. Strict Course Code matching
+                                // 4. Strict Course Code matching
                                 if (cCode.isNotEmpty && sSub.isNotEmpty) {
                                   final RegExp courseCodeRegex =
                                       RegExp(r'[a-z]{2,4}\s*\d{3}(-\d{4})?');
@@ -957,7 +1066,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                   }
                                 }
 
-                                // 4. Course Code or Name match
+                                // 5. Course Code or Name match
                                 bool hasCodeMatch = cCode.isNotEmpty &&
                                     (sSub.contains(cCode) ||
                                         sSubname.contains(cCode));
@@ -970,14 +1079,13 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                   return true;
                                 }
 
-                                // 5. Teacher match (ONLY as fallback if schedule subject is generic or empty)
-                                // If schedule subject explicitly names another course/subject, DO NOT match by teacher fallback alone
+                                // 6. Teacher match fallback
                                 if (sSub.isNotEmpty) {
                                   final subjectLetters =
                                       sSub.replaceAll(RegExp(r'[^a-z]'), '');
                                   if (subjectLetters.isNotEmpty &&
                                       subjectLetters.length >= 3) {
-                                    return false; // sSub specifies a different course subject
+                                    return false; // Specifies a different course
                                   }
                                 }
 

@@ -1,4 +1,5 @@
 // ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:convert';
 import 'dart:js' as js;
 
 /// Web implementation — synthesises a short notification "ding" using the
@@ -45,4 +46,31 @@ void playNotificationSound() {
   } catch (_) {
     // dart:js interop unavailable — ignore
   }
+}
+
+/// Web desktop notification popup using the HTML5 Notification API.
+void showBrowserNotification(String title, String body) {
+  try {
+    js.context.callMethod('eval', [r'''
+      (function(t, b) {
+        try {
+          if (!("Notification" in window)) return;
+          if (Notification.permission === "granted") {
+            new Notification(t, {
+              body: b,
+              icon: "favicon.png"
+            });
+          } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(function(p) {
+              if (p === "granted") {
+                new Notification(t, {
+                  body: b,
+                  icon: "favicon.png"
+                });
+              }
+            });
+          }
+        } catch(e) {}
+      })(''' + jsonEncode(title) + ',' + jsonEncode(body) + ');\n']);
+  } catch (_) {}
 }

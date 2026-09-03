@@ -81,7 +81,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         debugPrint('[ProfileScreen] Error checking cloud notification settings: $e');
       }
 
-      if (rVal && !kIsWeb) {
+      if (rVal) {
         RoutineReminderService.syncRoutineReminders(user);
       }
     }
@@ -114,7 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         debugPrint('Failed to sync notification pref to Firestore: $e');
       });
 
-      if (key == 'notif_routine' && !kIsWeb) {
+      if (key == 'notif_routine') {
         RoutineReminderService.syncRoutineReminders(user);
       }
     }

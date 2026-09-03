@@ -9,6 +9,8 @@ import 'in_app_notification.dart';
 import 'fcm_service.dart';
 import 'notification_router.dart';
 
+import 'shared/sound_helper.dart';
+
 /// Background service for scheduling and dispatching 10-minute class reminders.
 /// Uses in-memory caching from shared ScheduleService to avoid duplicate Firestore queries.
 class RoutineReminderService {
@@ -19,9 +21,8 @@ class RoutineReminderService {
   static List<ClassSchedule> _cachedSchedule = [];
 
   /// Synchronizes class reminder notifications with current user preferences.
-  /// No-op on web — timers and local notifications are not supported on the web platform.
+  /// Works across both Native Android/iOS devices and Web browsers while the tab/app is running.
   static Future<void> syncRoutineReminders(AppUser? user) async {
-    if (kIsWeb) return;
     if (user == null || !user.hasDeptScope) {
       stop();
       _lastSyncedUserId = null;
@@ -57,7 +58,7 @@ class RoutineReminderService {
     _reminderTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       _checkUpcomingClassesFromCache();
     });
-    debugPrint('[RoutineReminder] In-memory reminder timer active for user: ${user.email}');
+    debugPrint('[RoutineReminder] In-memory reminder timer active for user: ${user.email} (Web: $kIsWeb)');
   }
 
   static void _onScheduleUpdated() {
@@ -94,17 +95,22 @@ class RoutineReminderService {
           final bodyText =
               'Starts in $minutesLeft mins at ${cls.room}${cls.teacher.isNotEmpty ? " · ${cls.teacher}" : ""}';
 
-          // 1. Direct System Notification to Phone (Tray / Lock Screen / Sound / Vibration)
-          FCMService.showLocalSystemNotification(
-            title: titleText,
-            body: bodyText,
-            data: {
-              'target': 'schedule',
-              'type': 'routine_reminder',
-              'route': '/schedule',
-              'tabIndex': '1',
-            },
-          );
+          // 1. System/Browser notification + Sound chime
+          if (kIsWeb) {
+            playNotificationSound();
+            showBrowserNotification(titleText, bodyText);
+          } else {
+            FCMService.showLocalSystemNotification(
+              title: titleText,
+              body: bodyText,
+              data: {
+                'target': 'schedule',
+                'type': 'routine_reminder',
+                'route': '/schedule',
+                'tabIndex': '1',
+              },
+            );
+          }
 
           // 2. In-App Glassmorphic Overlay Banner (if app is open)
           try {

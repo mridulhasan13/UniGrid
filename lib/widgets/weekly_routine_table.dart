@@ -1347,29 +1347,19 @@ class WeeklyRoutineTable extends StatelessWidget {
       ClassSchedule cls, AppUser? user) async {
     if (user == null || !user.hasDeptScope) return null;
 
-    final List<String> candidateInitials = [];
-    if (cls.teacher.trim().isNotEmpty) {
-      candidateInitials.add(cls.teacher.trim().toLowerCase());
-    }
-
-    // Extract potential teacher short code from subject like "YE 211-0723: YM - A"
-    final subject = cls.subject.trim();
-    if (subject.contains(':')) {
-      final afterColon = subject.split(':')[1].trim();
-      final parts = afterColon.split(RegExp(r'[\s\-_]+'));
-      for (final p in parts) {
-        if (p.isNotEmpty && p.length <= 5) {
-          candidateInitials.add(p.toLowerCase());
-        }
-      }
-    }
+    final String teacherInitial = cls.teacher.trim().toLowerCase();
+    final String subject = cls.subject.trim();
+    final String subjectLower = subject.toLowerCase();
 
     try {
       final List<String> searchPaths = [
-        'depts/${user.department}/courses',
         deptBatchCol(user.department, user.batch, 'courses'),
+        'depts/${user.department}/courses',
         'courses',
       ];
+
+      Map<String, dynamic>? bestMatch;
+      int highestScore = 0;
 
       for (final path in searchPaths) {
         try {
@@ -1381,29 +1371,67 @@ class WeeklyRoutineTable extends StatelessWidget {
             final tName = (data['teacherName'] ?? '').toString().trim();
             final cName = (data['courseName'] ?? '').toString().trim();
 
-            final bool matchesInitial = tShort.isNotEmpty &&
-                candidateInitials.contains(tShort.toLowerCase());
+            int score = 0;
+
             final bool matchesCode = cCode.isNotEmpty &&
-                (subject.toLowerCase().contains(cCode.toLowerCase()) ||
+                (subjectLower.contains(cCode.toLowerCase()) ||
                     cCode.toLowerCase().contains(subject.split(':')[0].trim().toLowerCase()));
 
-            if (matchesInitial || matchesCode) {
-              return {
+            if (matchesCode) score += 10;
+
+            // Match teacher initials
+            if (teacherInitial.isNotEmpty && tShort.isNotEmpty &&
+                teacherInitial == tShort.toLowerCase()) {
+              score += 25;
+            } else if (teacherInitial.isNotEmpty && tName.isNotEmpty &&
+                tName.toLowerCase().contains(teacherInitial)) {
+              score += 15;
+            }
+
+            // Match course name / part (e.g. FME - A vs FME - B)
+            if (cName.isNotEmpty && subjectLower.contains(cName.toLowerCase())) {
+              score += 25;
+            } else {
+              // Check part match (A vs B)
+              if (subjectLower.contains('- a') || subjectLower.contains('(a)')) {
+                if (cName.toLowerCase().contains('- a') || cName.toLowerCase().contains('(a)')) {
+                  score += 15;
+                } else if (cName.toLowerCase().contains('- b') || cName.toLowerCase().contains('(b)')) {
+                  score -= 15;
+                }
+              } else if (subjectLower.contains('- b') || subjectLower.contains('(b)')) {
+                if (cName.toLowerCase().contains('- b') || cName.toLowerCase().contains('(b)')) {
+                  score += 15;
+                } else if (cName.toLowerCase().contains('- a') || cName.toLowerCase().contains('(a)')) {
+                  score -= 15;
+                }
+              }
+            }
+
+            if (score > highestScore) {
+              highestScore = score;
+              bestMatch = {
                 'courseCode': cCode,
                 'courseName': cName,
                 'teacherName': tName,
                 'teacherShort': tShort.isNotEmpty
                     ? tShort
-                    : (candidateInitials.isNotEmpty
-                        ? candidateInitials.first.toUpperCase()
+                    : (cls.teacher.trim().isNotEmpty
+                        ? cls.teacher.trim().toUpperCase()
                         : ''),
                 'totalCredit': data['totalCredit'],
                 'levelTerm': data['levelTerm'],
               };
             }
           }
+
+          if (bestMatch != null && highestScore >= 35) {
+            return bestMatch;
+          }
         } catch (_) {}
       }
+
+      return bestMatch;
     } catch (e) {
       debugPrint('Error looking up course/teacher: $e');
     }
@@ -1588,7 +1616,11 @@ class WeeklyRoutineTable extends StatelessWidget {
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      if (resolvedCourseName.isNotEmpty) ...[
+                                      if (resolvedCourseName.isNotEmpty &&
+                                          !cls.subject
+                                              .toLowerCase()
+                                              .contains(resolvedCourseName
+                                                  .toLowerCase())) ...[
                                         const SizedBox(height: 2),
                                         Text(
                                           resolvedCourseName,
