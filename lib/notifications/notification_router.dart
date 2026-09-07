@@ -21,11 +21,58 @@ class NotificationRouter {
   NotificationRouter._();
 
   static String? activeChatId;
+  static String? activeScreen = 'home'; // 'home', 'schedule', 'materials', 'chat', 'cr_panel', 'master', 'profile'
+  static String? activePrivateChatUserId;
   static Map<String, dynamic>? _pendingPayload;
   static Timer? _drainTimer;
   static int _drainAttempts = 0;
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
+
+  /// Returns true if the user is currently viewing the page that this notification targets.
+  static bool isViewingTarget(Map<String, dynamic> data) {
+    final target = (data['target'] ?? data['type'] ?? data['route'] ?? '').toString().toLowerCase();
+    final categoryTag = (data['categoryTag'] ?? '').toString().toLowerCase();
+    final prefField = (data['preferenceField'] ?? '').toString();
+    final senderUserId = (data['senderUserId'] ?? '').toString();
+
+    // 1. Private Chat: if user is currently inside PrivateChatScreen with this sender
+    if (target.contains('private') || target.contains('pm_')) {
+      if (activePrivateChatUserId != null && activePrivateChatUserId == senderUserId) {
+        return true;
+      }
+    }
+
+    // 2. Group Chat: if user is currently on the main Chat tab and NOT in a private chat
+    if (target.contains('chat') || target.contains('group') || categoryTag == 'unigrid_chats' || prefField == 'notifChat') {
+      if (activeScreen == 'chat' && activePrivateChatUserId == null) {
+        return true;
+      }
+    }
+
+    // 3. Schedule / Timetable / Routine Reminders: if user is on Schedule tab
+    if (target.contains('schedule') || target.contains('routine') || target.contains('reminder') || categoryTag == 'unigrid_routine') {
+      if (activeScreen == 'schedule') {
+        return true;
+      }
+    }
+
+    // 4. Study Materials: if user is on Materials tab
+    if (target.contains('material') || categoryTag == 'unigrid_materials') {
+      if (activeScreen == 'materials') {
+        return true;
+      }
+    }
+
+    // 5. Announcements / Notices: if user is on Home tab
+    if (target.contains('announcement') || target.contains('notice') || categoryTag == 'unigrid_alerts') {
+      if (activeScreen == 'home') {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   /// Wipes all notifications from the Android / iOS notification bar
   static Future<void> clearAllNotifications() async {

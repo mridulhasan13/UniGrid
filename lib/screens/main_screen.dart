@@ -40,15 +40,36 @@ class _MainScreenState extends State<MainScreen> {
   bool? _lastIsCR;
   bool? _lastIsRootAdmin;
 
-  void _clearHistoryForTab(int tabIndex) {
+  void _syncActiveScreenAndClearNotifs(int tabIndex) {
     if (tabIndex == 0) {
+      NotificationRouter.activeScreen = 'home';
+      NotificationRouter.activeChatId = null;
       WAReceiver.clearHistory('unigrid_alerts').catchError((_) {});
+      WAReceiver.clearHistory('alerts').catchError((_) {});
     } else if (tabIndex == 1) {
+      NotificationRouter.activeScreen = 'schedule';
+      NotificationRouter.activeChatId = null;
       WAReceiver.clearHistory('unigrid_routine').catchError((_) {});
+      WAReceiver.clearHistory('routine').catchError((_) {});
     } else if (tabIndex == 2) {
+      NotificationRouter.activeScreen = 'materials';
+      NotificationRouter.activeChatId = null;
       WAReceiver.clearHistory('unigrid_materials').catchError((_) {});
+      WAReceiver.clearHistory('materials').catchError((_) {});
     } else if (tabIndex == 3) {
+      NotificationRouter.activeScreen = 'chat';
+      NotificationRouter.activeChatId = 'group_chat';
       WAReceiver.clearHistory('batch_chat').catchError((_) {});
+      WAReceiver.clearHistory('chat').catchError((_) {});
+    } else if (tabIndex == 4) {
+      NotificationRouter.activeScreen = 'cr_panel';
+      NotificationRouter.activeChatId = null;
+    } else if (tabIndex == 5) {
+      NotificationRouter.activeScreen = 'master';
+      NotificationRouter.activeChatId = null;
+    } else {
+      NotificationRouter.activeScreen = 'profile';
+      NotificationRouter.activeChatId = null;
     }
   }
 
@@ -56,10 +77,7 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _currentIndex = MainScreen.tabNotifier.value;
-    if (_currentIndex == 3) {
-      NotificationRouter.activeChatId = 'group_chat';
-    }
-    _clearHistoryForTab(_currentIndex);
+    _syncActiveScreenAndClearNotifs(_currentIndex);
     MainScreen.tabNotifier.addListener(_onTabChanged);
 
     // Process any pending notification tap once MainScreen is mounted
@@ -70,9 +88,7 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
-    if (NotificationRouter.activeChatId == 'group_chat') {
-      NotificationRouter.activeChatId = null;
-    }
+    NotificationRouter.activeChatId = null;
     MainScreen.tabNotifier.removeListener(_onTabChanged);
     super.dispose();
   }
@@ -82,12 +98,7 @@ class _MainScreenState extends State<MainScreen> {
       setState(() {
         _currentIndex = MainScreen.tabNotifier.value;
       });
-      _clearHistoryForTab(_currentIndex);
-      if (_currentIndex == 3) {
-        NotificationRouter.activeChatId = 'group_chat';
-      } else if (NotificationRouter.activeChatId == 'group_chat') {
-        NotificationRouter.activeChatId = null;
-      }
+      _syncActiveScreenAndClearNotifs(_currentIndex);
     }
   }
 

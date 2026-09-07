@@ -392,7 +392,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                 ),
                 height: double.infinity,
                 child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
+                  physics: const ClampingScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                   child: Form(
                     key: _formKey,

@@ -43,6 +43,12 @@ class WWReceiver {
       final senderUid = (message.data['senderUserId'] as String?) ?? '';
       if (senderUid.isNotEmpty && senderUid == currentUid) return;
 
+      // ── Active Screen Suppression Guard ──────────────────────────────────
+      if (NotificationRouter.isViewingTarget(message.data)) {
+        debugPrint('[WWReceiver] Suppressed web notification: user is currently active on this screen.');
+        return;
+      }
+
       // ── User notification preference check (Settings toggle) ─────────────
       try {
         final prefs = await SharedPreferences.getInstance();

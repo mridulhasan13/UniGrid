@@ -388,6 +388,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
             });
 
           return SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).padding.bottom + 96,
             ),
@@ -1733,6 +1734,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
               final sysData = snap.data?.data() as Map<String, dynamic>? ?? {};
               final bool isMaintenance = _localMaintenanceMode ?? (sysData['maintenanceMode'] == true);
 
+              final bool isLight = AppColors.isLight;
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -1742,22 +1744,33 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       color: isMaintenance
-                          ? Colors.redAccent.withOpacity(0.16)
-                          : Colors.white.withOpacity(0.04),
+                          ? Colors.redAccent.withOpacity(isLight ? 0.12 : 0.18)
+                          : (isLight ? const Color(0xFFF8FAFC) : Colors.white.withOpacity(0.04)),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isMaintenance
-                            ? Colors.redAccent.withOpacity(0.6)
-                            : AppColors.glassCardBorder,
-                        width: isMaintenance ? 1.4 : 0.8,
+                            ? Colors.redAccent.withOpacity(0.7)
+                            : (isLight ? const Color(0xFFCBD5E1) : AppColors.glassCardBorder),
+                        width: isMaintenance ? 1.4 : 1.0,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          isMaintenance ? Icons.lock_rounded : Icons.lock_open_rounded,
-                          color: isMaintenance ? Colors.redAccent : Colors.greenAccent,
-                          size: 18,
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isMaintenance
+                                ? Colors.redAccent.withOpacity(0.18)
+                                : (isLight ? const Color(0xFFDCFCE7) : Colors.greenAccent.withOpacity(0.12)),
+                          ),
+                          child: Icon(
+                            isMaintenance ? Icons.lock_rounded : Icons.lock_open_rounded,
+                            color: isMaintenance
+                                ? Colors.redAccent
+                                : (isLight ? const Color(0xFF16A34A) : Colors.greenAccent),
+                            size: 18,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -1767,11 +1780,14 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                               Text(
                                 isMaintenance ? 'Maintenance Mode ACTIVE' : 'Maintenance Mode',
                                 style: TextStyle(
-                                  color: isMaintenance ? Colors.redAccent : AppColors.textPrimary,
-                                  fontSize: 12,
+                                  color: isMaintenance
+                                      ? Colors.redAccent
+                                      : AppColors.textPrimary,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              const SizedBox(height: 2),
                               Text(
                                 isMaintenance
                                     ? 'Regular students are locked out'
@@ -1787,25 +1803,40 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Mini Toggle
+                        // Prominent High-Contrast Toggle
                         Container(
-                          width: 44,
-                          height: 24,
-                          padding: const EdgeInsets.all(2.5),
+                          width: 46,
+                          height: 26,
+                          padding: const EdgeInsets.all(3),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            color: isMaintenance ? Colors.redAccent : Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            color: isMaintenance
+                                ? Colors.redAccent
+                                : (isLight ? const Color(0xFF94A3B8) : Colors.white.withOpacity(0.22)),
+                            border: Border.all(
+                              color: isMaintenance
+                                  ? Colors.redAccent
+                                  : (isLight ? const Color(0xFF64748B) : Colors.white.withOpacity(0.35)),
+                              width: 1,
+                            ),
                           ),
                           child: AnimatedAlign(
                             duration: const Duration(milliseconds: 200),
                             curve: Curves.easeInOut,
                             alignment: isMaintenance ? Alignment.centerRight : Alignment.centerLeft,
                             child: Container(
-                              width: 19,
-                              height: 19,
-                              decoration: const BoxDecoration(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: Colors.white,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.25),
+                                    blurRadius: 3,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -3473,13 +3504,19 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                 ),
                 const SizedBox(height: 6),
 
-                // ── Controls: Toggles & Dropdowns in Compact Row ──────────
-                Row(
+                // ── Controls: Toggles & Dropdowns in Adaptive Wrap ──────────
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  runAlignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
-                    // CR Switch
+                    // Switch Group (CR & Approved)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // CR Switch
                         Text('CR',
                             style: TextStyle(
                                 color: isCR
@@ -3488,7 +3525,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600)),
                         Transform.scale(
-                          scale: 0.68,
+                          scale: 0.65,
                           child: Switch(
                             value: isCR,
                             activeThumbColor: AppColors.primary,
@@ -3501,14 +3538,9 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                 _updateUserStatus(uid, 'isCR', val),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(width: 4),
+                        const SizedBox(width: 4),
 
-                    // Approved Switch
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                        // Approved Switch
                         Text('Approved',
                             style: TextStyle(
                                 color: isApproved
@@ -3517,7 +3549,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600)),
                         Transform.scale(
-                          scale: 0.68,
+                          scale: 0.65,
                           child: Switch(
                             value: isApproved,
                             activeThumbColor: AppColors.emerald,
@@ -3533,95 +3565,113 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       ],
                     ),
 
-                    const Spacer(),
-
-                    // Dept Dropdown Pill
-                    Container(
-                      height: 26,
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: isLight ? const Color(0xFFF1F5F9) : Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                            color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.12),
-                            width: 0.8),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: kDeptCodes.contains(data['department'])
-                              ? data['department']
-                              : null,
-                          hint: Text('Dept',
+                    // Dropdowns Group (Dept & Batch)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Dept Dropdown Pill (Modern Badge)
+                        Container(
+                          height: 26,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(isLight ? 0.08 : 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(isLight ? 0.25 : 0.35),
+                              width: 1.0,
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: kDeptCodes.contains(data['department'])
+                                  ? data['department']
+                                  : null,
+                              hint: Text('Dept',
+                                  style: TextStyle(
+                                      color: AppColors.primary.withOpacity(0.7),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600)),
+                              dropdownColor: isLight ? Colors.white : AppColors.backgroundTop,
+                              borderRadius: BorderRadius.circular(12),
                               style: TextStyle(
-                                  color: AppColors.textSecondary,
+                                  color: AppColors.primary,
                                   fontSize: 10.5,
-                                  fontWeight: FontWeight.w600)),
-                          dropdownColor: AppColors.backgroundTop,
-                          style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold),
-                          isDense: true,
-                          icon: Icon(Icons.arrow_drop_down,
-                              size: 14, color: AppColors.textSecondary),
-                          items: kDepartments
-                              .map((d) => DropdownMenuItem<String>(
-                                    value: d['code'],
-                                    child: Text(d['code']!),
-                                  ))
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              _updateUserStatus(uid, 'department', val);
-                            }
-                          },
+                                  fontWeight: FontWeight.bold),
+                              isDense: true,
+                              icon: Icon(Icons.keyboard_arrow_down_rounded,
+                                  size: 14, color: AppColors.primary),
+                              items: kDepartments
+                                  .map((d) => DropdownMenuItem<String>(
+                                        value: d['code'],
+                                        child: Text(d['code']!,
+                                            style: TextStyle(
+                                              color: isLight ? const Color(0xFF1E293B) : Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            )),
+                                      ))
+                                  .toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  _updateUserStatus(uid, 'department', val);
+                                }
+                              },
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
+                        const SizedBox(width: 4),
 
-                    // Batch Dropdown Pill
-                    Container(
-                      height: 26,
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: isLight ? const Color(0xFFF1F5F9) : Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                            color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.12),
-                            width: 0.8),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: kBatches.contains(data['batch'])
-                              ? data['batch']
-                              : null,
-                          hint: Text('Batch',
+                        // Batch Dropdown Pill (Modern Badge)
+                        Container(
+                          height: 26,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.cyan.withOpacity(isLight ? 0.08 : 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.cyan.withOpacity(isLight ? 0.25 : 0.35),
+                              width: 1.0,
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: kBatches.contains(data['batch'])
+                                  ? data['batch']
+                                  : null,
+                              hint: Text('Batch',
+                                  style: TextStyle(
+                                      color: AppColors.cyan.withOpacity(0.7),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600)),
+                              dropdownColor: isLight ? Colors.white : AppColors.backgroundTop,
+                              borderRadius: BorderRadius.circular(12),
                               style: TextStyle(
-                                  color: AppColors.textSecondary,
+                                  color: AppColors.cyan,
                                   fontSize: 10.5,
-                                  fontWeight: FontWeight.w600)),
-                          dropdownColor: AppColors.backgroundTop,
-                          style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold),
-                          isDense: true,
-                          icon: Icon(Icons.arrow_drop_down,
-                              size: 14, color: AppColors.textSecondary),
-                          items: kBatches
-                              .map((b) => DropdownMenuItem<String>(
-                                    value: b,
-                                    child: Text(b),
-                                  ))
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              _updateUserStatus(uid, 'batch', val);
-                            }
-                          },
+                                  fontWeight: FontWeight.bold),
+                              isDense: true,
+                              icon: Icon(Icons.keyboard_arrow_down_rounded,
+                                  size: 14, color: AppColors.cyan),
+                              items: kBatches
+                                  .map((b) => DropdownMenuItem<String>(
+                                        value: b,
+                                        child: Text('Batch $b',
+                                            style: TextStyle(
+                                              color: isLight ? const Color(0xFF1E293B) : Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            )),
+                                      ))
+                                  .toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  _updateUserStatus(uid, 'batch', val);
+                                }
+                              },
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),

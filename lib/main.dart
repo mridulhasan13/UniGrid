@@ -140,7 +140,8 @@ class MyApp extends StatelessWidget {
             ),
           ),
           scrollBehavior: const MaterialScrollBehavior().copyWith(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            physics: const ClampingScrollPhysics(),
+            overscroll: false,
           ),
           home: const NetworkAwareWrapper(
             child: AuthWrapper(),

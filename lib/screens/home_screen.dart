@@ -154,8 +154,7 @@ class HomeScreen extends StatelessWidget {
               }
 
               return ListView.builder(
-                physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics()),
+                physics: const ClampingScrollPhysics(),
                 padding: EdgeInsets.only(
                   left: 16,
                   right: 16,

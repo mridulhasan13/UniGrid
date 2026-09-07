@@ -96,6 +96,13 @@ class WAReceiver {
       final senderUid = (message.data['senderUserId'] as String?) ?? '';
       if (senderUid.isNotEmpty && senderUid == currentUid) return;
 
+      // ── Active Screen Suppression Guard ──────────────────────────────────
+      // If user is already on the exact screen/conversation, do not show popups
+      if (NotificationRouter.isViewingTarget(message.data)) {
+        debugPrint('[WAReceiver] Suppressed foreground notification: user is currently active on this screen.');
+        return;
+      }
+
       final prefField = (message.data['preferenceField'] as String?) ?? '';
       final target = (message.data['target'] ?? message.data['type'] ?? '').toString().toLowerCase();
 

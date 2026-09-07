@@ -48,6 +48,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   void initState() {
     super.initState();
     NotificationRouter.activeChatId = widget.recipient.id;
+    NotificationRouter.activePrivateChatUserId = widget.recipient.id;
     WAReceiver.clearHistory(widget.recipient.id).catchError((_) {});
     NotificationRouter.clearAllNotifications();
     final user = Provider.of<AppUser?>(context, listen: false);
@@ -62,6 +63,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
 
   @override
   void dispose() {
+    if (NotificationRouter.activePrivateChatUserId == widget.recipient.id) {
+      NotificationRouter.activePrivateChatUserId = null;
+    }
     if (NotificationRouter.activeChatId == widget.recipient.id) {
       if (MainScreen.tabNotifier.value == 3) {
         NotificationRouter.activeChatId = 'group_chat';

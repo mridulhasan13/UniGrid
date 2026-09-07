@@ -322,7 +322,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         // Scrollable content
                         Expanded(
                           child: SingleChildScrollView(
-                            physics: const BouncingScrollPhysics(),
+                            physics: const ClampingScrollPhysics(),
                             child: Column(
                               children: defaultSlots.map((slot) {
                                 final slotNum = slot['slot'] as int;
@@ -1728,6 +1728,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                             final double tableHeight = (availableHeight - calendarHeight - 8 - 80).clamp(465.0, 1000.0);
 
                             return SingleChildScrollView(
+                              physics: const ClampingScrollPhysics(),
                               child: Padding(
                                 padding: EdgeInsets.only(
                                   left: 16.0,
