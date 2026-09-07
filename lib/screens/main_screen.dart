@@ -36,6 +36,9 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   String? _lastSyncedUserId;
+  final Map<int, Widget> _cachedScreens = {};
+  bool? _lastIsCR;
+  bool? _lastIsRootAdmin;
 
   void _clearHistoryForTab(int tabIndex) {
     if (tabIndex == 0) {
@@ -100,16 +103,25 @@ class _MainScreenState extends State<MainScreen> {
       RoutineReminderService.syncRoutineReminders(user);
     }
 
-    final List<Widget> screens = [
-      const RepaintBoundary(child: HomeScreen()),
-      const RepaintBoundary(child: ScheduleScreen()),
-      const RepaintBoundary(child: MaterialsScreen()),
-      const RepaintBoundary(child: ChatScreen()),
+    final isCR = user != null && user.isCR;
+    if (_lastIsCR != isCR || _lastIsRootAdmin != isRootAdmin) {
+      _lastIsCR = isCR;
+      _lastIsRootAdmin = isRootAdmin;
+      _cachedScreens.clear();
+    }
+
+    final safeIndex = _currentIndex.clamp(0, 6);
+
+    final List<Widget Function()> screenBuilders = [
+      () => const RepaintBoundary(child: HomeScreen()),
+      () => const RepaintBoundary(child: ScheduleScreen()),
+      () => const RepaintBoundary(child: MaterialsScreen()),
+      () => const RepaintBoundary(child: ChatScreen()),
       if (user != null && (user.isCR || isRootAdmin))
-        const RepaintBoundary(child: CRPanelScreen()),
+        () => const RepaintBoundary(child: CRPanelScreen()),
       if (isRootAdmin)
-        const RepaintBoundary(child: MasterPanelScreen()),
-      const RepaintBoundary(child: ProfileScreen()),
+        () => const RepaintBoundary(child: MasterPanelScreen()),
+      () => const RepaintBoundary(child: ProfileScreen()),
     ];
 
     final List<BottomNavigationBarItem> navItems = [
@@ -129,12 +141,23 @@ class _MainScreenState extends State<MainScreen> {
     ];
 
     // Safety: reset index if out of bounds (happens when CR Panel is added/removed)
-    if (_currentIndex >= screens.length) {
+    if (_currentIndex >= screenBuilders.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _currentIndex = 0);
       });
     }
-    final safeIndex = _currentIndex.clamp(0, screens.length - 1);
+
+    // Cache the active screen so its state and listeners stay alive
+    if (!_cachedScreens.containsKey(safeIndex) && safeIndex < screenBuilders.length) {
+      _cachedScreens[safeIndex] = screenBuilders[safeIndex]();
+    }
+
+    final List<Widget> lazyScreens = List.generate(screenBuilders.length, (i) {
+      if (_cachedScreens.containsKey(i)) {
+        return _cachedScreens[i]!;
+      }
+      return const SizedBox.shrink();
+    });
 
     return Scaffold(
       extendBody: true,
@@ -145,98 +168,97 @@ class _MainScreenState extends State<MainScreen> {
         ),
         child: Stack(
           children: [
-            // Main Content
+            // Main Content with Lazy Initialization
             IndexedStack(
-              index: safeIndex,
-              children: screens,
+              index: safeIndex.clamp(0, lazyScreens.length - 1),
+              children: lazyScreens,
             ),
           ],
         ),
       ),
-      bottomNavigationBar: Container(
-        margin: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          bottom: MediaQuery.of(context).padding.bottom > 0
-              ? MediaQuery.of(context).padding.bottom + 8
-              : 16,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.glassCardColor.withOpacity(0.92), // Deeper backdrop to hide scrolling content
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: AppColors.glassCardBorder,
-            width: 1.5,
-          ),
-          boxShadow: [
-            // Strong drop shadow to place the bar "above of all elements"
-            BoxShadow(
-              color: Colors.black.withOpacity(0.55),
-              blurRadius: 20,
-              spreadRadius: 2,
-              offset: const Offset(0, 6),
-            ),
-            // Theme-colored ambient glow
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.12),
-              blurRadius: 16,
-              spreadRadius: 0,
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+      bottomNavigationBar: MediaQuery.of(context).viewInsets.bottom > 0
+          ? const SizedBox.shrink()
+          : Container(
+              margin: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                bottom: MediaQuery.of(context).padding.bottom > 0
+                    ? MediaQuery.of(context).padding.bottom + 8
+                    : 16,
+              ),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.textPrimary.withOpacity(0.06),
-                    Colors.transparent,
-                  ],
+                color: AppColors.glassCardColor.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.glassCardBorder,
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.isLight
+                        ? Colors.black.withOpacity(0.08)
+                        : Colors.black.withOpacity(0.55),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 6),
+                  ),
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.12),
+                    blurRadius: 16,
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.textPrimary.withOpacity(0.06),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: List.generate(navItems.length, (index) {
+                      final item = navItems[index];
+                      final isSelected = index == safeIndex;
+
+                      IconData iconData = Icons.help;
+                      if (item.icon is Icon) {
+                        iconData = (item.icon as Icon).icon ?? Icons.help;
+                      }
+
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          setState(() {
+                            _currentIndex = index;
+                          });
+                          MainScreen.tabNotifier.value = index;
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4.0, vertical: 4.0),
+                          child: Icon(
+                            iconData,
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                            size: 26,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(navItems.length, (index) {
-                  final item = navItems[index];
-                  final isSelected = index == safeIndex;
-
-                  IconData iconData = Icons.help;
-                  if (item.icon is Icon) {
-                    iconData = (item.icon as Icon).icon ?? Icons.help;
-                  }
-
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      setState(() {
-                        _currentIndex = index;
-                      });
-                      MainScreen.tabNotifier.value = index;
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4.0, vertical: 4.0),
-                      child: Icon(
-                        iconData,
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.textSecondary,
-                        size: 26,
-                      ),
-                    ),
-                  );
-                }),
-              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

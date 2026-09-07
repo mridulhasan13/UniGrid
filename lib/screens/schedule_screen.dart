@@ -6,12 +6,11 @@ import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../services/theme_service.dart';
 import '../utils/constants.dart';
+import '../utils/schedule_constants.dart';
 import '../utils/dept_scope.dart';
 import '../widgets/weekly_routine_table.dart';
-import '../utils/schedule_constants.dart';
 import 'schedule_builder_screen.dart';
 import 'course_registry_screen.dart';
-import '../widgets/glass_card.dart';
 import '../widgets/floating_app_bar.dart';
 import '../services/auth_service.dart';
 import '../notifications/in_app_notification.dart';
@@ -416,6 +415,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                             child: DropdownButtonFormField<
                                                 String>(
                                               value: currentType,
+                                              isExpanded: true,
                                               decoration: InputDecoration(
                                                 labelText: 'Type',
                                                 labelStyle: TextStyle(
@@ -454,6 +454,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                 return DropdownMenuItem(
                                                   value: type,
                                                   child: Text(type,
+                                                      overflow: TextOverflow.ellipsis,
                                                       style: TextStyle(
                                                           color: AppColors.textPrimary,
                                                           fontSize: 13)),
@@ -472,6 +473,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                               child: DropdownButtonFormField<
                                                   String>(
                                                 value: currentBreakDays,
+                                                isExpanded: true,
                                                 decoration: InputDecoration(
                                                   labelText: 'Days as Break',
                                                   labelStyle: TextStyle(
@@ -516,6 +518,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                   return DropdownMenuItem(
                                                     value: day,
                                                     child: Text(day,
+                                                        overflow: TextOverflow.ellipsis,
                                                         style: TextStyle(
                                                             color: AppColors.textPrimary,
                                                             fontSize: 12)),
@@ -1124,7 +1127,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           value: chosenDay,
                           isExpanded: true,
                           dropdownColor: AppColors.backgroundTop,
-                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                          style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
                           items: daysList.map((day) {
                             final count = defaultDocs.docs
                                 .where((d) => (d.data()['dayOfWeek'] ?? '').toString().trim().toLowerCase() == day.toLowerCase())
@@ -1533,7 +1536,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   height: 48,
                 ),
                 const SizedBox(height: 16),
-                const Text('Department not set',
+                Text('Department not set',
                     style: AppStyles.heading2, textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 Text('Please complete your profile to view your schedule.',
@@ -1802,7 +1805,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.backgroundTop,
-        title: const Text('Copy Previous Week\'s Schedule',
+        title: Text('Copy Previous Week\'s Schedule',
             style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
         content: Text(
           'Do you want to copy all scheduled classes from the previous week ($prevWeekStr) '

@@ -95,6 +95,11 @@ class ThemeService extends ChangeNotifier {
       {bool saveToPrefs = true, bool syncToFirestore = false}) {
     _currentTheme = themeName;
 
+    // Reset default text colors and isLight for dark themes
+    AppColors.textPrimary = Colors.white;
+    AppColors.textSecondary = const Color(0xFF94A3B8);
+    AppColors.isLight = false;
+
     switch (themeName) {
       case 'Mist Emerald':
         AppColors.primary = const Color(0xFF10B981);
@@ -159,6 +164,17 @@ class ThemeService extends ChangeNotifier {
         AppColors.backgroundBottom = const Color(0xFF000000);
         AppColors.glassCardColor = const Color(0xFF18181B);
         AppColors.glassCardBorder = const Color(0xFF27272A);
+        break;
+      case 'Bright Pearl':
+        AppColors.isLight = true;
+        AppColors.primary = const Color(0xFF1D4ED8);
+        AppColors.secondary = const Color(0xFF2563EB);
+        AppColors.backgroundTop = const Color(0xFFF1F5F9);
+        AppColors.backgroundBottom = const Color(0xFFE2E8F0);
+        AppColors.glassCardColor = const Color(0xFFFFFFFF);
+        AppColors.glassCardBorder = const Color(0xFFCBD5E1);
+        AppColors.textPrimary = const Color(0xFF020617);
+        AppColors.textSecondary = const Color(0xFF334155);
         break;
       default:
         AppColors.primary = const Color(0xFF3B82F6);

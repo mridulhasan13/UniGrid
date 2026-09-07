@@ -225,9 +225,12 @@ class WeeklyRoutineTable extends StatelessWidget {
       ScheduleService.instance.syncScope(user.department, user.batch);
     }
 
-    return ValueListenableBuilder<Map<String, String>>(
-      valueListenable: ScheduleService.instance.dayStatusesNotifier,
-      builder: (context, dayStatusesMap, _) {
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) {
+        return ValueListenableBuilder<Map<String, String>>(
+          valueListenable: ScheduleService.instance.dayStatusesNotifier,
+          builder: (context, dayStatusesMap, _) {
         return ValueListenableBuilder<List<ClassSchedule>>(
           valueListenable: ScheduleService.instance.scheduleNotifier,
           builder: (context, rawClassesList, _) {
@@ -391,24 +394,46 @@ class WeeklyRoutineTable extends StatelessWidget {
                         final bool isBoycott = activeStatus == 'boycott';
                         final bool isHoliday = activeStatus == 'holiday';
 
-                        Color borderColor = AppColors.primary.withOpacity(0.2);
-                        List<Color> bgColors = [
-                          AppColors.primary.withOpacity(0.15),
-                          AppColors.secondary.withOpacity(0.04)
-                        ];
+                        Color borderColor = AppColors.isLight
+                            ? const Color(0xFFCBD5E1)
+                            : AppColors.primary.withOpacity(0.15);
+                        List<Color> bgColors = AppColors.isLight
+                            ? [const Color(0xFFF1F5F9), const Color(0xFFE2E8F0)]
+                            : [
+                                AppColors.primary.withOpacity(0.12),
+                                AppColors.secondary.withOpacity(0.03)
+                              ];
 
                         if (isAuto) {
-                          borderColor = Colors.cyanAccent.withOpacity(0.7);
-                          bgColors = [
-                            Colors.cyan.withOpacity(0.35),
-                            Colors.cyan.withOpacity(0.12)
-                          ];
+                          borderColor = AppColors.isLight
+                              ? const Color(0xFF0891B2)
+                              : Colors.cyanAccent.withOpacity(0.6);
+                          bgColors = AppColors.isLight
+                              ? [const Color(0xFFCFFAFE), const Color(0xFFA5F3FC)]
+                              : [
+                                  Colors.cyan.withOpacity(0.3),
+                                  Colors.cyan.withOpacity(0.1)
+                                ];
                         } else if (isBoycott) {
-                          borderColor = Colors.redAccent.withOpacity(0.7);
-                          bgColors = [
-                            Colors.red.withOpacity(0.35),
-                            Colors.red.withOpacity(0.12)
-                          ];
+                          borderColor = AppColors.isLight
+                              ? const Color(0xFFDC2626)
+                              : Colors.redAccent.withOpacity(0.6);
+                          bgColors = AppColors.isLight
+                              ? [const Color(0xFFFEE2E2), const Color(0xFFFECACA)]
+                              : [
+                                  Colors.red.withOpacity(0.3),
+                                  Colors.red.withOpacity(0.1)
+                                ];
+                        } else if (isHoliday) {
+                          borderColor = AppColors.isLight
+                              ? const Color(0xFFD97706)
+                              : Colors.amberAccent.withOpacity(0.6);
+                          bgColors = AppColors.isLight
+                              ? [const Color(0xFFFEF3C7), const Color(0xFFFDE68A)]
+                              : [
+                                  Colors.amber.withOpacity(0.3),
+                                  Colors.amber.withOpacity(0.1)
+                                ];
                         }
 
                         return Expanded(
@@ -421,7 +446,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                                 onTap: () {
                                   _showDayStatusDialog(context, user, day, dayDate, activeStatus);
                                 },
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(6),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
@@ -431,8 +456,8 @@ class WeeklyRoutineTable extends StatelessWidget {
                                     ),
                                     border: Border.all(
                                         color: borderColor,
-                                        width: (isAuto || isBoycott) ? 1.5 : 1.0),
-                                    borderRadius: BorderRadius.circular(4),
+                                        width: (isAuto || isBoycott || isHoliday) ? 1.5 : 1.0),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Center(
                                     child: Column(
@@ -445,10 +470,18 @@ class WeeklyRoutineTable extends StatelessWidget {
                                               fontSize: 7.5,
                                               fontWeight: FontWeight.bold,
                                               color: isAuto
-                                                  ? Colors.cyanAccent
+                                                  ? (AppColors.isLight
+                                                      ? const Color(0xFF0891B2)
+                                                      : Colors.cyanAccent)
                                                   : (isBoycott
-                                                      ? Colors.redAccent
-                                                      : AppColors.textPrimary),
+                                                      ? (AppColors.isLight
+                                                          ? const Color(0xFFDC2626)
+                                                          : Colors.redAccent)
+                                                      : (isHoliday
+                                                          ? (AppColors.isLight
+                                                              ? const Color(0xFFD97706)
+                                                              : Colors.amberAccent)
+                                                          : AppColors.textPrimary)),
                                               letterSpacing: 0.2),
                                         ),
                                         const SizedBox(height: 1),
@@ -457,9 +490,11 @@ class WeeklyRoutineTable extends StatelessWidget {
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                               fontSize: 6.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.textPrimary
-                                                  .withOpacity(0.7),
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.isLight
+                                                  ? const Color(0xFF475569)
+                                                  : AppColors.textPrimary
+                                                      .withOpacity(0.7),
                                               letterSpacing: 0.1),
                                         ),
                                         if (isAuto || isBoycott) ...[
@@ -546,10 +581,10 @@ class WeeklyRoutineTable extends StatelessWidget {
             color: AppColors.glassCardColor.withOpacity(useBlur ? 0.75 : 0.95),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-                color: AppColors.primary.withOpacity(0.25), width: 1),
+                color: AppColors.primary.withOpacity(AppColors.isLight ? 0.35 : 0.25), width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.6),
+                color: Colors.black.withOpacity(AppColors.isLight ? 0.08 : 0.6),
                 blurRadius: 40,
                 offset: const Offset(0, 15),
               ),
@@ -600,7 +635,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppColors.primary.withOpacity(0.12),
+                      AppColors.primary.withOpacity(AppColors.isLight ? 0.04 : 0.12),
                       AppColors.primary.withOpacity(0),
                     ],
                   ),
@@ -636,7 +671,9 @@ class WeeklyRoutineTable extends StatelessWidget {
     );
   },
 );
-}
+      },
+    );
+  }
 
   Widget _buildTimeHeader(
       List<Map<String, dynamic>> slotsList, int slotNum, String defaultRange) {
@@ -653,10 +690,14 @@ class WeeklyRoutineTable extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 1),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(4),
+        color: AppColors.isLight
+            ? const Color(0xFFEFF6FF)
+            : AppColors.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
-            color: AppColors.primary.withOpacity(0.2),
+            color: AppColors.isLight
+                ? const Color(0xFFBFDBFE)
+                : AppColors.primary.withOpacity(0.12),
             width: 1),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
@@ -680,7 +721,9 @@ class WeeklyRoutineTable extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 7.5,
-              color: AppColors.secondary,
+              color: AppColors.isLight
+                  ? const Color(0xFF1D4ED8)
+                  : AppColors.secondary,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -708,10 +751,14 @@ class WeeklyRoutineTable extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 1),
       decoration: BoxDecoration(
-        color: AppColors.secondary.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(4),
+        color: AppColors.isLight
+            ? const Color(0xFFF1F5F9)
+            : AppColors.secondary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
-            color: AppColors.secondary.withOpacity(0.2),
+            color: AppColors.isLight
+                ? const Color(0xFFCBD5E1)
+                : AppColors.secondary.withOpacity(0.12),
             width: 1),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
@@ -722,7 +769,9 @@ class WeeklyRoutineTable extends StatelessWidget {
         style: TextStyle(
           fontSize: 8.5,
           fontWeight: FontWeight.bold,
-          color: AppColors.secondary,
+          color: AppColors.isLight
+              ? const Color(0xFF1D4ED8)
+              : AppColors.secondary,
           letterSpacing: 0.3,
         ),
       ),
@@ -794,25 +843,33 @@ class WeeklyRoutineTable extends StatelessWidget {
     final bool isAuto = status == 'auto';
     final bool isHoliday = status == 'holiday';
     final Color themeColor = isAuto
-        ? Colors.cyanAccent
-        : (isHoliday ? Colors.orangeAccent : Colors.redAccent);
+        ? (AppColors.isLight ? const Color(0xFF0891B2) : Colors.cyanAccent)
+        : (isHoliday
+            ? (AppColors.isLight ? const Color(0xFFD97706) : Colors.amberAccent)
+            : (AppColors.isLight ? const Color(0xFFDC2626) : Colors.redAccent));
     final String displayText = isAuto
         ? 'AUTO'
         : (isHoliday ? 'HOLIDAY' : 'BOYCOTT');
-    final List<Color> bgGradient = isAuto
-        ? [
-            const Color(0xFF003840).withOpacity(0.9),
-            const Color(0xFF001F24).withOpacity(0.9),
-          ]
-        : (isHoliday
+    final List<Color> bgGradient = AppColors.isLight
+        ? (isAuto
+            ? [const Color(0xFFCFFAFE), const Color(0xFFA5F3FC)]
+            : (isHoliday
+                ? [const Color(0xFFFEF3C7), const Color(0xFFFDE68A)]
+                : [const Color(0xFFFEE2E2), const Color(0xFFFECACA)]))
+        : (isAuto
             ? [
-                const Color(0xFF402200).withOpacity(0.9),
-                const Color(0xFF241300).withOpacity(0.9),
+                const Color(0xFF003840).withOpacity(0.9),
+                const Color(0xFF001F24).withOpacity(0.9),
               ]
-            : [
-                const Color(0xFF40000D).withOpacity(0.9),
-                const Color(0xFF240005).withOpacity(0.9),
-              ]);
+            : (isHoliday
+                ? [
+                    const Color(0xFF402200).withOpacity(0.9),
+                    const Color(0xFF241300).withOpacity(0.9),
+                  ]
+                : [
+                    const Color(0xFF40000D).withOpacity(0.9),
+                    const Color(0xFF240005).withOpacity(0.9),
+                  ]));
 
     return Container(
       decoration: BoxDecoration(
@@ -821,11 +878,15 @@ class WeeklyRoutineTable extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: themeColor.withOpacity(0.5), width: 1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+            color: AppColors.isLight
+                ? themeColor.withOpacity(0.4)
+                : themeColor.withOpacity(0.4),
+            width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: themeColor.withOpacity(0.15),
+            color: themeColor.withOpacity(AppColors.isLight ? 0.08 : 0.15),
             blurRadius: 6,
           ),
         ],
@@ -1175,7 +1236,7 @@ class WeeklyRoutineTable extends StatelessWidget {
 
       if (isBreakForDay) {
         children.add(
-          const Expanded(
+          Expanded(
             flex: 45,
             child: MiniRotatedBreak(text: 'BREAK'),
           ),
@@ -1225,7 +1286,7 @@ class WeeklyRoutineTable extends StatelessWidget {
         i += actualSpan;
       } else {
         children.add(
-          const Expanded(
+          Expanded(
             flex: 45,
             child: BlankItem(),
           ),
@@ -1241,47 +1302,59 @@ class WeeklyRoutineTable extends StatelessWidget {
 
   Widget _buildDynamicClassBox(BuildContext context, ClassSchedule cls,
       {bool isCompact = false, int stackedCount = 1}) {
-    final bool isLab = cls.subject.toLowerCase().contains('lab') ||
-        cls.subject.toLowerCase().contains('practical') ||
-        cls.span > 1;
-
     final String status = cls.status.toLowerCase();
-    final Color baseColor = isLab ? AppColors.secondary : AppColors.primary;
 
     final Color mainThemeColor;
     final List<Color> gradientColors;
+    final Color cardBorderColor;
 
     if (status == 'completed') {
-      mainThemeColor = const Color(0xFF00E676); // Green
-      gradientColors = [
-        const Color(0xFF00E676).withOpacity(0.15),
-        const Color(0xFF003010).withOpacity(0.25),
-      ];
+      mainThemeColor = AppColors.emerald;
+      cardBorderColor = AppColors.isLight
+          ? const Color(0xFF86EFAC)
+          : AppColors.emerald.withOpacity(0.4);
+      gradientColors = AppColors.isLight
+          ? [const Color(0xFFDCFCE7), const Color(0xFFBBF7D0)]
+          : [
+              AppColors.emerald.withOpacity(0.18),
+              AppColors.emerald.withOpacity(0.06),
+            ];
     } else if (status == 'cancelled') {
-      mainThemeColor = const Color(0xFFFF1744); // Red
-      gradientColors = [
-        const Color(0xFFFF1744).withOpacity(0.15),
-        const Color(0xFF400010).withOpacity(0.25),
-      ];
-    } else if (status == 'upcoming') {
-      mainThemeColor = const Color(0xFF2196F3); // Blue
-      gradientColors = [
-        const Color(0xFF2196F3).withOpacity(0.15),
-        const Color(0xFF0D47A1).withOpacity(0.25),
-      ];
+      mainThemeColor = AppColors.crimson;
+      cardBorderColor = AppColors.isLight
+          ? const Color(0xFFFCA5A5)
+          : AppColors.crimson.withOpacity(0.4);
+      gradientColors = AppColors.isLight
+          ? [const Color(0xFFFEE2E2), const Color(0xFFFECACA)]
+          : [
+              AppColors.crimson.withOpacity(0.18),
+              AppColors.crimson.withOpacity(0.06),
+            ];
     } else if (status == 'no class' || status == 'no_class') {
-      // Both underscore and space variants are treated as 'No Class'
-      mainThemeColor = const Color(0xFFFFD600); // Vibrant Yellow
-      gradientColors = [
-        const Color(0xFFFFD600).withOpacity(0.15),
-        const Color(0xFF423A00).withOpacity(0.25),
-      ];
+      mainThemeColor = AppColors.amber;
+      cardBorderColor = AppColors.isLight
+          ? const Color(0xFFFCD34D)
+          : AppColors.amber.withOpacity(0.4);
+      gradientColors = AppColors.isLight
+          ? [const Color(0xFFFEF3C7), const Color(0xFFFDE68A)]
+          : [
+              AppColors.amber.withOpacity(0.18),
+              AppColors.amber.withOpacity(0.06),
+            ];
     } else {
-      mainThemeColor = baseColor;
-      gradientColors = [
-        baseColor.withOpacity(0.15),
-        Colors.black.withOpacity(0.35),
-      ];
+      // Normal / Upcoming class -> Pure Vibrant Blue across all themes
+      mainThemeColor = AppColors.isLight
+          ? const Color(0xFF1D4ED8)
+          : const Color(0xFF38BDF8);
+      cardBorderColor = AppColors.isLight
+          ? const Color(0xFF93C5FD)
+          : const Color(0xFF38BDF8).withOpacity(0.35);
+      gradientColors = AppColors.isLight
+          ? [const Color(0xFFDBEAFE), const Color(0xFFBFDBFE)]
+          : [
+              const Color(0xFF0284C7).withOpacity(0.22),
+              const Color(0xFF0369A1).withOpacity(0.08),
+            ];
     }
 
     final user = Provider.of<AppUser?>(context);
@@ -1299,8 +1372,8 @@ class WeeklyRoutineTable extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border.all(color: mainThemeColor.withOpacity(0.35)),
-          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: cardBorderColor, width: 1.0),
+          borderRadius: BorderRadius.circular(6),
         ),
         padding: EdgeInsets.symmetric(horizontal: 2, vertical: verticalPadding),
         alignment: Alignment.center,
@@ -1315,8 +1388,8 @@ class WeeklyRoutineTable extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: roomFontSize,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+                color: AppColors.isLight ? const Color(0xFF1E293B) : AppColors.textSecondary,
               ),
             ),
             if (stackedCount < 3) SizedBox(height: isCompact ? 1 : 2),
@@ -1333,7 +1406,7 @@ class WeeklyRoutineTable extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: titleFontSize,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w800,
                 color: mainThemeColor,
               ),
             ),
@@ -1541,21 +1614,21 @@ class WeeklyRoutineTable extends StatelessWidget {
 
                 switch (cls.status.toLowerCase()) {
                   case 'completed':
-                    statusColor = Colors.greenAccent;
+                    statusColor = AppColors.emerald;
                     statusIcon = Icons.check_circle_rounded;
                     break;
                   case 'cancelled':
-                    statusColor = Colors.redAccent;
+                    statusColor = AppColors.crimson;
                     statusIcon = Icons.cancel_rounded;
                     break;
                   case 'no class':
                   case 'no_class':
-                    statusColor = Colors.amberAccent;
+                    statusColor = AppColors.amber;
                     statusIcon = Icons.block_rounded;
                     statusText = 'NO CLASS';
                     break;
                   case 'upcoming':
-                    statusColor = Colors.blueAccent;
+                    statusColor = AppColors.cyan;
                     statusIcon = Icons.schedule_rounded;
                     break;
                   default:
@@ -1660,7 +1733,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                                 color: statusColor.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                    color: statusColor.withOpacity(0.4)),
+                                    color: statusColor.withOpacity(0.5)),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -1700,42 +1773,42 @@ class WeeklyRoutineTable extends StatelessWidget {
                                     cls.room.isNotEmpty
                                         ? cls.room
                                         : 'Not specified',
-                                    Colors.cyanAccent,
+                                    AppColors.cyan,
                                   ),
-                                  const Divider(
-                                      color: Colors.white10, height: 16),
+                                  Divider(
+                                      color: AppColors.textPrimary.withOpacity(0.08), height: 16),
                                   _buildDetailRow(
                                     Icons.access_time_rounded,
                                     'Time & Slot',
                                     '${cls.time} (Slot ${cls.startSlot}${cls.span > 1 ? " - ${cls.startSlot + cls.span - 1}" : ""})',
-                                    Colors.amberAccent,
+                                    AppColors.amber,
                                   ),
-                                  const Divider(
-                                      color: Colors.white10, height: 16),
+                                  Divider(
+                                      color: AppColors.textPrimary.withOpacity(0.08), height: 16),
                                   _buildDetailRow(
                                     Icons.calendar_today_rounded,
                                     'Day',
                                     cls.dayOfWeek,
-                                    Colors.purpleAccent,
+                                    AppColors.purple,
                                   ),
                                   if (cls.group.isNotEmpty) ...[
-                                    const Divider(
-                                        color: Colors.white10, height: 16),
+                                    Divider(
+                                        color: AppColors.textPrimary.withOpacity(0.08), height: 16),
                                     _buildDetailRow(
                                       Icons.group_rounded,
                                       'Section / Group',
                                       cls.group,
-                                      Colors.blueAccent,
+                                      AppColors.primary,
                                     ),
                                   ],
                                   if (courseInfo?['totalCredit'] != null) ...[
-                                    const Divider(
-                                        color: Colors.white10, height: 16),
+                                    Divider(
+                                        color: AppColors.textPrimary.withOpacity(0.08), height: 16),
                                     _buildDetailRow(
                                       Icons.star_outline_rounded,
                                       'Credits',
                                       '${courseInfo!['totalCredit']} Credits',
-                                      Colors.greenAccent,
+                                      AppColors.emerald,
                                     ),
                                   ],
                                 ],
@@ -1835,35 +1908,35 @@ class WeeklyRoutineTable extends StatelessWidget {
                                   children: [
                                     _buildStatusActionChip(
                                       label: 'Upcoming',
-                                      color: Colors.lightBlueAccent,
+                                      color: AppColors.cyan,
                                       icon: Icons.schedule_rounded,
                                       onTap: () => _updateStatus(
-                                          context, ctx, cls, 'upcoming'),
+                                          context, ctx, cls, 'upcoming', user: user),
                                     ),
                                     _buildStatusActionChip(
                                       label: 'Completed',
-                                      color: const Color(0xFF00E676),
+                                      color: AppColors.emerald,
                                       icon: Icons.check_circle_rounded,
                                       onTap: () => _updateStatus(
-                                          context, ctx, cls, 'completed'),
+                                          context, ctx, cls, 'completed', user: user),
                                     ),
                                     _buildStatusActionChip(
                                       label: 'Cancelled',
-                                      color: const Color(0xFFFF5252),
+                                      color: AppColors.crimson,
                                       icon: Icons.cancel_rounded,
                                       onTap: () => _updateStatus(
-                                          context, ctx, cls, 'cancelled'),
+                                          context, ctx, cls, 'cancelled', user: user),
                                     ),
                                     _buildStatusActionChip(
                                       label: 'No Class',
-                                      color: const Color(0xFFFFD700),
+                                      color: AppColors.amber,
                                       icon: Icons.block_rounded,
                                       onTap: () => _updateStatus(
-                                          context, ctx, cls, 'no class'),
+                                          context, ctx, cls, 'no class', user: user),
                                     ),
                                     _buildStatusActionChip(
                                       label: 'Edit',
-                                      color: const Color(0xFFE040FB),
+                                      color: AppColors.purple,
                                       icon: Icons.edit_rounded,
                                       onTap: () {
                                         Navigator.pop(ctx);
@@ -1882,7 +1955,7 @@ class WeeklyRoutineTable extends StatelessWidget {
                                     ),
                                     _buildStatusActionChip(
                                       label: 'Delete Slot',
-                                      color: const Color(0xFFFF3D00),
+                                      color: AppColors.crimson,
                                       icon: Icons.delete_forever_rounded,
                                       onTap: () =>
                                           _deleteClass(context, ctx, cls),
@@ -1929,6 +2002,7 @@ class WeeklyRoutineTable extends StatelessWidget {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isLight = AppColors.isLight;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1937,13 +2011,16 @@ class WeeklyRoutineTable extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8.5),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.22),
+            color: isLight ? color.withOpacity(0.12) : color.withOpacity(0.22),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(0.85), width: 1.3),
+            border: Border.all(
+              color: isLight ? color.withOpacity(0.6) : color.withOpacity(0.85),
+              width: 1.3,
+            ),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.4),
-                blurRadius: 10,
+                color: isLight ? Colors.black.withOpacity(0.04) : color.withOpacity(0.4),
+                blurRadius: isLight ? 6 : 10,
                 spreadRadius: 0.5,
                 offset: const Offset(0, 1),
               ),
@@ -1956,8 +2033,8 @@ class WeeklyRoutineTable extends StatelessWidget {
               const SizedBox(width: 6.5),
               Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isLight ? color : Colors.white,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.3,
@@ -1986,55 +2063,70 @@ class WeeklyRoutineTable extends StatelessWidget {
   }
 
   Future<void> _updateStatus(
-      BuildContext parentContext, BuildContext sheetContext, ClassSchedule cls, String status) async {
+      BuildContext parentContext, BuildContext sheetContext, ClassSchedule cls, String status, {AppUser? user}) async {
     if (sheetContext.mounted) {
       Navigator.pop(sheetContext); // close bottom sheet
     }
-    final user = Provider.of<AppUser?>(parentContext, listen: false);
-    final schedulePath = user != null && user.hasDeptScope
-        ? deptBatchCol(user.department, user.batch, 'schedule')
+    final effectiveUser = user ?? Provider.of<AppUser?>(parentContext, listen: false);
+    final schedulePath = effectiveUser != null && effectiveUser.hasDeptScope
+        ? deptBatchCol(effectiveUser.department, effectiveUser.batch, 'schedule')
         : 'schedule';
 
     try {
       final collectionRef = FirebaseFirestore.instance.collection(schedulePath);
-
-      // Batch update target doc AND any duplicates matching the same day, startSlot, subject, group, and scheduledDate
-      final query = await collectionRef
-          .where('dayOfWeek', isEqualTo: cls.dayOfWeek)
-          .where('startSlot', isEqualTo: cls.startSlot)
-          .get();
-
       final batch = FirebaseFirestore.instance.batch();
-      bool foundTarget = false;
+      bool batchHasOps = false;
 
-      for (var doc in query.docs) {
-        final data = doc.data();
-        final String subj = (data['subject'] ?? '').toString().trim();
-        final String grp = (data['group'] ?? '').toString().trim();
-        final bool dateMatches = _isSameScheduledDate(data['scheduledDate'], cls.scheduledDate);
-
-        if (doc.id == cls.id || (dateMatches && subj == cls.subject.trim() && grp == cls.group.trim())) {
-          batch.update(doc.reference, {
+      // 1. Direct update on target document ID if valid
+      if (cls.id.isNotEmpty) {
+        final targetDocRef = collectionRef.doc(cls.id);
+        final docSnap = await targetDocRef.get();
+        if (docSnap.exists) {
+          batch.set(targetDocRef, {
             'status': status,
             'lastUpdatedDate': FieldValue.serverTimestamp(),
-          });
-          foundTarget = true;
+          }, SetOptions(merge: true));
+          batchHasOps = true;
         }
       }
 
-      if (!foundTarget) {
-        batch.update(collectionRef.doc(cls.id), {
-          'status': status,
-          'lastUpdatedDate': FieldValue.serverTimestamp(),
-        });
+      // 2. Also update any matching class doc in Firestore (e.g. matching dayOfWeek, startSlot, subject, group)
+      final allDocs = await collectionRef.get();
+      for (var doc in allDocs.docs) {
+        if (doc.id == cls.id && batchHasOps) continue;
+        final data = doc.data();
+        final String dayStr = (data['dayOfWeek'] ?? '').toString().trim().toLowerCase();
+        final int startSlot = data['startSlot'] is int
+            ? data['startSlot']
+            : int.tryParse(data['startSlot']?.toString() ?? '0') ?? 0;
+        final String subj = (data['subject'] ?? '').toString().trim().toLowerCase();
+        final String grp = (data['group'] ?? '').toString().trim().toLowerCase();
+
+        final bool dayMatches = dayStr == cls.dayOfWeek.trim().toLowerCase();
+        final bool slotMatches = startSlot == cls.startSlot;
+        final bool subjMatches = subj == cls.subject.trim().toLowerCase();
+        final bool grpMatches = grp.isEmpty || cls.group.trim().isEmpty || grp == cls.group.trim().toLowerCase();
+        final bool dateMatches = _isSameScheduledDate(data['scheduledDate'], cls.scheduledDate);
+
+        if (dayMatches && slotMatches && subjMatches && grpMatches && (dateMatches || data['scheduledDate'] == null)) {
+          batch.set(doc.reference, {
+            'status': status,
+            'lastUpdatedDate': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          batchHasOps = true;
+        }
       }
 
-      await batch.commit();
+      if (batchHasOps) {
+        await batch.commit();
+      }
 
       if (parentContext.mounted) {
         final String statusLabel = status == 'no class'
             ? 'No Class'
-            : status.substring(0, 1).toUpperCase() + status.substring(1);
+            : (status == 'upcoming'
+                ? 'Upcoming'
+                : status.substring(0, 1).toUpperCase() + status.substring(1));
         final Color accentColor = status == 'cancelled'
             ? Colors.redAccent
             : (status == 'completed'
@@ -2263,10 +2355,14 @@ class MiniRotatedBreak extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.secondary.withOpacity(0.03),
+        color: AppColors.isLight
+            ? const Color(0xFFF1F5F9)
+            : AppColors.secondary.withOpacity(0.03),
         border: Border.all(
-            color: AppColors.secondary.withOpacity(0.15)),
-        borderRadius: BorderRadius.circular(4),
+            color: AppColors.isLight
+                ? const Color(0xFFCBD5E1)
+                : AppColors.secondary.withOpacity(0.12)),
+        borderRadius: BorderRadius.circular(6),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
       alignment: Alignment.center,
@@ -2277,8 +2373,10 @@ class MiniRotatedBreak extends StatelessWidget {
             text,
             style: TextStyle(
                 fontSize: 6.5,
-                fontWeight: FontWeight.bold,
-                color: AppColors.secondary,
+                fontWeight: FontWeight.w800,
+                color: AppColors.isLight
+                    ? const Color(0xFF1D4ED8)
+                    : AppColors.secondary,
                 letterSpacing: 1.2),
             textAlign: TextAlign.center,
           ),
@@ -2293,11 +2391,18 @@ class BlankItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Provider.of<ThemeService>(context, listen: true);
+    final bool isLight = AppColors.isLight;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.textPrimary.withOpacity(0.005),
-        border: Border.all(color: AppColors.textPrimary.withOpacity(0.02)),
-        borderRadius: BorderRadius.circular(4),
+        color: isLight
+            ? const Color(0xFFF8FAFC)
+            : AppColors.primary.withOpacity(0.04),
+        border: Border.all(
+            color: isLight
+                ? const Color(0xFFE2E8F0)
+                : AppColors.primary.withOpacity(0.12)),
+        borderRadius: BorderRadius.circular(6),
       ),
     );
   }

@@ -368,7 +368,7 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
             onPressed: _isProcessing
                 ? null
                 : () => Navigator.of(context).pop(null),
-            icon: const Icon(Icons.close, color: AppColors.textSecondary, size: 20),
+            icon: Icon(Icons.close, color: AppColors.textSecondary, size: 20),
             splashRadius: 20,
             tooltip: 'Cancel',
           ),
@@ -537,7 +537,7 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
           // Row 2: Zoom Slider
           Row(
             children: [
-              const Icon(Icons.zoom_out_rounded,
+              Icon(Icons.zoom_out_rounded,
                   color: AppColors.textSecondary, size: 16),
               Expanded(
                 child: SliderTheme(
@@ -563,7 +563,7 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
                   ),
                 ),
               ),
-              const Icon(Icons.zoom_in_rounded,
+              Icon(Icons.zoom_in_rounded,
                   color: AppColors.textSecondary, size: 16),
               const SizedBox(width: 4),
               SizedBox(
@@ -571,7 +571,7 @@ class _ImageCropDialogState extends State<ImageCropDialog> {
                 child: Text(
                   '${(_scale * 100).toInt()}%',
                   textAlign: TextAlign.end,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,

@@ -293,7 +293,7 @@ class _FileViewerScreenState extends State<FileViewerScreen>
             const SizedBox(height: 24),
             Text(
               widget.fileName,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -311,7 +311,7 @@ class _FileViewerScreenState extends State<FileViewerScreen>
               ),
               child: Text(
                 '$ext Document',
-                style: const TextStyle(
+                style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
                     fontWeight: FontWeight.w500),
@@ -338,7 +338,7 @@ class _FileViewerScreenState extends State<FileViewerScreen>
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'The document will open directly in your phone\'s browser or native viewer.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
@@ -375,7 +375,7 @@ class _FileViewerScreenState extends State<FileViewerScreen>
             const SizedBox(height: 24),
             Text(
               widget.fileName,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -414,7 +414,7 @@ class _FileViewerScreenState extends State<FileViewerScreen>
               _deletionReason ??
                   'Items may be deleted by the admin, ask them for it.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -472,7 +472,7 @@ class _FileViewerScreenState extends State<FileViewerScreen>
             Icon(Icons.broken_image,
                 color: AppColors.textSecondary.withOpacity(0.3), size: 64),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Could not decode image.',
               style: TextStyle(color: AppColors.textSecondary),
             ),
@@ -489,16 +489,16 @@ class _FileViewerScreenState extends State<FileViewerScreen>
       appBar: AppBar(
         title: Text(
           widget.fileName,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+          style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
           overflow: TextOverflow.ellipsis,
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
         actions: [
           if (_fullUrl.isNotEmpty && !_isBase64 && !_isDeleted) ...[
             IconButton(
-              icon: const Icon(Icons.print, color: AppColors.textPrimary),
+              icon: Icon(Icons.print, color: AppColors.textPrimary),
               onPressed: _printFile,
               tooltip: 'Print / Open externally',
             ),

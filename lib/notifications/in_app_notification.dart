@@ -278,7 +278,7 @@ class _InAppNotificationWidgetState extends State<_InAppNotificationWidget>
                                       Expanded(
                                         child: LinkifiedText(
                                           widget.title,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: AppColors.textPrimary,
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,

@@ -1,6 +1,6 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:provider/provider.dart';
+import '../services/theme_service.dart';
 import '../utils/constants.dart';
 
 class GlassCard extends StatelessWidget {
@@ -23,7 +23,7 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool useBlur = !kIsWeb;
+    Provider.of<ThemeService>(context); // Reactive theme updates
 
     // Solid opaque base — gradient cannot override a separate Stack layer
     Widget cardContainer = Stack(

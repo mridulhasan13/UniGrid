@@ -990,6 +990,33 @@ class FCMService {
     );
   }
 
+  static Future<void> notifyRoutineUpdated({
+    required String subject,
+    required String action,
+    required String dayOfWeek,
+    required String senderUserId,
+    required String department,
+    required String batch,
+    String? messageId,
+  }) async {
+    await sendToDeptAndBatch(
+      department: department,
+      batch: batch,
+      title: 'Routine $action: $subject',
+      body: '$subject ($dayOfWeek) has been $action in the routine.',
+      senderUserId: senderUserId,
+      messageId: messageId,
+      extraData: {
+        'target': 'schedule',
+        'type': 'routine_update',
+        'route': '/schedule',
+        'tabIndex': '1',
+        'preferenceField': 'notifRoutine',
+        'categoryTag': 'unigrid_routine',
+      },
+    );
+  }
+
   static Future<void> notifyNewRegistration({
     required String studentName,
     required String studentId,

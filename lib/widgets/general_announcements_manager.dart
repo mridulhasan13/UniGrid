@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
 import '../services/auth_service.dart';
+import '../services/theme_service.dart';
 import '../services/supabase_storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
@@ -354,6 +355,7 @@ class GeneralAnnouncementsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Provider.of<ThemeService>(context); // Global theme listener
     final authService = Provider.of<AuthService>(context, listen: false);
     // ONLY Root Admins have deletion & administrative power over General Notices
     final isRootAdmin = authService.isRootAdmin(authService.currentAuthEmail) ||
@@ -390,7 +392,7 @@ class GeneralAnnouncementsSheet extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 14),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -737,7 +739,7 @@ class _GeneralCard extends StatelessWidget {
             if ((item['title'] as String).isNotEmpty)
               Text(
                 item['title'] as String,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -993,7 +995,16 @@ class _GeneralAnnouncementComposerState
 
   @override
   Widget build(BuildContext context) {
+    Provider.of<ThemeService>(context); // Global theme listener
     final bool isMobile = MediaQuery.of(context).size.width <= 600;
+    final bool isLight = AppColors.isLight;
+
+    final inputFillColor = isLight
+        ? const Color(0xFFF8FAFC)
+        : AppColors.glassCardColor.withOpacity(0.55);
+    final inputBorderColor = isLight
+        ? const Color(0xFFCBD5E1)
+        : AppColors.glassCardBorder.withOpacity(0.8);
 
     return GlassCard(
       padding: const EdgeInsets.all(20),
@@ -1005,14 +1016,19 @@ class _GeneralAnnouncementComposerState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.15),
+                  color: isLight
+                      ? Colors.amber.withOpacity(0.2)
+                      : Colors.amber.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.campaign_rounded,
-                    color: Colors.amberAccent, size: 22),
+                child: Icon(
+                  Icons.campaign_rounded,
+                  color: isLight ? const Color(0xFFD97706) : Colors.amberAccent,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1052,15 +1068,16 @@ class _GeneralAnnouncementComposerState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
+              color: inputFillColor,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.glassCardBorder),
+              border: Border.all(color: inputBorderColor),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _target,
                 isExpanded: true,
-                dropdownColor: AppColors.backgroundTop,
+                dropdownColor: isLight ? Colors.white : AppColors.backgroundTop,
+                iconEnabledColor: AppColors.textSecondary,
                 style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
                 items: [
                   const DropdownMenuItem(
@@ -1089,13 +1106,23 @@ class _GeneralAnnouncementComposerState
             controller: _titleController,
             style: TextStyle(color: AppColors.textPrimary),
             decoration: InputDecoration(
+              filled: true,
+              fillColor: inputFillColor,
               labelText: 'Announcement Title',
               labelStyle: TextStyle(color: AppColors.textSecondary),
+              floatingLabelStyle: TextStyle(
+                  color: isLight ? AppColors.primary : AppColors.secondary),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: inputBorderColor),
+              ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.glassCardBorder),
+                borderSide: BorderSide(color: inputBorderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
               ),
             ),
           ),
@@ -1107,13 +1134,23 @@ class _GeneralAnnouncementComposerState
             maxLines: 4,
             style: TextStyle(color: AppColors.textPrimary),
             decoration: InputDecoration(
+              filled: true,
+              fillColor: inputFillColor,
               labelText: 'Announcement Message',
               labelStyle: TextStyle(color: AppColors.textSecondary),
+              floatingLabelStyle: TextStyle(
+                  color: isLight ? AppColors.primary : AppColors.secondary),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: inputBorderColor),
+              ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.glassCardBorder),
+                borderSide: BorderSide(color: inputBorderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
               ),
             ),
           ),
@@ -1127,13 +1164,25 @@ class _GeneralAnnouncementComposerState
                   controller: _detailsController,
                   style: TextStyle(color: AppColors.textPrimary),
                   decoration: InputDecoration(
+                    filled: true,
+                    fillColor: inputFillColor,
                     labelText: 'Details (e.g. Venue: Main Hall)',
                     labelStyle: TextStyle(color: AppColors.textSecondary),
+                    floatingLabelStyle: TextStyle(
+                        color:
+                            isLight ? AppColors.primary : AppColors.secondary),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: inputBorderColor),
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.glassCardBorder),
+                      borderSide: BorderSide(color: inputBorderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          BorderSide(color: AppColors.primary, width: 1.5),
                     ),
                   ),
                 ),
@@ -1142,13 +1191,16 @@ class _GeneralAnnouncementComposerState
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
+                  color: inputFillColor,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.glassCardBorder),
+                  border: Border.all(color: inputBorderColor),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: _type,
-                    dropdownColor: AppColors.backgroundTop,
+                    dropdownColor:
+                        isLight ? Colors.white : AppColors.backgroundTop,
+                    iconEnabledColor: AppColors.textSecondary,
                     style: TextStyle(color: AppColors.textPrimary),
                     items: const [
                       DropdownMenuItem(
@@ -1175,7 +1227,11 @@ class _GeneralAnnouncementComposerState
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: _pickFile,
-                    icon: const Icon(Icons.attach_file_rounded, size: 18),
+                    icon: Icon(Icons.attach_file_rounded,
+                        size: 18,
+                        color: isLight
+                            ? AppColors.primary
+                            : AppColors.secondary),
                     label: Text(
                       _attachedFile == null
                           ? 'Attach File'
@@ -1184,8 +1240,11 @@ class _GeneralAnnouncementComposerState
                       overflow: TextOverflow.ellipsis,
                     ),
                     style: OutlinedButton.styleFrom(
+                      backgroundColor: isLight
+                          ? const Color(0xFFF1F5F9)
+                          : AppColors.glassCardColor.withOpacity(0.4),
                       foregroundColor: AppColors.textPrimary,
-                      side: BorderSide(color: AppColors.glassCardBorder),
+                      side: BorderSide(color: inputBorderColor),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -1219,6 +1278,8 @@ class _GeneralAnnouncementComposerState
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
+                  elevation: isLight ? 1 : 4,
+                  shadowColor: AppColors.primary.withOpacity(0.4),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1231,7 +1292,11 @@ class _GeneralAnnouncementComposerState
               children: [
                 OutlinedButton.icon(
                   onPressed: _pickFile,
-                  icon: const Icon(Icons.attach_file_rounded, size: 18),
+                  icon: Icon(Icons.attach_file_rounded,
+                      size: 18,
+                      color: isLight
+                          ? AppColors.primary
+                          : AppColors.secondary),
                   label: Text(
                     _attachedFile == null
                         ? 'Attach File'
@@ -1240,8 +1305,13 @@ class _GeneralAnnouncementComposerState
                     overflow: TextOverflow.ellipsis,
                   ),
                   style: OutlinedButton.styleFrom(
+                    backgroundColor: isLight
+                        ? const Color(0xFFF1F5F9)
+                        : AppColors.glassCardColor.withOpacity(0.4),
                     foregroundColor: AppColors.textPrimary,
-                    side: BorderSide(color: AppColors.glassCardBorder),
+                    side: BorderSide(color: inputBorderColor),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1267,8 +1337,10 @@ class _GeneralAnnouncementComposerState
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.onPrimary,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    elevation: isLight ? 1 : 4,
+                    shadowColor: AppColors.primary.withOpacity(0.4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

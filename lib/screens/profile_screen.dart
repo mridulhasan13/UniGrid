@@ -670,7 +670,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 : null,
                           ),
                           if (_isUploading)
-                            const Positioned.fill(
+                            Positioned.fill(
                               child: CircleAvatar(
                                 backgroundColor: Colors.black45,
                                 radius: 44,
@@ -783,7 +783,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : null,
                         ),
                         if (_isUploading)
-                          const Positioned.fill(
+                          Positioned.fill(
                             child: CircleAvatar(
                               backgroundColor: Colors.black45,
                               radius: 36,
@@ -1816,6 +1816,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const Color(0xFF8B5CF6),
             activeTheme == 'Amethyst Orchid',
             hasAdminAccess),
+        const SizedBox(height: 12),
         _buildThemeCard(
             'Sunset Coral',
             'Vibrant Sunset Coral & Deep Ember',
@@ -1826,8 +1827,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _buildThemeCard(
             'Black & White',
             'Minimalist Pure Black & High-Contrast White',
-            const Color(0xFFFFFFFF),
+            const Color(0xFF18181B),
             activeTheme == 'Black & White',
+            hasAdminAccess),
+        const SizedBox(height: 12),
+        _buildThemeCard(
+            'Bright Pearl',
+            'Modern Bright Minimalist Pearl & Sapphire Accent',
+            const Color(0xFFF8FAFC),
+            activeTheme == 'Bright Pearl',
             hasAdminAccess),
       ],
     );
@@ -2014,7 +2022,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _aboutInfoLinkRow(Icons.email_outlined, 'Support',
                   'support.unigrid@gmail.com', 'mailto:support.unigrid@gmail.com'),
               const Divider(color: Colors.white10, height: 16),
-              _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.2'),
+              _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.1'),
             ],
           ),
         ),

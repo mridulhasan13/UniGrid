@@ -383,7 +383,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Nominate Admin', style: AppStyles.heading2),
+          Text('Nominate Admin', style: AppStyles.heading2),
           const SizedBox(height: 20),
           TextField(
             controller: emailCtrl,
@@ -438,7 +438,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Manage Admins', style: AppStyles.heading2),
+          Text('Manage Admins', style: AppStyles.heading2),
           const SizedBox(height: 20),
           SizedBox(
             width: double.maxFinite,
@@ -644,7 +644,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Post New Announcement',
               style: AppStyles.heading2,
             ),
@@ -705,6 +705,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: _announcementType,
+                    isExpanded: true,
                     dropdownColor: AppColors.backgroundTop,
                     style: TextStyle(color: AppColors.textPrimary),
                     decoration: InputDecoration(
@@ -718,7 +719,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                       ),
                     ),
                     items: ['Notice', 'Urgent', 'Material'].map((type) {
-                      return DropdownMenuItem(value: type, child: Text(type));
+                      return DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis));
                     }).toList(),
                     onChanged: (val) =>
                         setState(() => _announcementType = val!),
@@ -826,7 +827,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
               ),
             ),
             const Divider(height: 48, thickness: 2),
-            const Text('Schedule Management', style: AppStyles.heading2),
+            Text('Schedule Management', style: AppStyles.heading2),
             const SizedBox(height: 16),
             GlassCard(
               padding: const EdgeInsets.all(16),
@@ -874,7 +875,7 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
               ),
             ),
             const Divider(height: 48, thickness: 2),
-            const Text(
+            Text(
               'Admin Management',
               style: AppStyles.heading2,
             ),
@@ -970,8 +971,8 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                       ),
                       children: [
                         if (pendingCount == 0)
-                          const Padding(
-                            padding: EdgeInsets.all(16),
+                          Padding(
+                            padding: const EdgeInsets.all(16),
                             child: Text('No pending approvals at the moment.',
                                 style: TextStyle(color: AppColors.textSecondary)),
                           ),
@@ -1203,8 +1204,8 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                           ),
                         ),
                         if (filteredMembers.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(16),
+                          Padding(
+                            padding: const EdgeInsets.all(16),
                             child: Text('No members found.',
                                 style: TextStyle(color: AppColors.textSecondary)),
                           ),

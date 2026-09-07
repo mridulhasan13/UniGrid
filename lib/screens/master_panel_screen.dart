@@ -16,6 +16,7 @@ import '../models/models.dart';
 import '../widgets/general_announcements_manager.dart';
 import '../services/supabase_config.dart';
 import '../services/supabase_storage_service.dart';
+import '../services/theme_service.dart';
 import 'file_viewer_screen.dart';
 
 class MasterPanelScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
   String _reportsFilter = 'All';
   String _reportsSearchQuery = '';
   final TextEditingController _reportsSearchController = TextEditingController();
+  int _usersDisplayLimit = 25;
 
   @override
   void dispose() {
@@ -47,7 +49,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchLiveStorageFromSupabase();
+    // Storage metrics are loaded instantly via Firestore stream;
+    // Live recursive bucket scans are performed on-demand via the Refresh button.
   }
 
   Future<void> _fetchLiveStorageFromSupabase({bool showFeedback = false}) async {
@@ -258,6 +261,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Provider.of<ThemeService>(context); // Listen to global theme updates
     return SafeArea(
       child: StreamBuilder<QuerySnapshot>(
         stream: _firestore.collection('users').snapshots(),
@@ -2101,7 +2105,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                 children: [
                   Expanded(
                     child: _buildReportMetricTile(
-                      label: 'Total Reports',
+                      label: 'Total',
                       count: totalReports,
                       color: Colors.blueAccent,
                       icon: Icons.flag_rounded,
@@ -2110,7 +2114,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildReportMetricTile(
-                      label: 'Pending Review',
+                      label: 'Pending',
                       count: pendingReports,
                       color: Colors.amberAccent,
                       icon: Icons.hourglass_top_rounded,
@@ -2181,7 +2185,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         )
                       : null,
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.04),
+                  fillColor: AppColors.isLight ? const Color(0xFFF8FAFC) : Colors.white.withOpacity(0.04),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: AppColors.glassCardBorder),
@@ -2200,7 +2204,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.02),
+                    color: AppColors.isLight ? const Color(0xFFF8FAFC) : Colors.white.withOpacity(0.02),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.glassCardBorder),
                   ),
@@ -2264,17 +2268,21 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                     return Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: isPending
-                            ? Colors.amber.withOpacity(0.04)
-                            : (isSolved
-                                ? Colors.green.withOpacity(0.03)
-                                : Colors.white.withOpacity(0.02)),
+                        color: AppColors.isLight
+                            ? (isPending
+                                ? const Color(0xFFFFFBEB)
+                                : (isSolved ? const Color(0xFFF0FDF4) : Colors.white))
+                            : (isPending
+                                ? Colors.amber.withOpacity(0.04)
+                                : (isSolved
+                                    ? Colors.green.withOpacity(0.03)
+                                    : Colors.white.withOpacity(0.02))),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: isPending
                               ? Colors.amberAccent.withOpacity(0.35)
                               : (isSolved
-                                  ? Colors.greenAccent.withOpacity(0.3)
+                                  ? (AppColors.isLight ? const Color(0xFF86EFAC) : Colors.greenAccent.withOpacity(0.3))
                                   : AppColors.glassCardBorder),
                           width: isPending ? 1.2 : 0.8,
                         ),
@@ -2364,9 +2372,9 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
+                              color: AppColors.isLight ? const Color(0xFFF1F5F9) : Colors.black.withOpacity(0.3),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.white.withOpacity(0.08)),
+                              border: Border.all(color: AppColors.isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.08)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2683,18 +2691,25 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
   Widget _buildReportFilterChip(String filterKey, String label, {Color? color}) {
     final bool isSelected = _reportsFilter == filterKey;
     final activeColor = color ?? AppColors.primary;
+    final onActiveColor = activeColor.computeLuminance() > 0.5 ? Colors.black : Colors.white;
     return ChoiceChip(
       label: Text(
         label,
         style: TextStyle(
-          color: isSelected ? Colors.white : AppColors.textSecondary,
+          color: isSelected ? onActiveColor : AppColors.textSecondary,
           fontSize: 11.5,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
         ),
       ),
       selected: isSelected,
-      selectedColor: activeColor.withOpacity(0.7),
-      backgroundColor: Colors.white.withOpacity(0.04),
+      selectedColor: activeColor,
+      backgroundColor: AppColors.isLight ? const Color(0xFFF1F5F9) : Colors.white.withOpacity(0.06),
+      side: BorderSide(
+        color: isSelected
+            ? activeColor
+            : (AppColors.isLight ? const Color(0xFFCBD5E1) : AppColors.glassCardBorder),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       onSelected: (_) => setState(() => _reportsFilter = filterKey),
     );
   }
@@ -2746,21 +2761,21 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: Colors.redAccent.withOpacity(0.4)),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
-            SizedBox(width: 8),
-            Text('Delete Message From Chat?', style: TextStyle(color: Colors.white, fontSize: 16)),
+            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+            const SizedBox(width: 8),
+            Text('Delete Message From Chat?', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
           ],
         ),
-        content: const Text(
+        content: Text(
           'This will permanently remove the reported message from the student chat room and mark this report as solved.',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -2817,12 +2832,12 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: Colors.redAccent.withOpacity(0.4)),
         ),
-        title: const Text('Delete Report Record?', style: TextStyle(color: Colors.white, fontSize: 16)),
-        content: const Text('This will permanently delete this report log from the database.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        title: Text('Delete Report Record?', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: Text('This will permanently delete this report log from the database.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -3108,13 +3123,24 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      itemCount: users.length,
-      itemBuilder: (context, index) {
-        final doc = users[index];
+    final bool isFiltered = _searchQuery.isNotEmpty ||
+        _selectedDeptFilter != 'All' ||
+        _selectedBatchFilter != 'All' ||
+        _selectedActivityFilter != 'All';
+
+    final displayedUsers = isFiltered || users.length <= _usersDisplayLimit
+        ? users
+        : users.take(_usersDisplayLimit).toList();
+
+    return Column(
+      children: [
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          itemCount: displayedUsers.length,
+          itemBuilder: (context, index) {
+            final doc = displayedUsers[index];
         final data = doc.data() as Map<String, dynamic>;
         final uid = doc.id;
         final email = data['email'] ?? 'No Email';
@@ -3158,32 +3184,33 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
 
         final int userLogins = ((data['loginCount'] as num?)?.toInt() ?? 1).clamp(1, 10000);
 
+        final isLight = AppColors.isLight;
         String lastActiveFormatted = 'Never / Unknown';
-        Color activeColor = Colors.grey.shade400;
+        Color activeColor = isLight ? const Color(0xFF64748B) : Colors.grey.shade400;
         if (lastActiveDt != null) {
           final now = DateTime.now();
           final diff = now.difference(lastActiveDt);
           if (diff.isNegative || diff.inSeconds < 60) {
             lastActiveFormatted = 'Just now';
-            activeColor = Colors.greenAccent;
+            activeColor = AppColors.emerald;
           } else if (diff.inMinutes < 60) {
             lastActiveFormatted = '${diff.inMinutes}m ago';
-            activeColor = Colors.greenAccent;
+            activeColor = AppColors.emerald;
           } else if (diff.inHours < 24 && lastActiveDt.day == now.day) {
             lastActiveFormatted = 'Today at ${DateFormat('h:mm a').format(lastActiveDt)}';
-            activeColor = Colors.greenAccent;
+            activeColor = AppColors.emerald;
           } else if (diff.inHours < 24) {
             lastActiveFormatted = '${diff.inHours}h ago';
-            activeColor = Colors.greenAccent;
+            activeColor = AppColors.emerald;
           } else if (diff.inDays <= 7) {
             lastActiveFormatted = '${diff.inDays}d ago (${DateFormat('E, h:mm a').format(lastActiveDt)})';
-            activeColor = Colors.lightBlueAccent;
+            activeColor = AppColors.cyan;
           } else if (diff.inDays <= 30) {
             lastActiveFormatted = '${diff.inDays}d ago (${DateFormat('MMM d').format(lastActiveDt)})';
-            activeColor = Colors.purpleAccent.shade100;
+            activeColor = AppColors.purple;
           } else {
             lastActiveFormatted = DateFormat('MMM d, yyyy • h:mm a').format(lastActiveDt);
-            activeColor = Colors.grey.shade500;
+            activeColor = isLight ? const Color(0xFF64748B) : Colors.grey.shade500;
           }
         }
 
@@ -3271,15 +3298,15 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: Colors.redAccent.withOpacity(0.2),
+                                  color: AppColors.crimson.withOpacity(0.18),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                      color: Colors.redAccent.withOpacity(0.5)),
+                                      color: AppColors.crimson.withOpacity(0.5)),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'ROOT',
                                   style: TextStyle(
-                                      color: Colors.redAccent,
+                                      color: AppColors.crimson,
                                       fontSize: 9,
                                       fontWeight: FontWeight.bold),
                                 ),
@@ -3319,9 +3346,9 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         Text(
                           '$dept • Batch $batch${studentId.isNotEmpty ? " • ID: $studentId" : ""}${phone.isNotEmpty ? " • $phone" : ""}',
                           style: TextStyle(
-                              color: AppColors.primary.withOpacity(0.9),
+                              color: AppColors.primary,
                               fontSize: 10.5,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                               height: 1.3),
                         ),
                         if (school.isNotEmpty) ...[
@@ -3339,7 +3366,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                 child: Text(
                                   'School: $school',
                                   style: TextStyle(
-                                    color: AppColors.textSecondary.withOpacity(0.9),
+                                    color: AppColors.textSecondary,
                                     fontSize: 10.5,
                                     height: 1.3,
                                   ),
@@ -3363,7 +3390,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                                 child: Text(
                                   'College: $college',
                                   style: TextStyle(
-                                    color: AppColors.textSecondary.withOpacity(0.9),
+                                    color: AppColors.textSecondary,
                                     fontSize: 10.5,
                                     height: 1.3,
                                   ),
@@ -3381,15 +3408,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: activeColor,
-                                boxShadow: activeColor == Colors.greenAccent
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.greenAccent.withOpacity(0.6),
-                                          blurRadius: 4,
-                                          spreadRadius: 1,
-                                        )
-                                      ]
-                                    : null,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: activeColor.withOpacity(0.4),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  )
+                                ],
                               ),
                             ),
                             const SizedBox(width: 5),
@@ -3410,15 +3435,15 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                           Row(
                             children: [
                               Icon(Icons.calendar_today_rounded,
-                                  size: 10.5, color: Colors.cyanAccent.withOpacity(0.8)),
+                                  size: 10.5, color: AppColors.cyan),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   'Joined: $joinedFormatted',
                                   style: TextStyle(
-                                    color: Colors.cyanAccent.withOpacity(0.85),
+                                    color: AppColors.cyan,
                                     fontSize: 10,
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
@@ -3430,8 +3455,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                   ),
                   if (!isRoot)
                     IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded,
-                          color: Colors.redAccent, size: 18),
+                      icon: Icon(Icons.delete_outline_rounded,
+                          color: AppColors.crimson, size: 18),
                       tooltip: 'Delete User',
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -3468,8 +3493,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             value: isCR,
                             activeThumbColor: AppColors.primary,
                             activeTrackColor: AppColors.primary.withOpacity(0.4),
-                            inactiveThumbColor: Colors.grey,
-                            inactiveTrackColor: Colors.white12,
+                            inactiveThumbColor: isLight ? const Color(0xFF94A3B8) : Colors.grey,
+                            inactiveTrackColor: isLight ? const Color(0xFFE2E8F0) : Colors.white12,
                             materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,
                             onChanged: (val) =>
@@ -3487,7 +3512,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                         Text('Approved',
                             style: TextStyle(
                                 color: isApproved
-                                    ? Colors.greenAccent
+                                    ? AppColors.emerald
                                     : AppColors.textSecondary,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600)),
@@ -3495,10 +3520,10 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                           scale: 0.68,
                           child: Switch(
                             value: isApproved,
-                            activeThumbColor: Colors.greenAccent,
-                            activeTrackColor: Colors.greenAccent.withOpacity(0.4),
-                            inactiveThumbColor: Colors.grey,
-                            inactiveTrackColor: Colors.white12,
+                            activeThumbColor: AppColors.emerald,
+                            activeTrackColor: AppColors.emerald.withOpacity(0.4),
+                            inactiveThumbColor: isLight ? const Color(0xFF94A3B8) : Colors.grey,
+                            inactiveTrackColor: isLight ? const Color(0xFFE2E8F0) : Colors.white12,
                             materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,
                             onChanged: (val) =>
@@ -3515,10 +3540,11 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       height: 26,
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
+                        color: isLight ? const Color(0xFFF1F5F9) : Colors.white.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.12), width: 0.8),
+                            color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.12),
+                            width: 0.8),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
@@ -3528,7 +3554,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                           hint: Text('Dept',
                               style: TextStyle(
                                   color: AppColors.textSecondary,
-                                  fontSize: 10.5)),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600)),
                           dropdownColor: AppColors.backgroundTop,
                           style: TextStyle(
                               color: AppColors.textPrimary,
@@ -3558,10 +3585,11 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       height: 26,
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
+                        color: isLight ? const Color(0xFFF1F5F9) : Colors.white.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.12), width: 0.8),
+                            color: isLight ? const Color(0xFFCBD5E1) : Colors.white.withOpacity(0.12),
+                            width: 0.8),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
@@ -3571,7 +3599,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                           hint: Text('Batch',
                               style: TextStyle(
                                   color: AppColors.textSecondary,
-                                  fontSize: 10.5)),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600)),
                           dropdownColor: AppColors.backgroundTop,
                           style: TextStyle(
                               color: AppColors.textPrimary,
@@ -3601,7 +3630,57 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
           ),
         );
       },
-    );
+    ),
+    if (!isFiltered && users.length > displayedUsers.length)
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+        child: Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _usersDisplayLimit += 25;
+                  });
+                },
+                icon: const Icon(Icons.expand_more_rounded, size: 18),
+                label: Text(
+                  'Load More (${displayedUsers.length} of ${users.length})',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  side: BorderSide(color: AppColors.primary.withOpacity(0.35)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _usersDisplayLimit = users.length;
+                });
+              },
+              child: Text(
+                'Show All ${users.length} Members',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+  ],
+);
   }
 }
 

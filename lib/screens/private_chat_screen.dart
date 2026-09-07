@@ -326,16 +326,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             ),
           ],
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.glassCardColor.withOpacity(0.92),
         elevation: 0,
-        flexibleSpace: ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              color: AppColors.backgroundTop.withOpacity(0.5),
-            ),
-          ),
-        ),
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -354,7 +346,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
               if (snapshot.hasError)
                 return Center(
                     child: Text('Error: ${snapshot.error}',
-                        style: const TextStyle(color: AppColors.textPrimary)));
+                        style: TextStyle(color: AppColors.textPrimary)));
               if (!snapshot.hasData)
                 return const Center(
                   child: UniGridLoader(
@@ -520,7 +512,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         gaplessPlayback: true,
                       );
                     } catch (e) {
-                      imgWidget = const SizedBox(
+                      imgWidget = SizedBox(
                         width: 150,
                         height: 150,
                         child: Icon(Icons.broken_image, color: AppColors.textPrimary),
@@ -571,13 +563,15 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   primaryColor: currentTheme == 'Black & White'
                       ? const Color(0xFF2E2E30)
                       : AppColors.primary,
-                  secondaryColor: const Color(0xFF1E1E1E),
+                  secondaryColor: AppColors.isLight
+                      ? const Color(0xFFE2E8F0)
+                      : const Color(0xFF1E1E1E),
                   backgroundColor: Colors.transparent,
                   inputBackgroundColor:
                       AppColors.backgroundTop.withOpacity(0.9),
                   inputTextColor: AppColors.textPrimary,
                   receivedMessageBodyTextStyle:
-                      const TextStyle(color: AppColors.textPrimary),
+                      TextStyle(color: AppColors.textPrimary),
                   sentMessageBodyTextStyle: TextStyle(
                       color: currentTheme == 'Black & White'
                           ? Colors.white
@@ -669,18 +663,16 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       useSafeArea: true,
       builder: (ctx) => ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + 16,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.backgroundTop.withOpacity(0.92),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
-            ),
-            child: SingleChildScrollView(
+        child: Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).padding.bottom + 16,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.glassCardColor.withOpacity(0.95),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
+          ),
+          child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -734,8 +726,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   void _showReportPrivateDialog(types.Message message) {

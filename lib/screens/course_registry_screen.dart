@@ -108,6 +108,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                     const SizedBox(height: 20),
                     DropdownButtonFormField<String>(
                       value: selectedDialogLevelTerm,
+                      isExpanded: true,
                       dropdownColor: AppColors.backgroundTop,
                       style: TextStyle(color: AppColors.textPrimary),
                       decoration: InputDecoration(
@@ -121,7 +122,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                       items: _levelTermOptions
                           .where((opt) => opt != 'Active' && opt != 'All')
                           .map((val) =>
-                              DropdownMenuItem(value: val, child: Text(val)))
+                              DropdownMenuItem(value: val, child: Text(val, overflow: TextOverflow.ellipsis)))
                           .toList(),
                       onChanged: (val) {
                         if (val != null) {
@@ -171,6 +172,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                           flex: 2,
                           child: DropdownButtonFormField<String>(
                             value: selectedPart,
+                            isExpanded: true,
                             dropdownColor: AppColors.backgroundTop,
                             style: TextStyle(color: AppColors.textPrimary),
                             decoration: InputDecoration(
@@ -182,9 +184,9 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                                   borderSide: BorderSide(color: AppColors.primary)),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'None', child: Text('None (Lab/Single)')),
-                              DropdownMenuItem(value: 'A', child: Text('A (- A)')),
-                              DropdownMenuItem(value: 'B', child: Text('B (- B)')),
+                              DropdownMenuItem(value: 'None', child: Text('None (Lab/Single)', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'A', child: Text('A (- A)', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'B', child: Text('B (- B)', overflow: TextOverflow.ellipsis)),
                             ],
                             onChanged: (val) {
                               if (val != null) {
@@ -253,7 +255,7 @@ class _CourseRegistryScreenState extends State<CourseRegistryScreen> {
                           val == null || val.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 20),
-                    const Text(
+                    Text(
                       'Class Test (CT) Marks PDFs',
                       style: TextStyle(
                           color: AppColors.textSecondary,

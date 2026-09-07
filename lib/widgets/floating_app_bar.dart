@@ -36,25 +36,23 @@ class FloatingAppBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.glassCardColor.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.glassCardBorder.withOpacity(0.7),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.glassCardColor.withOpacity(0.92),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.glassCardBorder.withOpacity(0.7),
+              width: 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
             child: Row(
               children: [
                 if (leadingWidget != null) ...[
@@ -104,7 +102,6 @@ class FloatingAppBar extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }

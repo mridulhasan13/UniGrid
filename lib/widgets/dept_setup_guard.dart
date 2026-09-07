@@ -72,13 +72,13 @@ class _DeptSetupGuardState extends State<DeptSetupGuard> {
                           height: 48,
                         ),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'Complete Your Profile',
                           style: AppStyles.heading2,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Please select your Department and Batch to configure your UniGrid workspace.',
                           style: AppStyles.caption,
                           textAlign: TextAlign.center,

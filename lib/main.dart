@@ -25,6 +25,7 @@ import 'package:flutter/foundation.dart';
 import 'widgets/dept_setup_guard.dart';
 import 'widgets/maintenance_guard.dart';
 import 'widgets/unigrid_loader.dart';
+import 'utils/web_bridge.dart';
 
 import 'notifications/in_app_notification.dart';
 
@@ -51,9 +52,10 @@ void main() async {
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
-  // Maximize in-memory image cache for instant, zero-delay avatar & media rendering
-  PaintingBinding.instance.imageCache.maximumSize = 1000;
-  PaintingBinding.instance.imageCache.maximumSizeBytes = 120 * 1024 * 1024; // 120MB in-memory image buffer
+  // Balanced image cache: fast rendering without exceeding web browser memory ceilings
+  PaintingBinding.instance.imageCache.maximumSize = kIsWeb ? 200 : 1000;
+  PaintingBinding.instance.imageCache.maximumSizeBytes =
+      kIsWeb ? (30 * 1024 * 1024) : (120 * 1024 * 1024); // 30MB on Web, 120MB on Native
 
   // Asynchronous non-blocking background initialization
   FCMService.initialize().catchError((e) {
@@ -99,7 +101,7 @@ class MyApp extends StatelessWidget {
               surface: AppColors.glassCardColor,
               background: AppColors.backgroundBottom,
             ),
-            appBarTheme: const AppBarTheme(
+            appBarTheme: AppBarTheme(
               backgroundColor: Colors.transparent,
               elevation: 0,
               centerTitle: true,
@@ -118,8 +120,8 @@ class MyApp extends StatelessWidget {
               type: BottomNavigationBarType.fixed,
             ),
             snackBarTheme: SnackBarThemeData(
-              backgroundColor: const Color(0xFF1E293B),
-              contentTextStyle: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              backgroundColor: AppColors.glassCardColor,
+              contentTextStyle: TextStyle(color: AppColors.textPrimary, fontSize: 14),
               actionTextColor: AppColors.secondary,
             ),
             textTheme:
@@ -167,8 +169,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _initSessionCheck() async {
     final authService = Provider.of<AuthService>(context, listen: false);
-    // Pre-cache core brand & profile assets in parallel
+    // Pre-cache core brand & profile assets in parallel and notify web container
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyAppLoaded();
       try {
         precacheImage(const AssetImage('assets/images/logo.png'), context);
         precacheImage(const AssetImage('assets/images/mridul_profile.png'), context);
@@ -180,6 +183,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _isRestoringSession = false;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyAppLoaded();
         NotificationRouter.processPendingNotification();
       });
     }

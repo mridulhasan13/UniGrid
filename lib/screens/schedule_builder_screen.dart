@@ -7,6 +7,7 @@ import '../utils/dept_scope.dart';
 import '../utils/schedule_constants.dart';
 import '../widgets/glass_card.dart';
 import '../notifications/in_app_notification.dart';
+import '../notifications/fcm_service.dart';
 
 class ScheduleBuilderScreen extends StatefulWidget {
   final ClassSchedule? classToEdit;
@@ -177,6 +178,18 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
         await FirebaseFirestore.instance
             .collection(schedulePath)
             .add(scheduleData);
+      }
+
+      // Notify batch students of routine update in background
+      if (widget.user != null && widget.user!.hasDeptScope) {
+        FCMService.notifyRoutineUpdated(
+          subject: _subjectController.text.trim(),
+          action: widget.classToEdit != null ? 'Updated' : 'Added',
+          dayOfWeek: _selectedDay,
+          senderUserId: widget.user!.id,
+          department: widget.user!.department,
+          batch: widget.user!.batch,
+        ).catchError((e) => debugPrint('[ScheduleBuilder] Notification error: $e'));
       }
 
       if (mounted) {
@@ -431,6 +444,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                             children: [
                               DropdownButtonFormField<String>(
                                 value: _selectedDay,
+                                isExpanded: true,
                                 decoration: _buildInputDecoration(
                                     'Day of Week', Icons.calendar_today_rounded),
                                 dropdownColor: AppColors.backgroundTop,
@@ -438,6 +452,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                   return DropdownMenuItem(
                                       value: day,
                                       child: Text(day,
+                                          overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                               color: AppColors.textPrimary, fontSize: 14)));
                                 }).toList(),
@@ -450,6 +465,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                   Expanded(
                                     child: DropdownButtonFormField<int>(
                                       value: _selectedStartSlot,
+                                      isExpanded: true,
                                       decoration: _buildInputDecoration(
                                           'Start Slot', Icons.access_time_rounded),
                                       dropdownColor: AppColors.backgroundTop,
@@ -460,6 +476,8 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                           value: slot,
                                           child: Text(
                                             'Slot $slot ($time)',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                                 color: AppColors.textPrimary, fontSize: 12.5),
                                           ),
@@ -473,6 +491,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                   Expanded(
                                     child: DropdownButtonFormField<int>(
                                       value: _selectedSpan,
+                                      isExpanded: true,
                                       decoration: _buildInputDecoration(
                                           'Span (Slots)', Icons.grid_view_rounded),
                                       dropdownColor: AppColors.backgroundTop,
@@ -480,6 +499,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                         return DropdownMenuItem(
                                             value: span,
                                             child: Text('$span Slot(s)',
+                                                overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                     color: AppColors.textPrimary, fontSize: 14)));
                                       }).toList(),
@@ -492,6 +512,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                               const SizedBox(height: 16),
                               DropdownButtonFormField<String>(
                                 value: _selectedGroup,
+                                isExpanded: true,
                                 decoration: _buildInputDecoration(
                                     'Parallel Lab Group (Optional)',
                                     Icons.group_work_rounded),
@@ -500,6 +521,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                   return DropdownMenuItem(
                                       value: group,
                                       child: Text(group,
+                                          overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                               color: AppColors.textPrimary, fontSize: 14)));
                                 }).toList(),
@@ -521,6 +543,7 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                             children: [
                               DropdownButtonFormField<String>(
                                 value: _selectedCourseId,
+                                isExpanded: true,
                                 dropdownColor: AppColors.backgroundTop,
                                 style: TextStyle(color: AppColors.textPrimary),
                                 decoration: _buildInputDecoration(
@@ -543,6 +566,8 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                   const DropdownMenuItem<String>(
                                     value: 'custom',
                                     child: Text('Custom / Manual Entry',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                             color: Colors.amberAccent,
                                             fontWeight: FontWeight.bold,
@@ -555,6 +580,8 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
                                       value: course.id,
                                       child: Text(
                                         '${course.courseCode}: ${course.courseName} (${course.teacherShort})',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           color: isCurrentTerm
                                               ? AppColors.textPrimary

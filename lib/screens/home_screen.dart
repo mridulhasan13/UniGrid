@@ -4,11 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
-import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
-import '../widgets/glass_card.dart';
 import '../services/supabase_storage_service.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/unigrid_loader.dart';
@@ -65,13 +63,13 @@ class HomeScreen extends StatelessWidget {
                 height: 48,
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Department not set',
                 style: AppStyles.heading2,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Please complete your profile to see announcements for your department and batch.',
                 style: AppStyles.caption,
                 textAlign: TextAlign.center,
@@ -271,8 +269,9 @@ class _AnnouncementCard extends StatelessWidget {
     final mainColor = _getMainColor(announcement.type);
     final badgeIcon = _getBadgeIcon(announcement.type);
 
-    const isCardLight = false;
-    const isPocketLight = false;
+    final isCardLight = AppColors.isLight;
+    final isPocketLight = AppColors.isLight;
+    final onMainColor = mainColor.computeLuminance() > 0.5 ? Colors.black : Colors.white;
 
     final screenWidth = MediaQuery.of(context).size.width;
     final cardWidth = screenWidth - 32;
@@ -303,7 +302,7 @@ class _AnnouncementCard extends StatelessWidget {
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.glassCardBorder.withOpacity(0.85), // Premium glass navy pocket
+                color: AppColors.glassCardBorder.withOpacity(0.85), // Premium glass pocket
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
                   color: mainColor.withOpacity(0.4),
@@ -329,7 +328,7 @@ class _AnnouncementCard extends StatelessWidget {
                     child: Text(
                       _getInitials(announcement.postedBy),
                       style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: onMainColor,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         height: 1.0,
@@ -343,10 +342,12 @@ class _AnnouncementCard extends StatelessWidget {
                       announcement.postedBy,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white70,
+                        color: isPocketLight
+                            ? const Color(0xFF0F172A)
+                            : Colors.white.withOpacity(0.85),
                       ),
                     ),
                   ),

@@ -86,7 +86,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                   height: 48,
                 ),
                 const SizedBox(height: 16),
-                const Text('Department not set',
+                Text('Department not set',
                     style: AppStyles.heading2, textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 Text('Please complete your profile to view study materials.',
@@ -188,12 +188,21 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
             child: Container(
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.glassCardColor.withOpacity(0.5),
+                color: AppColors.glassCardColor,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppColors.primary.withOpacity(0.2),
-                  width: 1,
+                  color: AppColors.glassCardBorder,
+                  width: 1.2,
                 ),
+                boxShadow: AppColors.isLight
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
               ),
               child: Center(
                 child: TextField(
@@ -775,7 +784,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Text(
                     'Upload Study Material',
                     style: AppStyles.heading2,
                     textAlign: TextAlign.center,
@@ -783,6 +792,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                   const SizedBox(height: 20),
                   DropdownButtonFormField<String>(
                     value: selectedCourseId,
+                    isExpanded: true,
                     dropdownColor: AppColors.backgroundTop,
                     style: TextStyle(color: AppColors.textPrimary),
                     decoration: InputDecoration(
@@ -797,6 +807,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                       DropdownMenuItem(
                         value: 'custom',
                         child: Text('Custom Course (Type manually)',
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.bold)),
@@ -805,7 +816,9 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                         return DropdownMenuItem(
                           value: course.id,
                           child: Text(
-                              '${course.courseCode}: ${course.courseName} (${course.teacherShort})'),
+                            '${course.courseCode}: ${course.courseName} (${course.teacherShort})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         );
                       }),
                     ],
@@ -890,6 +903,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: materialType,
+                    isExpanded: true,
                     dropdownColor: AppColors.backgroundTop,
                     style: TextStyle(color: AppColors.textPrimary),
                     decoration: InputDecoration(
@@ -901,7 +915,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                           borderSide: BorderSide(color: AppColors.primary)),
                     ),
                     items: ['Notes', 'Books', 'Videos', 'Others'].map((type) {
-                      return DropdownMenuItem(value: type, child: Text(type));
+                      return DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis));
                     }).toList(),
                     onChanged: (val) => materialType = val!,
                   ),

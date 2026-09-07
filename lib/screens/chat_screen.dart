@@ -235,6 +235,7 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = AppColors.isLight;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -245,15 +246,23 @@ class _ActionTile extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withOpacity(isLight ? 0.15 : 0.15),
                 shape: BoxShape.circle,
+                border: isLight
+                    ? Border.all(color: color.withOpacity(0.35), width: 1.2)
+                    : null,
               ),
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 16),
-            Text(label,
-                style: TextStyle(
-                    color: color, fontSize: 15, fontWeight: FontWeight.w500)),
+            Text(
+              label,
+              style: TextStyle(
+                color: isLight ? AppColors.textPrimary : color,
+                fontSize: 15,
+                fontWeight: isLight ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),
@@ -425,18 +434,16 @@ class _SeenBySheetState extends State<_SeenBySheet> {
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: (screenHeight * 0.75).clamp(320.0, 680.0),
-            minHeight: 240.0,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.backgroundTop.withOpacity(0.95),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
-          ),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: (screenHeight * 0.75).clamp(320.0, 680.0),
+          minHeight: 240.0,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.glassCardColor.withOpacity(0.95),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
+        ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -748,12 +755,11 @@ class _SeenBySheetState extends State<_SeenBySheet> {
                                   );
                                 },
                               ),
-              ),
+                            ),
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -902,8 +908,9 @@ class _MessageBubble extends StatelessWidget {
     final themeService = Provider.of<ThemeService>(context, listen: false);
     final currentTheme = themeService.currentTheme;
     final isBW = currentTheme == 'Black & White';
+    final isBright = AppColors.isLight;
     final textColor = isOwn
-        ? (isBW ? Colors.white : AppColors.onPrimary)
+        ? Colors.white
         : AppColors.textPrimary;
 
     final currentUser = Provider.of<AppUser?>(context, listen: false);
@@ -938,14 +945,18 @@ class _MessageBubble extends StatelessWidget {
           color: isHighlighted
               ? (isOwn
                   ? (isBW ? const Color(0xFF38383C) : AppColors.primary)
-                  : (isBW ? const Color(0xFF2B2B2E) : const Color(0xFF262232)))
+                  : (isBright
+                      ? const Color(0xFFDBEAFE)
+                      : (isBW ? const Color(0xFF2B2B2E) : const Color(0xFF262232))))
               : (isOwn
                   ? (isBW
                       ? const Color(0xFF2E2E30)
-                      : AppColors.primary.withValues(alpha: 0.95))
+                      : (isBright ? const Color(0xFF1D4ED8) : AppColors.primary.withValues(alpha: 0.95)))
                   : (isMentioned
-                      ? const Color(0xFF252015)
-                      : const Color(0xFF1E1E1E))),
+                      ? (isBright ? const Color(0xFFFEF3C7) : const Color(0xFF252015))
+                      : (isBright
+                          ? const Color(0xFFFFFFFF)
+                          : (isBW ? const Color(0xFF18181B) : const Color(0xFF1E1E1E))))),
           borderRadius: radius,
           border: Border.all(
             color: isHighlighted
@@ -957,33 +968,43 @@ class _MessageBubble extends StatelessWidget {
                     : (isOwn
                         ? (isBW
                             ? const Color(0xFF3F3F46)
-                            : AppColors.primary.withValues(alpha: 0.4))
-                        : Colors.white.withValues(alpha: 0.08))),
-            width: isHighlighted ? 1.2 : (isMentioned ? 1.2 : 0.8),
+                            : (isBright ? const Color(0xFF1E40AF) : AppColors.primary.withValues(alpha: 0.4)))
+                        : (isBright
+                            ? const Color(0xFFCBD5E1)
+                            : Colors.white.withValues(alpha: 0.08)))),
+            width: isHighlighted ? 1.2 : (isBright ? 1.2 : (isMentioned ? 1.2 : 0.8)),
           ),
-          boxShadow: isHighlighted
+          boxShadow: isBright && !isOwn
               ? [
                   BoxShadow(
-                    color: (isOwn ? Colors.white : AppColors.primary)
-                        .withValues(alpha: 0.22),
-                    blurRadius: 14,
-                    spreadRadius: 1,
-                  ),
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.14),
-                    blurRadius: 26,
-                    spreadRadius: 2,
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ]
-              : (isMentioned
+              : (isHighlighted
                   ? [
                       BoxShadow(
-                        color: Colors.amberAccent.withValues(alpha: 0.2),
-                        blurRadius: 10,
+                        color: (isOwn ? Colors.white : AppColors.primary)
+                            .withValues(alpha: 0.22),
+                        blurRadius: 14,
                         spreadRadius: 1,
                       ),
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.14),
+                        blurRadius: 26,
+                        spreadRadius: 2,
+                      ),
                     ]
-                  : null),
+                  : (isMentioned
+                      ? [
+                          BoxShadow(
+                            color: Colors.amberAccent.withValues(alpha: 0.2),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1070,7 +1091,7 @@ class _MessageBubble extends StatelessWidget {
               const SizedBox(height: 6),
               LinkifiedText(
                 message.text,
-                selectable: true,
+                selectable: false,
                 style: TextStyle(
                     color: textColor, fontSize: 14, height: 1.4),
                 linkStyle: TextStyle(
@@ -1088,7 +1109,7 @@ class _MessageBubble extends StatelessWidget {
           ] else
             LinkifiedText(
               message.text,
-              selectable: true,
+              selectable: false,
               style: TextStyle(
                   color: textColor, fontSize: 14, height: 1.4),
               linkStyle: TextStyle(
@@ -1149,11 +1170,13 @@ class _MessageBubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.28),
+            color: isOwn
+                ? Colors.black.withOpacity(0.18)
+                : (AppColors.isLight ? const Color(0xFFF1F5F9) : Colors.black.withOpacity(0.28)),
             borderRadius: BorderRadius.circular(10),
             border: Border(
               left: BorderSide(
-                color: isOwn ? textColor.withOpacity(0.7) : AppColors.primary,
+                color: isOwn ? Colors.white.withOpacity(0.8) : AppColors.primary,
                 width: 3,
               ),
             ),
@@ -1168,7 +1191,9 @@ class _MessageBubble extends StatelessWidget {
                     Text(
                       replyAuthor,
                       style: TextStyle(
-                        color: isOwn ? textColor.withOpacity(0.9) : AppColors.primary,
+                        color: isOwn
+                            ? Colors.white.withOpacity(0.9)
+                            : (AppColors.isLight ? const Color(0xFF1D4ED8) : AppColors.primary),
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1177,7 +1202,10 @@ class _MessageBubble extends StatelessWidget {
                     Text(
                       replyText.isEmpty ? 'Image' : replyText,
                       style: TextStyle(
-                          color: textColor.withOpacity(0.55), fontSize: 12),
+                          color: isOwn
+                              ? Colors.white.withOpacity(0.75)
+                              : (AppColors.isLight ? const Color(0xFF475569) : textColor.withOpacity(0.55)),
+                          fontSize: 12),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1188,7 +1216,7 @@ class _MessageBubble extends StatelessWidget {
               Icon(
                 Icons.arrow_upward_rounded,
                 size: 14,
-                color: (isOwn ? textColor : AppColors.primary).withOpacity(0.55),
+                color: (isOwn ? Colors.white : AppColors.primary).withOpacity(0.7),
               ),
             ],
           ),
@@ -1259,7 +1287,11 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -1270,7 +1302,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
   final List<PlatformFile> _selectedFiles = [];
   bool _isUploadingFiles = false;
-  final Set<String> _pendingSeenDocIds = {};
 
   String? _highlightedMessageId;
   Timer? _highlightTimer;
@@ -1284,6 +1315,38 @@ class _ChatScreenState extends State<ChatScreen> {
   List<AppUser> _departmentMembers = [];
   String? _mentionQuery;
   int? _mentionStartIndex;
+
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _messagesStream;
+  String? _cachedMessagesPath;
+  int _cachedMessageLimit = 50;
+  List<_ChatMsg> _cachedMsgs = [];
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>>? _configStream;
+  String? _cachedConfigPath;
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _getMessagesStream(
+      String path, int limit) {
+    if (_messagesStream == null ||
+        _cachedMessagesPath != path ||
+        _cachedMessageLimit != limit) {
+      _cachedMessagesPath = path;
+      _cachedMessageLimit = limit;
+      _messagesStream = _firestore
+          .collection(path)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .snapshots();
+    }
+    return _messagesStream!;
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> _getConfigStream(String path) {
+    if (_configStream == null || _cachedConfigPath != path) {
+      _cachedConfigPath = path;
+      _configStream = _firestore.collection(path).doc('department').snapshots();
+    }
+    return _configStream!;
+  }
 
   String get _chatPath {
     final user = Provider.of<AppUser?>(context, listen: false);
@@ -1763,22 +1826,20 @@ class _ChatScreenState extends State<ChatScreen> {
       useSafeArea: true,
       builder: (ctx) => ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + 16,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.backgroundTop.withOpacity(0.92),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+        child: Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).padding.bottom + 16,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.glassCardColor.withOpacity(0.95),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 // Drag handle
                 Container(
                   width: 40,
@@ -1821,7 +1882,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   _ActionTile(
                     icon: Icons.copy_rounded,
                     label: 'Copy Text',
-                    color: Colors.cyanAccent,
+                    color: AppColors.cyan,
                     onTap: () {
                       Navigator.pop(ctx);
                       Clipboard.setData(ClipboardData(text: msg.text));
@@ -1829,7 +1890,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         context,
                         title: 'Copied',
                         message: 'Message text copied to clipboard',
-                        accentColor: Colors.cyanAccent,
+                        accentColor: AppColors.cyan,
                         icon: Icons.copy_rounded,
                       );
                     },
@@ -1839,7 +1900,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   _ActionTile(
                     icon: Icons.edit_outlined,
                     label: 'Edit',
-                    color: Colors.blueAccent,
+                    color: AppColors.primary,
                     onTap: () {
                       Navigator.pop(ctx);
                       setState(() {
@@ -1857,7 +1918,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   _ActionTile(
                     icon: Icons.undo_rounded,
                     label: 'Unsend',
-                    color: Colors.orangeAccent,
+                    color: AppColors.amber,
                     onTap: () async {
                       Navigator.pop(ctx);
                       await _firestore
@@ -1878,7 +1939,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   _ActionTile(
                     icon: Icons.delete_outline_rounded,
                     label: isOwn ? 'Delete' : 'Delete (Admin)',
-                    color: Colors.redAccent,
+                    color: AppColors.crimson,
                     onTap: () async {
                       Navigator.pop(ctx);
                       final confirm = await showDialog<bool>(
@@ -1895,11 +1956,11 @@ class _ChatScreenState extends State<ChatScreen> {
                           actions: [
                             TextButton(
                                 onPressed: () => Navigator.pop(d, false),
-                                child: const Text('Cancel')),
+                                child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
                             TextButton(
                               onPressed: () => Navigator.pop(d, true),
-                              child: const Text('Delete',
-                                  style: TextStyle(color: Colors.redAccent)),
+                              child: Text('Delete',
+                                  style: TextStyle(color: AppColors.crimson, fontWeight: FontWeight.bold)),
                             ),
                           ],
                         ),
@@ -1928,7 +1989,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   _ActionTile(
                     icon: Icons.flag_outlined,
                     label: 'Report Message',
-                    color: Colors.amberAccent,
+                    color: AppColors.amber,
                     onTap: () {
                       Navigator.pop(ctx);
                       _showReportDialog(msg);
@@ -1940,8 +2001,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   void _showReportDialog(_ChatMsg msg) {
@@ -1961,19 +2021,19 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (d) => StatefulBuilder(
         builder: (dialogCtx, setDialogState) {
           return AlertDialog(
-            backgroundColor: AppColors.glassCardColor,
+            backgroundColor: AppColors.backgroundTop,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: Colors.amberAccent.withOpacity(0.3)),
+              side: BorderSide(color: AppColors.amber.withOpacity(0.35)),
             ),
             title: Row(
-              children: const [
-                Icon(Icons.flag_rounded, color: Colors.amberAccent, size: 22),
-                SizedBox(width: 8),
+              children: [
+                Icon(Icons.flag_rounded, color: AppColors.amber, size: 22),
+                const SizedBox(width: 8),
                 Text(
                   'Report Content',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -2002,7 +2062,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             isSelected
                                 ? Icons.radio_button_checked_rounded
                                 : Icons.radio_button_off_rounded,
-                            color: isSelected ? Colors.amberAccent : AppColors.textSecondary,
+                            color: isSelected ? AppColors.amber : AppColors.textSecondary,
                             size: 18,
                           ),
                           const SizedBox(width: 10),
@@ -2010,7 +2070,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             child: Text(
                               r,
                               style: TextStyle(
-                                color: isSelected ? Colors.white : AppColors.textSecondary,
+                                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
                                 fontSize: 12.5,
                                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                               ),
@@ -2116,6 +2176,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // ============================================================
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     Provider.of<ThemeService>(context); // Listen to global theme updates
     final appUser = Provider.of<AppUser?>(context);
     if (appUser == null) {
@@ -2127,8 +2188,6 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           _buildAppBar(),
           Expanded(child: _buildMessageList(appUser)),
-          if (_replyingTo != null) _buildReplyBanner(),
-          if (_editingMessage != null) _buildEditBanner(),
           _buildInputBar(appUser),
         ],
       ),
@@ -2142,13 +2201,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final isAllowed =
         user != null && (user.isCR || authService.isRootAdmin(user.email));
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream: _firestore
-          .collection(_getConfigPathForUser(user))
-          .doc('department')
-          .snapshots(),
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _getConfigStream(_getConfigPathForUser(user)),
       builder: (context, snap) {
-        final data = snap.data?.data() as Map<String, dynamic>?;
+        final data = snap.data?.data();
         final deptName = data?['name'] as String? ?? 'IPE Department';
         final logoUrl = data?['logoUrl'] as String?;
 
@@ -2158,146 +2214,165 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.glassCardColor.withOpacity(0.4),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppColors.glassCardBorder.withOpacity(0.7),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.25),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.glassCardColor.withOpacity(0.92),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.glassCardBorder.withOpacity(0.7),
+                    width: 1.5,
                   ),
-                  child: Row(
-                    children: [
-                      // Dept Logo
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.primary,
-                              AppColors.secondary.withOpacity(0.8)
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.45),
-                              blurRadius: 10,
-                              spreadRadius: 0,
-                            ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // Dept Logo
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primary,
+                            AppColors.secondary.withOpacity(0.8)
                           ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        child: (logoUrl != null && logoUrl.isNotEmpty)
-                            ? ClipOval(
-                                child: logoUrl.startsWith('data:image')
-                                    ? Builder(
-                                        builder: (context) {
-                                          try {
-                                            return Image.memory(
-                                              base64Decode(logoUrl.split(',').last),
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
-                                                  Icon(Icons.school_rounded,
-                                                      color: AppColors.textPrimary,
-                                                      size: 20),
-                                            );
-                                          } catch (_) {
-                                            return Icon(Icons.school_rounded,
-                                                color: AppColors.textPrimary, size: 20);
-                                          }
-                                        },
-                                      )
-                                    : Image.network(
-                                        logoUrl,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Icon(
-                                            Icons.school_rounded,
-                                            color: AppColors.textPrimary,
-                                            size: 20),
-                                      ),
-                              )
-                            : Icon(Icons.school_rounded,
-                                color: AppColors.textPrimary, size: 20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.45),
+                            blurRadius: 10,
+                            spreadRadius: 0,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      // Dept name + live indicator
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              deptName,
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  margin: const EdgeInsets.only(right: 5),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.greenAccent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                )
-                                    .animate(onPlay: (c) => c.repeat(reverse: true))
-                                    .fadeIn(duration: 700.ms),
-                                Text(
-                                  'Department Chat',
+                      child: (logoUrl != null && logoUrl.isNotEmpty)
+                          ? ClipOval(
+                              child: logoUrl.startsWith('data:image')
+                                  ? Builder(
+                                      builder: (context) {
+                                        try {
+                                          return Image.memory(
+                                            base64Decode(
+                                                logoUrl.split(',').last),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                Icon(Icons.school_rounded,
+                                                    color:
+                                                        AppColors.textPrimary,
+                                                    size: 20),
+                                          );
+                                        } catch (_) {
+                                          return Icon(Icons.school_rounded,
+                                              color: AppColors.textPrimary,
+                                              size: 20);
+                                        }
+                                      },
+                                    )
+                                  : Image.network(
+                                      logoUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Icon(
+                                          Icons.school_rounded,
+                                          color: AppColors.textPrimary,
+                                          size: 20),
+                                    ),
+                            )
+                          : Icon(Icons.school_rounded,
+                              color: AppColors.textPrimary, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    // Dept name + live indicator
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  deptName,
                                   style: TextStyle(
-                                      color: AppColors.textPrimary.withOpacity(0.45),
-                                      fontSize: 11),
+                                    color: AppColors.textPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isAllowed) ...[
+                                const SizedBox(width: 6),
+                                GestureDetector(
+                                  onTap: () =>
+                                      _showEditDeptDialog(deptName, logoUrl),
+                                  child: Icon(Icons.edit_rounded,
+                                      size: 14, color: AppColors.secondary),
                                 ),
                               ],
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                margin: const EdgeInsets.only(right: 5),
+                                decoration: const BoxDecoration(
+                                  color: Colors.greenAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              )
+                                  .animate(
+                                      onPlay: (c) => c.repeat(reverse: true))
+                                  .fadeIn(duration: 700.ms),
+                              Text(
+                                'Department Chat',
+                                style: TextStyle(
+                                    color:
+                                        AppColors.textPrimary.withOpacity(0.45),
+                                    fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      if (isAllowed) ...[
-                        IconButton(
-                          icon: Icon(
-                            Icons.people_alt_rounded,
-                            color: AppColors.textSecondary,
-                            size: 24,
-                          ),
-                          onPressed: () => _showMembersDialog(context, user!),
-                          tooltip: 'View Department Members',
+                    ),
+                    if (isAllowed && user != null) ...[
+                      IconButton(
+                        icon: Icon(
+                          Icons.people_alt_rounded,
+                          color: AppColors.textSecondary,
+                          size: 24,
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: Icon(
-                            Icons.edit_note_rounded,
-                            color: AppColors.textSecondary,
-                            size: 24,
-                          ),
-                          onPressed: () => _showEditDeptDialog(deptName, logoUrl),
-                          tooltip: 'Edit Department Details',
+                        onPressed: () => _showMembersDialog(context, user),
+                        tooltip: 'View Department Members',
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: Icon(
+                          Icons.edit_note_rounded,
+                          color: AppColors.textSecondary,
+                          size: 24,
                         ),
-                      ],
+                        onPressed: () =>
+                            _showEditDeptDialog(deptName, logoUrl),
+                        tooltip: 'Edit Department Details',
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -2630,15 +2705,13 @@ class _ChatScreenState extends State<ChatScreen> {
               child: ClipRRect(
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(24)),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundTop.withOpacity(0.92),
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(24)),
-                      border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
-                    ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.glassCardColor.withOpacity(0.95),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(24)),
+                    border: Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
+                  ),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 24, vertical: 20),
                     child: Column(
@@ -2838,13 +2911,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+              );
+            },
+          );
+        },
+      );
+    }
 
   // ---- REPLY SCROLL & HIGHLIGHT ----
   void _scrollToRepliedMessage(String targetId, List<_ChatMsg> currentMsgs) {
@@ -2928,19 +3000,22 @@ class _ChatScreenState extends State<ChatScreen> {
   // ---- MESSAGE LIST ----
   Widget _buildMessageList(AppUser appUser) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _firestore
-          .collection(_chatPath)
-          .orderBy('createdAt', descending: true)
-          .limit(_messageLimit)
-          .snapshots(),
+      stream: _getMessagesStream(_chatPath, _messageLimit),
       builder: (ctx, snap) {
-        if (snap.hasError) {
+        if (snap.hasError && _cachedMsgs.isEmpty) {
           return Center(
             child: Text('Error loading messages: ${snap.error}',
                 style: const TextStyle(color: Colors.redAccent)),
           );
         }
-        if (!snap.hasData) {
+        if (snap.hasData) {
+          _cachedMsgs = snap.data!.docs.map((d) => _ChatMsg.fromDoc(d)).toList()
+            ..sort((a, b) {
+              final cmp = b.createdAt.compareTo(a.createdAt);
+              if (cmp != 0) return cmp;
+              return b.preciseTime.compareTo(a.preciseTime);
+            });
+        } else if (_cachedMsgs.isEmpty) {
           return const UniGridLoader(
             title: 'Connecting to batch network...',
             subtitle: 'Fetching group messages...',
@@ -2948,12 +3023,7 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
 
-        final msgs = snap.data!.docs.map((d) => _ChatMsg.fromDoc(d)).toList()
-          ..sort((a, b) {
-            final cmp = b.createdAt.compareTo(a.createdAt);
-            if (cmp != 0) return cmp;
-            return b.preciseTime.compareTo(a.preciseTime);
-          });
+        final msgs = _cachedMsgs;
 
         // Mark conversation read via 1 lightweight user watermark write (0 writes to message docs)
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2980,88 +3050,103 @@ class _ChatScreenState extends State<ChatScreen> {
 
         return Stack(
           children: [
-            ListView.builder(
-              controller: _scrollController,
-              cacheExtent: 1000,
-              physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics()),
-              reverse: true,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              itemCount: msgs.length + 1,
-              itemBuilder: (ctx, i) {
-                if (i == msgs.length) {
-                  return Center(
-                    child: TextButton.icon(
-                      icon: const Icon(Icons.history, size: 16),
-                      label: const Text('Load older messages'),
-                      style: TextButton.styleFrom(
-                          foregroundColor: AppColors.textSecondary),
-                      onPressed: () => setState(() => _messageLimit += 50),
-                    ),
-                  );
-                }
-                final msg = msgs[i];
-                final isOwn = msg.authorId == appUser.id;
-                final showDate = i == msgs.length - 1 ||
-                    !_sameDay(msg.createdAt, msgs[i + 1].createdAt);
-                final isHighlighted = _highlightedMessageId == msg.id ||
-                    _highlightedMessageId == msg.docId;
-                final msgKey =
-                    _messageKeys.putIfAbsent(msg.id, () => GlobalKey());
+            ShaderMask(
+              shaderCallback: (Rect bounds) {
+                return const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black,
+                    Colors.black,
+                  ],
+                  stops: [0.0, 0.04, 1.0],
+                ).createShader(bounds);
+              },
+              blendMode: BlendMode.dstIn,
+              child: ListView.builder(
+                controller: _scrollController,
+                cacheExtent: 1000,
+                physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics()),
+                reverse: true,
+                padding: const EdgeInsets.only(left: 12, right: 12, bottom: 10, top: 16),
+                itemCount: msgs.length + 1,
+                itemBuilder: (ctx, i) {
+                  if (i == msgs.length) {
+                    return Center(
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.history, size: 16),
+                        label: const Text('Load older messages'),
+                        style: TextButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary),
+                        onPressed: () => setState(() => _messageLimit += 50),
+                      ),
+                    );
+                  }
+                  final msg = msgs[i];
+                  final isOwn = msg.authorId == appUser.id;
+                  final showDate = i == msgs.length - 1 ||
+                      !_sameDay(msg.createdAt, msgs[i + 1].createdAt);
+                  final isHighlighted = _highlightedMessageId == msg.id ||
+                      _highlightedMessageId == msg.docId;
+                  final msgKey =
+                      _messageKeys.putIfAbsent(msg.id, () => GlobalKey());
 
-                return Column(
-                  key: ValueKey(msg.id),
-                  children: [
-                    if (showDate) _dateSeparator(msg.createdAt),
-                    _SwipeToReply(
-                      onReply: () {
-                        if (msg.isUnsent || msg.isDeleted) return;
-                        setState(() => _replyingTo = msg);
-                        _focusNode.requestFocus();
-                      },
-                      child: Container(
-                        key: msgKey,
-                        child: _MessageBubble(
-                          message: msg,
-                          isOwn: isOwn,
-                          isHighlighted: isHighlighted,
-                          currentUserId: appUser.id,
-                          userWatermarks: _userWatermarks,
-                          onSeenTap: isOwn ? () => _showSeenBy(msg) : null,
-                          onReplyTap: (replyId) =>
-                              _scrollToRepliedMessage(replyId, msgs),
-                          onTap: () {
-                            if (msg.isUnsent || msg.isDeleted) {
-                              if (isOwn) {
-                                _showSeenBy(msg);
+                  return Column(
+                    key: ValueKey(msg.id),
+                    children: [
+                      if (showDate) _dateSeparator(msg.createdAt),
+                      _SwipeToReply(
+                        onReply: () {
+                          if (msg.isUnsent || msg.isDeleted) return;
+                          setState(() => _replyingTo = msg);
+                          _focusNode.requestFocus();
+                        },
+                        child: Container(
+                          key: msgKey,
+                          child: _MessageBubble(
+                            message: msg,
+                            isOwn: isOwn,
+                            isHighlighted: isHighlighted,
+                            currentUserId: appUser.id,
+                            userWatermarks: _userWatermarks,
+                            onSeenTap: isOwn ? () => _showSeenBy(msg) : null,
+                            onReplyTap: (replyId) =>
+                                _scrollToRepliedMessage(replyId, msgs),
+                            onTap: () {
+                              if (msg.isUnsent || msg.isDeleted) {
+                                if (isOwn) {
+                                  _showSeenBy(msg);
+                                }
+                                return;
                               }
-                              return;
-                            }
-                            if (msg.type == 'image' && msg.uri != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => FileViewerScreen(
-                                    fileName: msg.fileName ?? 'Image.jpg',
-                                    fileUrl: msg.uri,
+                              if (msg.type == 'image' && msg.uri != null) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => FileViewerScreen(
+                                      fileName: msg.fileName ?? 'Image.jpg',
+                                      fileUrl: msg.uri,
+                                    ),
                                   ),
-                                ),
-                              );
-                            } else {
-                              if (isOwn) {
-                                _showSeenBy(msg);
+                                );
                               } else {
-                                HapticFeedback.selectionClick();
+                                if (isOwn) {
+                                  _showSeenBy(msg);
+                                } else {
+                                  HapticFeedback.selectionClick();
+                                }
                               }
-                            }
-                          },
-                          onLongPress: () => _showActions(msg, appUser),
+                            },
+                            onLongPress: () => _showActions(msg, appUser),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
             Positioned(
               bottom: 12,
@@ -3153,114 +3238,102 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ---- REPLY BANNER ----
   Widget _buildReplyBanner() {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.12),
-            border: Border(
-              top: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withOpacity(0.35), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 3,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(2),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Replying to ${_replyingTo!.authorName}',
+                  style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Replying to ${_replyingTo!.authorName}',
-                      style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      (_replyingTo!.isUnsent || _replyingTo!.isDeleted)
-                          ? 'This message was unsent'
-                          : (_replyingTo!.type == 'image' &&
-                                  _replyingTo!.text.isEmpty
-                              ? 'Image'
-                              : _replyingTo!.text),
-                      style:
-                          TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                const SizedBox(height: 2),
+                Text(
+                  (_replyingTo!.isUnsent || _replyingTo!.isDeleted)
+                      ? 'This message was unsent'
+                      : (_replyingTo!.type == 'image' &&
+                              _replyingTo!.text.isEmpty
+                          ? 'Image'
+                          : _replyingTo!.text),
+                  style:
+                      TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              IconButton(
-                icon: Icon(Icons.close, color: AppColors.textSecondary, size: 18),
-                onPressed: () => setState(() => _replyingTo = null),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          IconButton(
+            icon: Icon(Icons.close, color: AppColors.textSecondary, size: 18),
+            onPressed: () => setState(() => _replyingTo = null),
+          ),
+        ],
       ),
     );
   }
 
   // ---- EDIT BANNER ----
   Widget _buildEditBanner() {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.blueAccent.withOpacity(0.12),
-            border: Border(
-              top: BorderSide(color: Colors.blueAccent.withOpacity(0.3)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blueAccent.withOpacity(0.35), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.edit, color: Colors.blueAccent, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Editing message',
+                    style: TextStyle(
+                        color: Colors.blueAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
+                Text(
+                  _editingMessage!.text,
+                  style:
+                      TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
-          child: Row(
-            children: [
-              const Icon(Icons.edit, color: Colors.blueAccent, size: 18),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Editing message',
-                        style: TextStyle(
-                            color: Colors.blueAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600)),
-                    Text(
-                      _editingMessage!.text,
-                      style:
-                          TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.close, color: AppColors.textSecondary, size: 18),
-                onPressed: () {
-                  setState(() => _editingMessage = null);
-                  _textController.clear();
-                },
-              ),
-            ],
+          IconButton(
+            icon: Icon(Icons.close, color: AppColors.textSecondary, size: 18),
+            onPressed: () {
+              setState(() => _editingMessage = null);
+              _textController.clear();
+            },
           ),
-        ),
+        ],
       ),
     );
   }
@@ -3329,8 +3402,8 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          color: AppColors.glassCardColor.withOpacity(0.95),
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 4),
             shrinkWrap: true,
@@ -3462,20 +3535,28 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ---- INPUT BAR ----
   Widget _buildInputBar(AppUser appUser) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: EdgeInsets.only(
-            left: 8,
-            right: 8,
-            top: 10,
-            bottom: MediaQuery.of(context).padding.bottom + 12 + 12,
+    final bool isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final double bottomPad = isKeyboardOpen
+        ? 8.0
+        : (MediaQuery.of(context).padding.bottom + 12 + 16);
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: 8,
+        right: 8,
+        top: 8,
+        bottom: bottomPad,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundTop.withOpacity(0.96),
+        border: Border(
+          top: BorderSide(
+            color: AppColors.glassCardBorder.withOpacity(0.8),
+            width: 1.0,
           ),
-          decoration: const BoxDecoration(
-            color: Colors.transparent,
-          ),
-          child: Column(
+        ),
+      ),
+      child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -3505,16 +3586,20 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: AppColors.textPrimary.withOpacity(0.07),
+                        color: AppColors.isLight
+                            ? const Color(0xFFFFFFFF)
+                            : AppColors.textPrimary.withOpacity(0.07),
                         borderRadius: BorderRadius.circular(24),
-                        border:
-                            Border.all(color: AppColors.textPrimary.withOpacity(0.1)),
+                        border: Border.all(
+                          color: AppColors.isLight
+                              ? const Color(0xFFCBD5E1)
+                              : AppColors.textPrimary.withOpacity(0.1),
+                        ),
                       ),
                       child: TextField(
                         controller: _textController,
                         focusNode: _focusNode,
-                        style:
-                            TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
                         maxLines: 5,
                         minLines: 1,
                         textInputAction: TextInputAction.newline,
@@ -3523,7 +3608,9 @@ class _ChatScreenState extends State<ChatScreen> {
                               ? 'Edit message…'
                               : 'Message IPE…',
                           hintStyle: TextStyle(
-                              color: AppColors.textPrimary.withOpacity(0.3),
+                              color: AppColors.isLight
+                                  ? const Color(0xFF94A3B8)
+                                  : AppColors.textPrimary.withOpacity(0.3),
                               fontSize: 14),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
@@ -3579,10 +3666,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
+        );
+      }
 
   // ---- SELECTED FILES PREVIEW ----
   Widget _buildSelectedFilesPreview() {
@@ -3644,3 +3729,4 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+

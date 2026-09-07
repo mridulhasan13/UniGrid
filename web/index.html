@@ -221,214 +221,139 @@
   </div>
 
   <script>
-    // --- Auto-Recovery & Cache Management System for UniGrid Web ---
+    // ════════════════════════════════════════════════════════════════════════
+    // UniGrid Web Engine Lifecycle & Cache Management
+    // ════════════════════════════════════════════════════════════════════════
     var _isAppLoaded = false;
+    var _loadTimeout = null;
 
     function _removeSplash() {
       var splash = document.getElementById('unigrid-splash');
       if (splash) {
-        splash.style.transition = 'opacity 0.5s ease';
+        splash.style.transition = 'opacity 0.4s ease';
         splash.style.opacity = '0';
-        setTimeout(function() { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 500);
+        setTimeout(function() {
+          if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+        }, 400);
       }
     }
 
-    var _retryCount = parseInt(sessionStorage.getItem('unigrid_retry_count') || '0', 10);
-
-    function _clearCachesAndReload() {
-      if (sessionStorage.getItem('unigrid_reloading') === '1') return;
-      sessionStorage.setItem('unigrid_reloading', '1');
-      sessionStorage.setItem('unigrid_retry_count', (_retryCount + 1).toString());
-
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for (var i = 0; i < registrations.length; i++) {
-            var swUrl = registrations[i].active?.scriptURL || registrations[i].installing?.scriptURL || registrations[i].waiting?.scriptURL || '';
-            if (swUrl.includes('flutter_service_worker')) {
-              registrations[i].unregister();
-            }
-          }
-        });
-      }
-      if ('caches' in window) {
-        caches.keys().then(function(names) {
-          for (var name of names) caches.delete(name);
-        });
-      }
-      setTimeout(function() {
-        sessionStorage.removeItem('unigrid_reloading');
-        window.location.reload(true);
-      }, 300);
-    }
-
-    function _showRetry(msg) {
-      var subtext = document.getElementById('unigrid-loading-subtext');
-      var spinner = document.getElementById('unigrid-spinner');
-      var btn = document.getElementById('unigrid-retry-btn');
-      var loadingText = document.getElementById('unigrid-loading-text');
-
-      if (subtext) subtext.textContent = msg || 'Attempting automatic recovery...';
-      if (loadingText) loadingText.textContent = 'Refreshing UniGrid...';
-      if (spinner) {
-        spinner.style.borderTopColor = '#00E676';
-        spinner.style.display = 'block';
-      }
-
-      if (btn) {
-        btn.textContent = 'Clean Cache & Reload';
-        btn.onclick = _clearCachesAndReload;
-        btn.style.display = 'block';
-      }
-
-      if (_retryCount < 3) {
-        setTimeout(_clearCachesAndReload, 3500);
-      }
-    }
-
-    // Reset retry counter on successful load
+    // Called as soon as Flutter renders its first frame or mounts its canvas/DOM view
     window._onAppLoaded = function() {
+      if (_isAppLoaded) return;
       _isAppLoaded = true;
-      sessionStorage.removeItem('unigrid_retry_count');
+      if (_loadTimeout) clearTimeout(_loadTimeout);
       sessionStorage.removeItem('unigrid_reloading');
-      localStorage.removeItem('unigrid_purging');
       _removeSplash();
     };
 
-    // Auto-reload when internet connection is restored if stuck on error
-    window.addEventListener('online', function() {
-      var btn = document.getElementById('unigrid-retry-btn');
-      if (btn && btn.style.display === 'block' && !_isAppLoaded) {
-        _clearCachesAndReload();
+    // Automatic detection when Flutter attaches to the DOM
+    var _domObserver = new MutationObserver(function(mutations) {
+      if (document.querySelector('flutter-view, flt-glass-pane, flt-scene-host, [flt-renderer]')) {
+        _domObserver.disconnect();
+        window._onAppLoaded();
       }
     });
+    if (document.body) {
+      _domObserver.observe(document.body, { childList: true, subtree: true });
+    }
 
-    // Silent load timeout (15s fallback if engine hangs)
-    var _loadTimeout = setTimeout(function() {
-      if (!_isAppLoaded && _retryCount < 3) {
-        _clearCachesAndReload();
+    // Interval fallback in case Flutter mounted prior to observer
+    var _checkInterval = setInterval(function() {
+      if (_isAppLoaded) {
+        clearInterval(_checkInterval);
+        return;
       }
-    }, 15000);
+      if (document.querySelector('flutter-view, flt-glass-pane, flt-scene-host, [flt-renderer]')) {
+        clearInterval(_checkInterval);
+        if (_domObserver) _domObserver.disconnect();
+        window._onAppLoaded();
+      }
+    }, 100);
 
-    // Global JS error handler
-    window.addEventListener('error', function(e) {
-      if (_isAppLoaded) return;
-      console.warn('[UniGrid Web] Engine load notice:', e.message);
+    window.addEventListener('flutter-first-frame', function() {
+      window._onAppLoaded();
     });
 
-    // ════════════════════════════════════════════════════════════════════════
-    // Live Build Cache Purger & Auto-Updater System
-    // ════════════════════════════════════════════════════════════════════════
-    var CURRENT_APP_VERSION = '20260806_v12';
+    // Fallback if engine is completely stuck (e.g. offline on first load without cache)
+    _loadTimeout = setTimeout(function() {
+      if (!_isAppLoaded) {
+        var subtext = document.getElementById('unigrid-loading-subtext');
+        var btn = document.getElementById('unigrid-retry-btn');
+        if (subtext) subtext.textContent = 'Connection is taking longer than usual...';
+        if (btn) btn.style.display = 'block';
+      }
+    }, 25000);
 
-    function _purgeBrowserCacheAndReload(newVersion) {
-      console.log('[UniGrid Auto-Purger] Upgrading build version to:', newVersion);
-      if (localStorage.getItem('unigrid_purging') === '1') return;
-      localStorage.setItem('unigrid_purging', '1');
-
-      localStorage.setItem('unigrid_app_version', newVersion);
-      localStorage.setItem('unigrid_last_cache_clear', Date.now().toString());
+    // ════════════════════════════════════════════════════════════════════════
+    // Live Deployment Auto-Updater (Safe, No Reload Loops)
+    // ════════════════════════════════════════════════════════════════════════
+    function _purgeAndReload(newBuild) {
+      var lastReload = parseInt(sessionStorage.getItem('unigrid_last_purge_reload') || '0', 10);
+      if (Date.now() - lastReload < 15000) {
+        // Debounce: Never reload more than once in 15 seconds
+        return;
+      }
+      sessionStorage.setItem('unigrid_last_purge_reload', Date.now().toString());
+      localStorage.setItem('unigrid_active_build', String(newBuild));
 
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for (var i = 0; i < registrations.length; i++) {
-            var swUrl = registrations[i].active?.scriptURL || registrations[i].installing?.scriptURL || registrations[i].waiting?.scriptURL || '';
-            if (swUrl.includes('flutter_service_worker')) {
-              registrations[i].unregister();
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          for (var i = 0; i < regs.length; i++) {
+            var url = regs[i].active?.scriptURL || regs[i].installing?.scriptURL || regs[i].waiting?.scriptURL || '';
+            if (url.includes('flutter_service_worker')) {
+              regs[i].unregister();
             }
           }
         });
       }
 
       if ('caches' in window) {
-        caches.keys().then(function(names) {
-          return Promise.all(names.map(function(name) { return caches.delete(name); }));
+        caches.keys().then(function(keys) {
+          return Promise.all(keys.map(function(k) { return caches.delete(k); }));
         }).then(function() {
-          _finishPurgeAndReload();
+          setTimeout(function() { window.location.reload(true); }, 200);
         }).catch(function() {
-          _finishPurgeAndReload();
+          setTimeout(function() { window.location.reload(true); }, 200);
         });
       } else {
-        _finishPurgeAndReload();
+        setTimeout(function() { window.location.reload(true); }, 200);
       }
     }
 
-    function _finishPurgeAndReload() {
-      setTimeout(function() {
-        localStorage.removeItem('unigrid_purging');
-        window.location.reload(true);
-      }, 200);
-    }
-
-    // Check version and 5-day cache timer on page load
-    (function _checkImmediateVersionAndTimer() {
-      var savedVersion = localStorage.getItem('unigrid_app_version');
-      var lastClearTime = parseInt(localStorage.getItem('unigrid_last_cache_clear') || '0', 10);
-      var FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
-      var isExpiredFiveDays = lastClearTime > 0 && (Date.now() - lastClearTime) > FIVE_DAYS_MS;
-
-      if (!savedVersion) {
-        localStorage.setItem('unigrid_app_version', CURRENT_APP_VERSION);
-        localStorage.setItem('unigrid_last_cache_clear', Date.now().toString());
-        localStorage.removeItem('unigrid_purging');
-      } else if (savedVersion !== CURRENT_APP_VERSION || isExpiredFiveDays) {
-        if (isExpiredFiveDays) {
-          console.log('[UniGrid Auto-Purger] 5 days elapsed since last cache clear. Purging cache...');
-        }
-        _purgeBrowserCacheAndReload(CURRENT_APP_VERSION);
-      } else {
-        localStorage.removeItem('unigrid_purging');
-      }
-    })();
-
-    // Live Deployment Checker
     function _checkLiveDeploymentUpdate() {
       fetch('/version.json?t=' + Date.now(), { cache: 'no-store' })
         .then(function(res) {
           if (!res.ok) return null;
-          var contentType = res.headers.get('content-type') || '';
-          if (!contentType.includes('application/json') && !contentType.includes('text/plain')) return null;
           return res.json();
         })
         .then(function(data) {
           if (!data) return;
-          var liveBuildNumber = data.build_number || data.version;
-          if (!liveBuildNumber) return;
-          var storedLiveBuild = localStorage.getItem('unigrid_live_build');
-          if (storedLiveBuild && storedLiveBuild !== String(liveBuildNumber)) {
-            console.log('[UniGrid Live Deploy] New version detected live! Purging cache...');
-            localStorage.setItem('unigrid_live_build', String(liveBuildNumber));
-            _purgeBrowserCacheAndReload(CURRENT_APP_VERSION + '_' + liveBuildNumber);
-          } else {
-            localStorage.setItem('unigrid_live_build', String(liveBuildNumber));
+          var liveBuild = data.build_number || data.version;
+          if (!liveBuild) return;
+          var storedBuild = localStorage.getItem('unigrid_active_build');
+          if (!storedBuild) {
+            localStorage.setItem('unigrid_active_build', String(liveBuild));
+          } else if (storedBuild !== String(liveBuild)) {
+            console.log('[UniGrid Auto-Update] Updating build from', storedBuild, 'to', liveBuild);
+            _purgeAndReload(liveBuild);
           }
         })
         .catch(function(err) {
-          console.log('[UniGrid Live Deploy] Version check skipped:', err);
+          console.warn('[UniGrid] Version check skipped:', err);
         });
     }
 
+    // Check version on tab focus
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'visible') {
         _checkLiveDeploymentUpdate();
       }
     });
 
-    window.addEventListener('flutter-first-frame', function() {
-      clearTimeout(_loadTimeout);
-      window._onAppLoaded();
-    });
-
-    window.addEventListener('load', function(ev) {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for (var i = 0; i < registrations.length; i++) {
-            var swUrl = registrations[i].active?.scriptURL || registrations[i].installing?.scriptURL || registrations[i].waiting?.scriptURL || '';
-            if (swUrl.includes('flutter_service_worker')) {
-              registrations[i].unregister();
-            }
-          }
-        });
-      }
+    // Check version once on page load
+    window.addEventListener('load', function() {
+      _checkLiveDeploymentUpdate();
     });
   </script>
 </body>
