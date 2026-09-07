@@ -38,7 +38,18 @@ class WAReceiver {
     if (specificThreadKey != null && specificThreadKey.isNotEmpty) {
       await NotifThreadStore.clearThread(specificThreadKey);
       try {
-        await _local.cancel(specificThreadKey.hashCode);
+        if (specificThreadKey == 'batch_chat' || specificThreadKey == 'chat') {
+          await _local.cancel(1001, tag: 'unigrid_batch_chat');
+        } else if (specificThreadKey == 'unigrid_routine' || specificThreadKey == 'routine') {
+          await _local.cancel(3000, tag: 'unigrid_routine');
+        } else if (specificThreadKey == 'unigrid_materials' || specificThreadKey == 'materials') {
+          await _local.cancel(4000, tag: 'unigrid_materials');
+        } else if (specificThreadKey == 'unigrid_alerts' || specificThreadKey == 'alerts') {
+          await _local.cancel(2000, tag: 'unigrid_alerts');
+        } else {
+          final dmId = 10000 + (specificThreadKey.hashCode.abs() % 90000);
+          await _local.cancel(dmId, tag: 'unigrid_dm_$specificThreadKey');
+        }
       } catch (_) {}
     } else {
       _recentAlertLines.clear();
@@ -188,6 +199,21 @@ class WAReceiver {
           route.contains('material');
 
       if (isChat) {
+        // Suppress notification if user is actively in this chat screen right now
+        final currentActive = NotificationRouter.activeChatId;
+        if (currentActive != null) {
+          final bool isPrivateCheck = target.contains('private') || type.contains('private') || route.contains('private');
+          final senderUserId = (message.data['senderUserId'] ?? message.data['userId'] ?? message.data['authorId'] ?? '').toString();
+          if (isPrivateCheck && (senderUid == currentActive || senderUserId == currentActive)) {
+            debugPrint('[WAReceiver] Suppressing notification — active private chat is open');
+            return;
+          }
+          if (!isPrivateCheck && currentActive == 'group_chat') {
+            debugPrint('[WAReceiver] Suppressing notification — active group chat is open');
+            return;
+          }
+        }
+
         // Resolve conversation thread key (group chat vs 1-on-1 private chat)
         final bool isPrivate = target.contains('private') || type.contains('private') || route.contains('private');
         final String threadKey = isPrivate
@@ -202,6 +228,15 @@ class WAReceiver {
         final String androidTag = isPrivate
             ? 'unigrid_dm_$threadKey'
             : 'unigrid_batch_chat';
+        final int conversationNotifId = isPrivate ? (10000 + (threadKey.hashCode.abs() % 90000)) : 1001;
+
+        // Sync with active status bar notifications: if user dismissed/swiped previous notification, start fresh
+        await NotifThreadStore.syncWithActiveNotifications(
+          localNotif: _local,
+          threadKey: threadKey,
+          notifId: conversationNotifId,
+          tag: androidTag,
+        );
 
         // 1. Stack message lines under this sender/chat in persistent store (WhatsApp Style)
         final stackedLines = await NotifThreadStore.addMessage(
@@ -210,7 +245,6 @@ class WAReceiver {
           messageText: lineText,
         );
 
-        final int conversationNotifId = isPrivate ? threadKey.hashCode : 1001;
         final finalChatTitle = stackedLines.length > 1
             ? '$conversationTitle (${stackedLines.length} messages)'
             : conversationTitle;
@@ -242,6 +276,12 @@ class WAReceiver {
         );
       } else if (isRoutine) {
         final line = title.isNotEmpty ? '$title: $body' : body;
+        await NotifThreadStore.syncWithActiveNotifications(
+          localNotif: _local,
+          threadKey: 'unigrid_routine',
+          notifId: 3000,
+          tag: 'unigrid_routine',
+        );
         final stackedLines = await NotifThreadStore.addMessage(
           threadKey: 'unigrid_routine',
           senderName: '📅 Routine Reminders',
@@ -277,6 +317,12 @@ class WAReceiver {
         );
       } else if (isMaterial) {
         final line = title.isNotEmpty && title != 'UniGrid' ? '$title: $body' : body;
+        await NotifThreadStore.syncWithActiveNotifications(
+          localNotif: _local,
+          threadKey: 'unigrid_materials',
+          notifId: 4000,
+          tag: 'unigrid_materials',
+        );
         final stackedLines = await NotifThreadStore.addMessage(
           threadKey: 'unigrid_materials',
           senderName: '📁 Study Materials',
@@ -313,6 +359,12 @@ class WAReceiver {
       } else {
         // Notices / Announcements / General Notices -> ONE single stacked partition
         final line = title.isNotEmpty && title != 'UniGrid' ? '$title: $body' : body;
+        await NotifThreadStore.syncWithActiveNotifications(
+          localNotif: _local,
+          threadKey: 'unigrid_alerts',
+          notifId: 2000,
+          tag: 'unigrid_alerts',
+        );
         final stackedLines = await NotifThreadStore.addMessage(
           threadKey: 'unigrid_alerts',
           senderName: '📢 Announcements',

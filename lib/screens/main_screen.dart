@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
 import 'home_screen.dart';
@@ -13,9 +14,10 @@ import '../services/auth_service.dart';
 
 import '../services/theme_service.dart';
 import '../utils/constants.dart';
-import '../widgets/glass_card.dart';
 import '../notifications/notification_router.dart';
 import '../notifications/routine_reminder_service.dart';
+
+import '../notifications/web_to_app/wa_receiver.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -35,10 +37,26 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   String? _lastSyncedUserId;
 
+  void _clearHistoryForTab(int tabIndex) {
+    if (tabIndex == 0) {
+      WAReceiver.clearHistory('unigrid_alerts').catchError((_) {});
+    } else if (tabIndex == 1) {
+      WAReceiver.clearHistory('unigrid_routine').catchError((_) {});
+    } else if (tabIndex == 2) {
+      WAReceiver.clearHistory('unigrid_materials').catchError((_) {});
+    } else if (tabIndex == 3) {
+      WAReceiver.clearHistory('batch_chat').catchError((_) {});
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _currentIndex = MainScreen.tabNotifier.value;
+    if (_currentIndex == 3) {
+      NotificationRouter.activeChatId = 'group_chat';
+    }
+    _clearHistoryForTab(_currentIndex);
     MainScreen.tabNotifier.addListener(_onTabChanged);
 
     // Process any pending notification tap once MainScreen is mounted
@@ -49,6 +67,9 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    if (NotificationRouter.activeChatId == 'group_chat') {
+      NotificationRouter.activeChatId = null;
+    }
     MainScreen.tabNotifier.removeListener(_onTabChanged);
     super.dispose();
   }
@@ -58,6 +79,12 @@ class _MainScreenState extends State<MainScreen> {
       setState(() {
         _currentIndex = MainScreen.tabNotifier.value;
       });
+      _clearHistoryForTab(_currentIndex);
+      if (_currentIndex == 3) {
+        NotificationRouter.activeChatId = 'group_chat';
+      } else if (NotificationRouter.activeChatId == 'group_chat') {
+        NotificationRouter.activeChatId = null;
+      }
     }
   }
 
@@ -193,7 +220,8 @@ class _MainScreenState extends State<MainScreen> {
                       MainScreen.tabNotifier.value = index;
                     },
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4.0, vertical: 4.0),
                       child: Icon(
                         iconData,
                         color: isSelected

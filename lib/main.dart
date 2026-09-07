@@ -16,6 +16,7 @@ import 'screens/pending_approval_screen.dart';
 import 'utils/constants.dart';
 import 'notifications/fcm_service.dart';
 import 'notifications/notification_coordinator.dart';
+import 'notifications/notification_router.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'widgets/network_aware_wrapper.dart';
@@ -126,6 +127,18 @@ class MyApp extends StatelessWidget {
               bodyColor: AppColors.textPrimary,
               displayColor: AppColors.textPrimary,
             ),
+            pageTransitionsTheme: const PageTransitionsTheme(
+              builders: {
+                TargetPlatform.android: ZoomPageTransitionsBuilder(),
+                TargetPlatform.iOS: ZoomPageTransitionsBuilder(),
+                TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+                TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
+                TargetPlatform.linux: ZoomPageTransitionsBuilder(),
+              },
+            ),
+          ),
+          scrollBehavior: const MaterialScrollBehavior().copyWith(
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
           ),
           home: const NetworkAwareWrapper(
             child: AuthWrapper(),
@@ -165,6 +178,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (mounted) {
       setState(() {
         _isRestoringSession = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        NotificationRouter.processPendingNotification();
       });
     }
   }

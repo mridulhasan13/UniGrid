@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../utils/constants.dart';
@@ -26,13 +27,16 @@ class _FileViewerScreenState extends State<FileViewerScreen>
     with SingleTickerProviderStateMixin {
   String get _fullUrl => widget.fileUrl ?? '';
   bool _isPdfLoading = true;
-  String? _pdfLoadError;
   final PdfViewerController _pdfViewerController = PdfViewerController();
 
   AnimationController? _zoomAnimationController;
   final TransformationController _imageTransformController =
       TransformationController();
   TapDownDetails? _doubleTapDetails;
+
+  bool _isCheckingAvailability = false;
+  bool _isDeleted = false;
+  String? _deletionReason;
 
   bool get _isBase64 => _fullUrl.startsWith('data:');
 
@@ -75,12 +79,7 @@ class _FileViewerScreenState extends State<FileViewerScreen>
       duration: const Duration(milliseconds: 260),
     );
 
-    // Auto-launch the file externally on mobile if it is not an image/PDF and url is present
-    if (!kIsWeb && !_isImage && !_isPdf && _fullUrl.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _downloadFile();
-      });
-    }
+    _checkFileAvailability();
   }
 
   @override
@@ -93,13 +92,66 @@ class _FileViewerScreenState extends State<FileViewerScreen>
   @override
   void didUpdateWidget(covariant FileViewerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!kIsWeb && !_isImage && !_isPdf) {
-      // If the URL goes from empty/null to non-empty (finished uploading), auto-launch
-      if (oldWidget.fileUrl != widget.fileUrl && _fullUrl.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _downloadFile();
+    if (oldWidget.fileUrl != widget.fileUrl) {
+      _checkFileAvailability();
+    }
+  }
+
+  Future<void> _checkFileAvailability() async {
+    if (_fullUrl.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isCheckingAvailability = false;
         });
       }
+      return;
+    }
+    if (_isBase64) {
+      if (mounted) {
+        setState(() {
+          _isCheckingAvailability = false;
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _isCheckingAvailability = true;
+      _isDeleted = false;
+      _deletionReason = null;
+    });
+
+    try {
+      final uri = Uri.parse(_fullUrl);
+      http.Response response;
+      try {
+        response = await http.head(uri).timeout(const Duration(seconds: 4));
+      } catch (_) {
+        response = await http.get(uri, headers: {'Range': 'bytes=0-10'}).timeout(const Duration(seconds: 4));
+      }
+
+      if (response.statusCode == 404 ||
+          response.statusCode == 410 ||
+          response.statusCode == 400 ||
+          response.statusCode == 403) {
+        if (mounted) {
+          setState(() {
+            _isDeleted = true;
+            _isCheckingAvailability = false;
+            _deletionReason =
+                'Items may be deleted by the admin, ask them for it.';
+          });
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('[FileViewerScreen] Availability check error: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _isCheckingAvailability = false;
+      });
     }
   }
 
@@ -132,7 +184,18 @@ class _FileViewerScreenState extends State<FileViewerScreen>
   }
 
   void _downloadFile() async {
-    if (_fullUrl.isEmpty) return;
+    if (_isDeleted || _fullUrl.isEmpty) {
+      if (mounted) {
+        InAppNotification.show(
+          context,
+          title: 'File Not Available',
+          message: 'Items may be deleted by the admin. Ask them for it.',
+          accentColor: Colors.redAccent,
+          icon: Icons.link_off_rounded,
+        );
+      }
+      return;
+    }
     if (kIsWeb) {
       downloadWebFile(_fullUrl, widget.fileName);
     } else {
@@ -164,7 +227,18 @@ class _FileViewerScreenState extends State<FileViewerScreen>
   }
 
   void _printFile() async {
-    if (_fullUrl.isEmpty) return;
+    if (_isDeleted || _fullUrl.isEmpty) {
+      if (mounted) {
+        InAppNotification.show(
+          context,
+          title: 'File Not Available',
+          message: 'Items may be deleted by the admin. Ask them for it.',
+          accentColor: Colors.redAccent,
+          icon: Icons.link_off_rounded,
+        );
+      }
+      return;
+    }
     if (kIsWeb) {
       printWebFile(_fullUrl);
     } else {
@@ -245,7 +319,7 @@ class _FileViewerScreenState extends State<FileViewerScreen>
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: _downloadFile,
+              onPressed: _isDeleted ? null : _downloadFile,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.onPrimary,
@@ -275,9 +349,105 @@ class _FileViewerScreenState extends State<FileViewerScreen>
     );
   }
 
+  Widget _buildDeletedView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withOpacity(0.12),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.redAccent.withOpacity(0.35),
+                  width: 2,
+                ),
+              ),
+              child: const Icon(
+                Icons.link_off_rounded,
+                color: Colors.redAccent,
+                size: 64,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              widget.fileName,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.delete_outline_rounded,
+                      color: Colors.redAccent, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'File Removed / Deleted',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              _deletionReason ??
+                  'Items may be deleted by the admin, ask them for it.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).maybePop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                elevation: 3,
+              ),
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              label: const Text(
+                'Go Back',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   Widget _buildLoadingView({
-    String title = 'Securing Your File',
-    String subtitle = 'Uploading attachment to cloud storage...',
+    String title = 'Verifying File Security',
+    String subtitle = 'Checking cloud storage link...',
   }) {
     return UniGridLoader(
       title: title,
@@ -326,9 +496,9 @@ class _FileViewerScreenState extends State<FileViewerScreen>
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
         actions: [
-          if (_fullUrl.isNotEmpty && !_isBase64) ...[
+          if (_fullUrl.isNotEmpty && !_isBase64 && !_isDeleted) ...[
             IconButton(
-              icon: Icon(Icons.print, color: AppColors.textPrimary),
+              icon: const Icon(Icons.print, color: AppColors.textPrimary),
               onPressed: _printFile,
               tooltip: 'Print / Open externally',
             ),
@@ -344,153 +514,103 @@ class _FileViewerScreenState extends State<FileViewerScreen>
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(gradient: AppGradients.mainBackground),
-        child: _fullUrl.isEmpty
-            ? _buildLoadingView()
-            : (_isImage || _isBase64
-                ? GestureDetector(
-                    onDoubleTapDown: (details) => _doubleTapDetails = details,
-                    onDoubleTap: _handleImageDoubleTap,
-                    child: SizedBox.expand(
-                      child: InteractiveViewer(
-                        transformationController: _imageTransformController,
-                        minScale: 0.5,
-                        maxScale: 8.0,
-                        boundaryMargin: const EdgeInsets.all(60),
-                        clipBehavior: Clip.none,
-                        child: Center(
-                          child: _isBase64
-                              ? _buildBase64View()
-                              : Image.network(
-                                  _fullUrl,
-                                  fit: BoxFit.contain,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  loadingBuilder:
-                                      (context, child, progress) {
-                                    if (progress == null) return child;
-                                    return Center(
-                                      child: CircularProgressIndicator(
-                                          color: AppColors.primary),
-                                    );
-                                  },
-                                  errorBuilder:
-                                      (context, error, stackTrace) =>
-                                          Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.broken_image,
-                                            color: AppColors.textSecondary
-                                                .withOpacity(0.3),
-                                            size: 64),
-                                        const SizedBox(height: 12),
-                                        const Text(
-                                          'Could not load image.',
-                                          style: TextStyle(
-                                              color:
-                                                  AppColors.textSecondary),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ),
-                  )
-                : (_isPdf
-                    ? Stack(
-                        children: [
-                          InteractiveViewer(
-                            minScale: 1.0,
-                            maxScale: 6.0,
-                            boundaryMargin: const EdgeInsets.all(40),
+        child: _isDeleted
+            ? _buildDeletedView()
+            : (_isCheckingAvailability || _fullUrl.isEmpty
+                ? _buildLoadingView()
+                : (_isImage || _isBase64
+                    ? GestureDetector(
+                        onDoubleTapDown: (details) =>
+                            _doubleTapDetails = details,
+                        onDoubleTap: _handleImageDoubleTap,
+                        child: SizedBox.expand(
+                          child: InteractiveViewer(
+                            transformationController:
+                                _imageTransformController,
+                            minScale: 0.5,
+                            maxScale: 8.0,
+                            boundaryMargin: const EdgeInsets.all(60),
                             clipBehavior: Clip.none,
-                            child: SfPdfViewer.network(
-                              _fullUrl,
-                              controller: _pdfViewerController,
-                              canShowScrollHead: true,
-                              canShowScrollStatus: true,
-                              canShowPaginationDialog: false,
-                              enableTextSelection: false,
-                              pageLayoutMode: PdfPageLayoutMode.continuous,
-                              scrollDirection: PdfScrollDirection.vertical,
-                              interactionMode: PdfInteractionMode.pan,
-                              onDocumentLoaded: (details) {
-                                setState(() {
-                                  _isPdfLoading = false;
-                                  _pdfLoadError = null;
-                                });
-                              },
-                              onDocumentLoadFailed: (details) {
-                                setState(() {
-                                  _isPdfLoading = false;
-                                  _pdfLoadError = details.description;
-                                });
-                              },
+                            child: Center(
+                              child: _isBase64
+                                  ? _buildBase64View()
+                                  : Image.network(
+                                      _fullUrl,
+                                      fit: BoxFit.contain,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      loadingBuilder:
+                                          (context, child, progress) {
+                                        if (progress == null) return child;
+                                        return Center(
+                                          child: CircularProgressIndicator(
+                                              color: AppColors.primary),
+                                        );
+                                      },
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                          if (mounted && !_isDeleted) {
+                                            setState(() {
+                                              _isDeleted = true;
+                                            });
+                                          }
+                                        });
+                                        return _buildDeletedView();
+                                      },
+                                    ),
                             ),
                           ),
-                          if (_isPdfLoading)
-                            Positioned.fill(
-                              child: _buildLoadingView(
-                                title: 'Loading PDF Document',
-                                subtitle:
-                                    'Rendering pages with high fidelity...',
-                              ),
-                            ),
-                          if (_pdfLoadError != null)
-                            Positioned.fill(
-                              child: Container(
-                                color: AppColors.backgroundTop,
-                                padding: const EdgeInsets.all(24),
-                                child: Column(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.error_outline,
-                                        color: Colors.redAccent, size: 48),
-                                    const SizedBox(height: 16),
-                                    const Text(
-                                      'Failed to load PDF in-app',
-                                      style: TextStyle(
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      _pdfLoadError!,
-                                      style: const TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 12),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 24),
-                                    ElevatedButton.icon(
-                                      onPressed: _downloadFile,
-                                      icon: const Icon(Icons.open_in_new),
-                                      label: const Text(
-                                          'Open in Browser / External App'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.primary,
-                                        foregroundColor: AppColors.onPrimary,
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 20, vertical: 12),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                        ),
+                      )
+                    : (_isPdf
+                        ? Stack(
+                            children: [
+                              InteractiveViewer(
+                                minScale: 1.0,
+                                maxScale: 6.0,
+                                boundaryMargin: const EdgeInsets.all(40),
+                                clipBehavior: Clip.none,
+                                child: SfPdfViewer.network(
+                                  _fullUrl,
+                                  controller: _pdfViewerController,
+                                  canShowScrollHead: true,
+                                  canShowScrollStatus: true,
+                                  canShowPaginationDialog: false,
+                                  enableTextSelection: false,
+                                  pageLayoutMode: PdfPageLayoutMode.continuous,
+                                  scrollDirection:
+                                      PdfScrollDirection.vertical,
+                                  interactionMode: PdfInteractionMode.pan,
+                                  onDocumentLoaded: (details) {
+                                    setState(() {
+                                      _isPdfLoading = false;
+                                    });
+                                  },
+                                  onDocumentLoadFailed: (details) {
+                                    setState(() {
+                                      _isPdfLoading = false;
+                                      _isDeleted = true;
+                                      _deletionReason =
+                                          'Items may be deleted by the admin, ask them for it.';
+                                    });
+                                  },
                                 ),
                               ),
-                            ),
-                        ],
-                      )
-                    : (kIsWeb
-                        ? buildWebViewer(_fullUrl, widget.fileName)
-                        : _buildMobileDocumentView()))),
+                              if (_isPdfLoading)
+                                Positioned.fill(
+                                  child: _buildLoadingView(
+                                    title: 'Loading PDF Document',
+                                    subtitle:
+                                        'Rendering pages with high fidelity...',
+                                  ),
+                                ),
+                            ],
+                          )
+                        : (kIsWeb
+                            ? buildWebViewer(_fullUrl, widget.fileName)
+                            : _buildMobileDocumentView())))),
       ),
     );
   }

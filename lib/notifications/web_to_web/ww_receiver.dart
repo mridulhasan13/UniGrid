@@ -57,6 +57,14 @@ class WWReceiver {
           }
         }
 
+        if (prefField == 'notifRoutine' || target.contains('schedule') || target.contains('routine') || target.contains('reminder')) {
+          final notifRoutine = prefs.getBool('notif_routine') ?? true;
+          if (!notifRoutine) {
+            debugPrint('[WWReceiver] Suppressing web routine notification (notif_routine is OFF)');
+            return;
+          }
+        }
+
         if (prefField == 'notifAlerts' || target.contains('announcement') || target.contains('material') || target.contains('notice')) {
           final notifAlerts = prefs.getBool('notif_alerts') ?? true;
           if (!notifAlerts) {
@@ -152,6 +160,22 @@ class WWReceiver {
               : (isRoutine
                   ? Colors.blueAccent
                   : (isMaterial ? AppColors.primary : Colors.amberAccent)));
+
+      // ── Check if active chat screen is currently open ────────────────────
+      if (isChat) {
+        final currentActive = NotificationRouter.activeChatId;
+        if (currentActive != null) {
+          final senderUserId = (message.data['senderUserId'] ?? message.data['userId'] ?? message.data['authorId'] ?? '').toString();
+          if (isPrivate && (senderUid == currentActive || senderUserId == currentActive)) {
+            debugPrint('[WWReceiver] Suppressing in-app banner & sound — active private chat is open');
+            return;
+          }
+          if (!isPrivate && currentActive == 'group_chat') {
+            debugPrint('[WWReceiver] Suppressing in-app banner & sound — active group chat is open');
+            return;
+          }
+        }
+      }
 
       // ── Sound (Web Audio API ding-dong) ──────────────────────────────────
       playNotificationSound();

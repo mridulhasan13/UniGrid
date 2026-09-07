@@ -20,10 +20,13 @@ import '../notifications/fcm_service.dart';
 
 import '../notifications/in_app_notification.dart';
 import '../notifications/notification_router.dart';
+import 'main_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import '../services/theme_service.dart';
+
+import '../notifications/web_to_app/wa_receiver.dart';
 
 class PrivateChatScreen extends StatefulWidget {
   final AppUser recipient;
@@ -44,11 +47,29 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   @override
   void initState() {
     super.initState();
+    NotificationRouter.activeChatId = widget.recipient.id;
+    WAReceiver.clearHistory(widget.recipient.id).catchError((_) {});
     NotificationRouter.clearAllNotifications();
     final user = Provider.of<AppUser?>(context, listen: false);
     if (user != null) {
       _conversationId = _getConversationId(user.id, widget.recipient.id);
+      _firestore.collection('conversations').doc(_conversationId).set({
+        'readStatus': {user.id: true},
+        'unreadCount_${user.id}': 0,
+      }, SetOptions(merge: true)).catchError((_) {});
     }
+  }
+
+  @override
+  void dispose() {
+    if (NotificationRouter.activeChatId == widget.recipient.id) {
+      if (MainScreen.tabNotifier.value == 3) {
+        NotificationRouter.activeChatId = 'group_chat';
+      } else {
+        NotificationRouter.activeChatId = null;
+      }
+    }
+    super.dispose();
   }
 
   String _getConversationId(String id1, String id2) {
@@ -362,9 +383,14 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   } catch (e) {
                     debugPrint('Timestamp parse error: $e');
                   }
+                } else if (data['preciseTime'] != null) {
+                  try {
+                    final pt = (data['preciseTime'] as num).toInt();
+                    timestamp = pt > 100000000000000 ? (pt ~/ 1000) : pt;
+                  } catch (_) {}
                 }
 
-                final preciseTime = data['preciseTime'] ?? timestamp * 1000;
+                final preciseTime = data['preciseTime'] ?? (timestamp * 1000);
 
                 final bool isUnsent = data['isUnsent'] ?? false;
                 final bool isDeleted = data['isDeleted'] ?? false;
@@ -405,6 +431,10 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
               }).toList();
 
               _messages.sort((a, b) {
+                final aCreated = a.createdAt ?? 0;
+                final bCreated = b.createdAt ?? 0;
+                final cmp = bCreated.compareTo(aCreated);
+                if (cmp != 0) return cmp;
                 final aTime = a.metadata?['preciseTime'] ?? 0;
                 final bTime = b.metadata?['preciseTime'] ?? 0;
                 return bTime.compareTo(aTime);

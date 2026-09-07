@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/constants.dart';
 
+import '../screens/file_viewer_screen.dart';
+
 /// A widget that detects URLs and @mentions inside a text string and turns them into
 /// interactive, styled, clickable links and vibrant highlighted mention tags.
 class LinkifiedText extends StatefulWidget {
@@ -62,6 +64,36 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     }
     final uri = Uri.tryParse(formatted);
     if (uri != null) {
+      final lower = formatted.toLowerCase();
+      final isFileOrStorage = lower.contains('supabase.co/storage/') ||
+          lower.contains('/storage/v1/object/public/') ||
+          lower.endsWith('.pdf') ||
+          lower.endsWith('.png') ||
+          lower.endsWith('.jpg') ||
+          lower.endsWith('.jpeg') ||
+          lower.endsWith('.gif') ||
+          lower.endsWith('.webp') ||
+          lower.endsWith('.docx') ||
+          lower.endsWith('.pptx') ||
+          lower.endsWith('.xlsx');
+
+      if (isFileOrStorage && mounted) {
+        String fileName = 'Document';
+        if (uri.pathSegments.isNotEmpty) {
+          fileName = Uri.decodeComponent(uri.pathSegments.last);
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FileViewerScreen(
+              fileName: fileName,
+              fileUrl: formatted,
+            ),
+          ),
+        );
+        return;
+      }
+
       try {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);

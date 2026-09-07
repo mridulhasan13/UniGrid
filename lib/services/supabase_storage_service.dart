@@ -156,6 +156,28 @@ class SupabaseStorageService {
       return publicUrl;
     } on StorageException catch (e) {
       debugPrint('[SupabaseUpload] StorageException: ${e.message} | statusCode: ${e.statusCode}');
+      // Check if project quota is exceeded, paused, or storage limit is hit -> Auto-switch to standby project!
+      final bool isQuotaExceeded = e.statusCode == '507' ||
+          e.statusCode == '413' ||
+          e.statusCode == '400' ||
+          e.message.toLowerCase().contains('quota') ||
+          e.message.toLowerCase().contains('limit') ||
+          e.message.toLowerCase().contains('exceeded') ||
+          e.message.toLowerCase().contains('full') ||
+          e.message.toLowerCase().contains('paused');
+
+      if (isQuotaExceeded) {
+        debugPrint('[SupabaseUpload] Quota threshold reached. Initiating seamless auto-handoff...');
+        final switched = await SupabaseConfig.switchToNextStandbyProject();
+        if (switched) {
+          // Seamlessly retry upload to the new standby database!
+          return await uploadFile(
+            bytes: bytes,
+            fileName: fileName,
+            folder: folder,
+          );
+        }
+      }
       rethrow;
     } catch (e) {
       debugPrint('[SupabaseUpload] Unexpected error: $e');

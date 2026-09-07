@@ -25,6 +25,7 @@ import '../utils/dept_scope.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../notifications/in_app_notification.dart';
 import '../notifications/notification_router.dart';
+import '../notifications/web_to_app/wa_receiver.dart';
 
 // ============================================================
 // Data Model
@@ -77,6 +78,15 @@ class _ChatMsg {
       try {
         createdAt = (data['createdAt'] as Timestamp).toDate();
       } catch (_) {}
+    } else if (data['preciseTime'] != null) {
+      try {
+        final pt = (data['preciseTime'] as num).toInt();
+        if (pt > 100000000000000) {
+          createdAt = DateTime.fromMicrosecondsSinceEpoch(pt);
+        } else {
+          createdAt = DateTime.fromMillisecondsSinceEpoch(pt);
+        }
+      } catch (_) {}
     }
     List<String> seenBy = [];
     final rawSeen = data['seenBy'];
@@ -104,7 +114,7 @@ class _ChatMsg {
       authorPhoto: data['authorPhoto'] ?? '',
       createdAt: createdAt,
       preciseTime:
-          data['preciseTime'] ?? createdAt.millisecondsSinceEpoch * 1000,
+          data['preciseTime'] ?? createdAt.microsecondsSinceEpoch,
       text: isEffectivelyDeleted ? '' : (data['text'] ?? ''),
       type: isEffectivelyDeleted ? 'text' : (data['type'] ?? 'text'),
       isCR: data['isCR'] ?? false,
@@ -753,19 +763,23 @@ class _SeenBySheetState extends State<_SeenBySheet> {
 class _MessageBubble extends StatelessWidget {
   final _ChatMsg message;
   final bool isOwn;
+  final bool isHighlighted;
   final String currentUserId;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback? onSeenTap;
+  final ValueChanged<String>? onReplyTap;
   final Map<String, int>? userWatermarks;
 
   const _MessageBubble({
     required this.message,
     required this.isOwn,
+    this.isHighlighted = false,
     required this.currentUserId,
     required this.onTap,
     required this.onLongPress,
     this.onSeenTap,
+    this.onReplyTap,
     this.userWatermarks,
   });
 
@@ -910,66 +924,97 @@ class _MessageBubble extends StatelessWidget {
 
     final screenWidth = MediaQuery.sizeOf(context).width;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      constraints: BoxConstraints(maxWidth: screenWidth * 0.72),
-      decoration: BoxDecoration(
-        color: isOwn
-            ? (isBW
-                ? const Color(0xFF2E2E30)
-                : AppColors.primary.withOpacity(0.95))
-            : (isMentioned
-                ? const Color(0xFF252015)
-                : const Color(0xFF1E1E1E)),
-        borderRadius: radius,
-        border: Border.all(
-          color: isMentioned
-              ? Colors.amberAccent.withOpacity(0.85)
+    return AnimatedScale(
+      scale: isHighlighted ? 1.035 : 1.0,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: BoxConstraints(maxWidth: screenWidth * 0.72),
+        decoration: BoxDecoration(
+          color: isHighlighted
+              ? (isOwn
+                  ? (isBW ? const Color(0xFF38383C) : AppColors.primary)
+                  : (isBW ? const Color(0xFF2B2B2E) : const Color(0xFF262232)))
               : (isOwn
                   ? (isBW
-                      ? const Color(0xFF3F3F46)
-                      : AppColors.primary.withOpacity(0.4))
-                  : Colors.white.withOpacity(0.08)),
-          width: isMentioned ? 1.2 : 0.8,
+                      ? const Color(0xFF2E2E30)
+                      : AppColors.primary.withValues(alpha: 0.95))
+                  : (isMentioned
+                      ? const Color(0xFF252015)
+                      : const Color(0xFF1E1E1E))),
+          borderRadius: radius,
+          border: Border.all(
+            color: isHighlighted
+                ? (isOwn
+                    ? Colors.white.withValues(alpha: 0.35)
+                    : AppColors.primary.withValues(alpha: 0.5))
+                : (isMentioned
+                    ? Colors.amberAccent.withValues(alpha: 0.85)
+                    : (isOwn
+                        ? (isBW
+                            ? const Color(0xFF3F3F46)
+                            : AppColors.primary.withValues(alpha: 0.4))
+                        : Colors.white.withValues(alpha: 0.08))),
+            width: isHighlighted ? 1.2 : (isMentioned ? 1.2 : 0.8),
+          ),
+          boxShadow: isHighlighted
+              ? [
+                  BoxShadow(
+                    color: (isOwn ? Colors.white : AppColors.primary)
+                        .withValues(alpha: 0.22),
+                    blurRadius: 14,
+                    spreadRadius: 1,
+                  ),
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.14),
+                    blurRadius: 26,
+                    spreadRadius: 2,
+                  ),
+                ]
+              : (isMentioned
+                  ? [
+                      BoxShadow(
+                        color: Colors.amberAccent.withValues(alpha: 0.2),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null),
         ),
-        boxShadow: isMentioned
-            ? [
-                BoxShadow(
-                  color: Colors.amberAccent.withOpacity(0.2),
-                  blurRadius: 10,
-                  spreadRadius: 1,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Mentioned tag
+            if (isMentioned)
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.4), width: 0.5),
                 ),
-              ]
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Mentioned tag
-          if (isMentioned)
-            Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.amber.withOpacity(0.4), width: 0.5),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.alternate_email_rounded,
+                        size: 10.5, color: Colors.amberAccent),
+                    SizedBox(width: 3.5),
+                    Text('Mentioned you',
+                        style: TextStyle(
+                            color: Colors.amberAccent,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.alternate_email_rounded, size: 10.5, color: Colors.amberAccent),
-                  SizedBox(width: 3.5),
-                  Text('Mentioned you',
-                      style: TextStyle(
-                          color: Colors.amberAccent,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-          // Sender name for received messages
+            // Sender name for received messages
           if (!isOwn)
             Padding(
               padding: const EdgeInsets.only(bottom: 5),
@@ -1081,47 +1126,73 @@ class _MessageBubble extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildReplyPreview(Color textColor) {
     final replyData = message.replyTo!;
+    final replyId = (replyData['id'] ?? '').toString();
     final replyText = replyData['text'] as String? ?? '';
     final replyAuthor = replyData['authorName'] as String? ?? 'Unknown';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.28),
-        borderRadius: BorderRadius.circular(10),
-        border: Border(
-          left: BorderSide(
-            color: isOwn ? textColor.withOpacity(0.7) : AppColors.primary,
-            width: 3,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            replyAuthor,
-            style: TextStyle(
-              color: isOwn ? textColor.withOpacity(0.9) : AppColors.primary,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (replyId.isNotEmpty && onReplyTap != null) {
+          onReplyTap!(replyId);
+        }
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.28),
+            borderRadius: BorderRadius.circular(10),
+            border: Border(
+              left: BorderSide(
+                color: isOwn ? textColor.withOpacity(0.7) : AppColors.primary,
+                width: 3,
+              ),
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            replyText.isEmpty ? 'Image' : replyText,
-            style:
-                TextStyle(color: textColor.withOpacity(0.55), fontSize: 12),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      replyAuthor,
+                      style: TextStyle(
+                        color: isOwn ? textColor.withOpacity(0.9) : AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      replyText.isEmpty ? 'Image' : replyText,
+                      style: TextStyle(
+                          color: textColor.withOpacity(0.55), fontSize: 12),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.arrow_upward_rounded,
+                size: 14,
+                color: (isOwn ? textColor : AppColors.primary).withOpacity(0.55),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1201,6 +1272,11 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isUploadingFiles = false;
   final Set<String> _pendingSeenDocIds = {};
 
+  String? _highlightedMessageId;
+  Timer? _highlightTimer;
+  final Map<String, GlobalKey> _messageKeys = {};
+  bool _showScrollToBottom = false;
+
   StreamSubscription<QuerySnapshot>? _readReceiptsSub;
   Map<String, int> _userWatermarks = {};
   Map<String, AppUser> _receiptUsers = {};
@@ -1236,13 +1312,33 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    NotificationRouter.activeChatId = 'group_chat';
+    WAReceiver.clearHistory('batch_chat').catchError((_) {});
     NotificationRouter.clearAllNotifications();
     _textController.addListener(_handleMentionQuery);
+    _scrollController.addListener(_onChatScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AuthService>(context, listen: false).updateOnlineStatus(true);
       _loadDepartmentMembers();
       _initReceiptsListener();
     });
+  }
+
+  void _onChatScroll() {
+    if (!_scrollController.hasClients) return;
+    final show = _scrollController.offset > 240;
+    if (show != _showScrollToBottom) {
+      setState(() => _showScrollToBottom = show);
+    }
+  }
+
+  void _scrollToBottom() {
+    HapticFeedback.selectionClick();
+    _scrollController.animateTo(
+      0.0,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _initReceiptsListener() {
@@ -1359,6 +1455,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _highlightTimer?.cancel();
+    if (NotificationRouter.activeChatId == 'group_chat') {
+      NotificationRouter.activeChatId = null;
+    }
     _watermarkDebounceTimer?.cancel();
     final user = Provider.of<AppUser?>(context, listen: false);
     if (user != null && user.hasDeptScope && _lastRecordedWatermark > 0) {
@@ -1376,6 +1476,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }, SetOptions(merge: true)).catchError((_) {});
     }
     _readReceiptsSub?.cancel();
+    _scrollController.removeListener(_onChatScroll);
     _textController.removeListener(_handleMentionQuery);
     _textController.dispose();
     _scrollController.dispose();
@@ -2745,30 +2846,114 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // ---- REPLY SCROLL & HIGHLIGHT ----
+  void _scrollToRepliedMessage(String targetId, List<_ChatMsg> currentMsgs) {
+    if (targetId.isEmpty) return;
+
+    HapticFeedback.mediumImpact();
+
+    void triggerHighlight() {
+      if (!mounted) return;
+      setState(() {
+        _highlightedMessageId = targetId;
+      });
+      _highlightTimer?.cancel();
+      _highlightTimer = Timer(const Duration(milliseconds: 650), () {
+        if (mounted) {
+          setState(() {
+            if (_highlightedMessageId == targetId) {
+              _highlightedMessageId = null;
+            }
+          });
+        }
+      });
+    }
+
+    final key = _messageKeys[targetId];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        alignment: 0.5,
+      );
+      triggerHighlight();
+    } else {
+      final targetIndex = currentMsgs.indexWhere(
+        (m) => m.id == targetId || m.docId == targetId,
+      );
+
+      if (targetIndex != -1 && _scrollController.hasClients) {
+        // In reverse ListView: index 0 is at offset 0, higher index means higher offset up the list.
+        final double estimatedOffset = (targetIndex / currentMsgs.length) *
+            _scrollController.position.maxScrollExtent;
+        final double targetOffset = estimatedOffset.clamp(
+            0.0, _scrollController.position.maxScrollExtent);
+
+        _scrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.easeOutCubic,
+        ).then((_) {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            final delayedKey = _messageKeys[targetId];
+            if (delayedKey?.currentContext != null) {
+              Scrollable.ensureVisible(
+                delayedKey!.currentContext!,
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                alignment: 0.5,
+              );
+            }
+            triggerHighlight();
+          });
+        });
+      } else {
+        // Message is older than loaded limit
+        setState(() {
+          _messageLimit += 50;
+        });
+        InAppNotification.show(
+          context,
+          title: 'Replied Message',
+          message: 'Original message may be older. Loading previous messages...',
+          accentColor: AppColors.primary,
+          icon: Icons.history_rounded,
+        );
+        triggerHighlight();
+      }
+    }
+  }
+
   // ---- MESSAGE LIST ----
   Widget _buildMessageList(AppUser appUser) {
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _firestore
-          .collection(_getChatPathForUser(appUser))
-          .orderBy('preciseTime', descending: true)
+          .collection(_chatPath)
+          .orderBy('createdAt', descending: true)
           .limit(_messageLimit)
           .snapshots(),
-      builder: (context, snap) {
+      builder: (ctx, snap) {
         if (snap.hasError) {
           return Center(
-              child: Text('Error: ${snap.error}',
-                  style: TextStyle(color: AppColors.textPrimary)));
+            child: Text('Error loading messages: ${snap.error}',
+                style: const TextStyle(color: Colors.redAccent)),
+          );
         }
         if (!snap.hasData) {
           return const UniGridLoader(
-            title: 'Loading Chat',
+            title: 'Connecting to batch network...',
             subtitle: 'Fetching group messages...',
             showBackground: false,
           );
         }
 
         final msgs = snap.data!.docs.map((d) => _ChatMsg.fromDoc(d)).toList()
-          ..sort((a, b) => b.preciseTime.compareTo(a.preciseTime));
+          ..sort((a, b) {
+            final cmp = b.createdAt.compareTo(a.createdAt);
+            if (cmp != 0) return cmp;
+            return b.preciseTime.compareTo(a.preciseTime);
+          });
 
         // Mark conversation read via 1 lightweight user watermark write (0 writes to message docs)
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2793,77 +2978,136 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
 
-        return ListView.builder(
-          controller: _scrollController,
-          reverse: true,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          itemCount: msgs.length + 1,
-          itemBuilder: (ctx, i) {
-            if (i == msgs.length) {
-              return Center(
-                child: TextButton.icon(
-                  icon: const Icon(Icons.history, size: 16),
-                  label: const Text('Load older messages'),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
-                  onPressed: () => setState(() => _messageLimit += 50),
-                ),
-              );
-            }
-            final msg = msgs[i];
-            final isOwn = msg.authorId == appUser.id;
-            final showDate = i == msgs.length - 1 ||
-                !_sameDay(msg.createdAt, msgs[i + 1].createdAt);
+        return Stack(
+          children: [
+            ListView.builder(
+              controller: _scrollController,
+              cacheExtent: 1000,
+              physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics()),
+              reverse: true,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              itemCount: msgs.length + 1,
+              itemBuilder: (ctx, i) {
+                if (i == msgs.length) {
+                  return Center(
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.history, size: 16),
+                      label: const Text('Load older messages'),
+                      style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary),
+                      onPressed: () => setState(() => _messageLimit += 50),
+                    ),
+                  );
+                }
+                final msg = msgs[i];
+                final isOwn = msg.authorId == appUser.id;
+                final showDate = i == msgs.length - 1 ||
+                    !_sameDay(msg.createdAt, msgs[i + 1].createdAt);
+                final isHighlighted = _highlightedMessageId == msg.id ||
+                    _highlightedMessageId == msg.docId;
+                final msgKey =
+                    _messageKeys.putIfAbsent(msg.id, () => GlobalKey());
 
-            return Column(
-              key: ValueKey(msg.id),
-              children: [
-                if (showDate) _dateSeparator(msg.createdAt),
-                _SwipeToReply(
-                  onReply: () {
-                    if (msg.isUnsent || msg.isDeleted) return;
-                    setState(() => _replyingTo = msg);
-                    _focusNode.requestFocus();
-                  },
-                  child: _MessageBubble(
-                    message: msg,
-                    isOwn: isOwn,
-                    currentUserId: appUser.id,
-                    userWatermarks: _userWatermarks,
-                    onSeenTap: isOwn ? () => _showSeenBy(msg) : null,
-                    onTap: () {
-                      if (msg.isUnsent || msg.isDeleted) {
-                        if (isOwn) {
-                          _showSeenBy(msg);
-                        }
-                        return;
-                      }
-                      if (msg.type == 'image' && msg.uri != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FileViewerScreen(
-                              fileName: msg.fileName ?? 'Image.jpg',
-                              fileUrl: msg.uri,
-                            ),
+                return Column(
+                  key: ValueKey(msg.id),
+                  children: [
+                    if (showDate) _dateSeparator(msg.createdAt),
+                    _SwipeToReply(
+                      onReply: () {
+                        if (msg.isUnsent || msg.isDeleted) return;
+                        setState(() => _replyingTo = msg);
+                        _focusNode.requestFocus();
+                      },
+                      child: Container(
+                        key: msgKey,
+                        child: _MessageBubble(
+                          message: msg,
+                          isOwn: isOwn,
+                          isHighlighted: isHighlighted,
+                          currentUserId: appUser.id,
+                          userWatermarks: _userWatermarks,
+                          onSeenTap: isOwn ? () => _showSeenBy(msg) : null,
+                          onReplyTap: (replyId) =>
+                              _scrollToRepliedMessage(replyId, msgs),
+                          onTap: () {
+                            if (msg.isUnsent || msg.isDeleted) {
+                              if (isOwn) {
+                                _showSeenBy(msg);
+                              }
+                              return;
+                            }
+                            if (msg.type == 'image' && msg.uri != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => FileViewerScreen(
+                                    fileName: msg.fileName ?? 'Image.jpg',
+                                    fileUrl: msg.uri,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              if (isOwn) {
+                                _showSeenBy(msg);
+                              } else {
+                                HapticFeedback.selectionClick();
+                              }
+                            }
+                          },
+                          onLongPress: () => _showActions(msg, appUser),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            Positioned(
+              bottom: 12,
+              right: 12,
+              child: AnimatedScale(
+                scale: _showScrollToBottom ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutBack,
+                child: AnimatedOpacity(
+                  opacity: _showScrollToBottom ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 180),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _scrollToBottom,
+                      borderRadius: BorderRadius.circular(30),
+                      child: Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B)
+                              .withValues(alpha: 0.94),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.45),
+                            width: 1.2,
                           ),
-                        );
-                      } else {
-                        if (isOwn) {
-                          _showSeenBy(msg);
-                        } else {
-                          HapticFeedback.selectionClick();
-                        }
-                      }
-                    },
-                    onLongPress: () => _showActions(msg, appUser),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                    ),
                   ),
-                )
-                    .animate()
-                    .fadeIn(duration: 200.ms)
-                    .slideY(begin: 0.05, end: 0, duration: 200.ms),
-              ],
-            );
-          },
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -3236,6 +3480,14 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildMentionOverlay(),
+              if (_editingMessage != null) ...[
+                _buildEditBanner(),
+                const SizedBox(height: 6),
+              ],
+              if (_replyingTo != null) ...[
+                _buildReplyBanner(),
+                const SizedBox(height: 6),
+              ],
               if (_selectedFiles.isNotEmpty) ...[
                 _buildSelectedFilesPreview(),
                 const SizedBox(height: 8),

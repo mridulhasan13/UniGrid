@@ -112,6 +112,39 @@ class NotifThreadStore {
     return total;
   }
 
+  /// Validates if an existing notification for [notifId] (and optional [tag]) is currently
+  /// active in the system tray. If it was dismissed/swiped by the user, clears the stored thread first.
+  static Future<void> syncWithActiveNotifications({
+    required dynamic localNotif,
+    required String threadKey,
+    required int notifId,
+    String? tag,
+  }) async {
+    if (threadKey.isEmpty) return;
+    try {
+      final dynamic activeList = await localNotif.getActiveNotifications();
+      if (activeList is List) {
+        final isActive = activeList.any((n) {
+          try {
+            if (n.id != notifId) return false;
+            if (tag != null && tag.isNotEmpty && n.tag != null && n.tag != tag) {
+              return false;
+            }
+            return true;
+          } catch (_) {
+            return false;
+          }
+        });
+        if (!isActive) {
+          // The user swiped away or dismissed the previous notification from the status bar
+          await clearThread(threadKey);
+        }
+      }
+    } catch (e) {
+      debugPrint('[NotifThreadStore] syncWithActiveNotifications error: $e');
+    }
+  }
+
   /// Clears lines for a specific thread (e.g. when user opens a private chat with that sender).
   static Future<void> clearThread(String threadKey) async {
     if (threadKey.isEmpty) return;

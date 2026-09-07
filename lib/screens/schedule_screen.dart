@@ -15,6 +15,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/floating_app_bar.dart';
 import '../services/auth_service.dart';
 import '../notifications/in_app_notification.dart';
+import '../notifications/web_to_app/wa_receiver.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -32,6 +33,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
+    WAReceiver.clearHistory('unigrid_routine').catchError((_) {});
     // Auto-reset is now triggered on build once we have user context
   }
 

@@ -20,6 +20,7 @@ import '../widgets/floating_app_bar.dart';
 import '../services/auth_service.dart';
 import 'file_viewer_screen.dart';
 import '../notifications/in_app_notification.dart';
+import '../notifications/web_to_app/wa_receiver.dart';
 
 class MaterialsScreen extends StatefulWidget {
   const MaterialsScreen({super.key});
@@ -34,6 +35,12 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
   String? _selectedSubject;
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WAReceiver.clearHistory('unigrid_materials').catchError((_) {});
+  }
 
   String _getSubjectFolderName(StudyMaterial material) {
     final code = material.subjectCode.trim();

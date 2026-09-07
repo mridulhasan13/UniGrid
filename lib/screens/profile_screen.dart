@@ -21,9 +21,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/dept_scope.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../notifications/in_app_notification.dart';
 import '../notifications/routine_reminder_service.dart';
+import '../widgets/image_crop_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -200,13 +200,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (fileBytes == null) return;
 
+      // Show interactive image cropper/editor dialog to crop, rotate, and scale
+      if (!mounted) return;
+      final croppedBytes = await ImageCropDialog.show(
+        context,
+        imageBytes: fileBytes,
+        initialShape: CropShape.circle,
+        title: 'Adjust Profile Picture',
+      );
+
+      // If user cancelled the crop dialog, abort upload
+      if (croppedBytes == null) return;
+
       setState(() {
         _isUploading = true;
       });
 
       await authService.uploadProfilePhoto(
-        fileBytes,
-        file.extension ?? 'jpg',
+        croppedBytes,
+        'png',
       );
 
       if (mounted) {
@@ -2002,7 +2014,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _aboutInfoLinkRow(Icons.email_outlined, 'Support',
                   'support.unigrid@gmail.com', 'mailto:support.unigrid@gmail.com'),
               const Divider(color: Colors.white10, height: 16),
-              _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.1'),
+              _aboutInfoRow(Icons.info_outline_rounded, 'Version', '1.0.2'),
             ],
           ),
         ),

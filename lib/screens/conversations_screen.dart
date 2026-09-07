@@ -179,10 +179,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                               : '',
                           isUnread: isUnread,
                           onTap: () {
-                            // Mark as read
+                            // Mark as read and reset unread counter
                             doc.reference.set({
-                              'readStatus': {appUser.id: true}
-                            }, SetOptions(merge: true));
+                              'readStatus': {appUser.id: true},
+                              'unreadCount_${appUser.id}': 0,
+                            }, SetOptions(merge: true)).catchError((_) {});
 
                             Navigator.push(
                               context,
