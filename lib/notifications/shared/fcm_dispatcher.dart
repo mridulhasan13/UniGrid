@@ -173,19 +173,9 @@ class FcmDispatcher {
             body: jsonEncode({
               'message': {
                 'token': token,
-                'notification': {'title': title, 'body': body},
                 'data': dataPayload,
                 'android': {
                   'priority': 'high',
-                  'notification': {
-                    'title': title,
-                    'body': body,
-                    'sound': 'default',
-                    'channel_id': 'unigrid_notifications',
-                    'tag': messageId,
-                    'icon': '@mipmap/ic_launcher',
-                    'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-                  },
                 },
                 'apns': {
                   'payload': {

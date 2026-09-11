@@ -78,31 +78,35 @@ messaging.onBackgroundMessage((payload) => {
     tag = 'unigrid_routine';
   }
 
-  // 2. Nested Stack System
-  let stack = threadStacks.get(tag) || [];
+  // 2. Nested Stack System (8 displayed lines + 10+ Notifications count badge)
+  let thread = threadStacks.get(tag) || { lines: [], count: 0 };
   const line = isChat
     ? (isPrivate ? rawBody : (rawTitle && rawTitle !== senderName ? `${rawTitle}: ${rawBody}` : `${senderName}: ${rawBody}`))
     : (rawTitle ? `${rawTitle}: ${rawBody}` : rawBody);
 
   if (line.trim().length > 0) {
-    stack.push(line);
-    if (stack.length > 6) stack.shift(); // Keep latest 6 lines
-    threadStacks.set(tag, stack);
+    thread.lines.push(line);
+    thread.count = (thread.count || 0) + 1;
+    if (thread.lines.length > 8) thread.lines.shift(); // Keep latest 8 lines on display
+    threadStacks.set(tag, thread);
   }
 
   let finalTitle = rawTitle;
   let finalBody = rawBody;
 
-  if (stack.length > 1) {
+  if (thread.count > 1) {
+    const countTag = thread.count >= 10 ? '10+ Notifications' : `${thread.count} new messages`;
+    const alertCountTag = thread.count >= 10 ? '10+ Notifications' : `${thread.count} updates`;
+
     if (isPrivate) {
-      finalTitle = `${senderName} (${stack.length} new messages)`;
-      finalBody = stack.slice(-4).map(l => '• ' + l).join('\n');
+      finalTitle = `${senderName} (${countTag})`;
+      finalBody = thread.lines.map(l => '• ' + l).join('\n');
     } else if (isChat) {
-      finalTitle = `Department Chat (${stack.length} new messages)`;
-      finalBody = stack.slice(-4).map(l => '• ' + l).join('\n');
+      finalTitle = `Department Chat (${countTag})`;
+      finalBody = thread.lines.map(l => '• ' + l).join('\n');
     } else {
-      finalTitle = `${rawTitle || 'UniGrid'} (${stack.length} updates)`;
-      finalBody = stack.slice(-4).map(l => '• ' + l).join('\n');
+      finalTitle = `${rawTitle || 'UniGrid'} (${alertCountTag})`;
+      finalBody = thread.lines.map(l => '• ' + l).join('\n');
     }
   }
 

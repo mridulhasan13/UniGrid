@@ -147,6 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _newPasswordController;
 
   bool _isInitialized = false;
+  String? _lastLoadedUserId;
   bool _isSaving = false;
   String _saveError = '';
 
@@ -317,19 +318,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
 
-    // One-time load initialization
-    if (!_isInitialized) {
-      _nameController = TextEditingController(text: user.name);
-      _idController = TextEditingController(text: user.studentId);
-      _deptController = TextEditingController(text: user.department);
-      _batchController = TextEditingController(text: user.batch);
-      _phoneController = TextEditingController(text: user.phoneNumber);
-      _schoolController = TextEditingController(text: user.schoolName);
-      _collegeController = TextEditingController(text: user.collegeName);
-      _emailController = TextEditingController(text: user.email);
-      _currentPasswordController = TextEditingController();
-      _newPasswordController = TextEditingController();
-      _isInitialized = true;
+    // Initialize or update controllers when user data loads
+    if (!_isInitialized || _lastLoadedUserId != user.id) {
+      _lastLoadedUserId = user.id;
+      if (!_isInitialized) {
+        _nameController = TextEditingController(text: user.name);
+        _idController = TextEditingController(text: user.studentId);
+        _deptController = TextEditingController(text: user.department);
+        _batchController = TextEditingController(text: user.batch);
+        _phoneController = TextEditingController(text: user.phoneNumber);
+        _schoolController = TextEditingController(text: user.schoolName);
+        _collegeController = TextEditingController(text: user.collegeName);
+        _emailController = TextEditingController(text: user.email);
+        _currentPasswordController = TextEditingController();
+        _newPasswordController = TextEditingController();
+        _isInitialized = true;
+      } else {
+        _nameController.text = user.name;
+        _idController.text = user.studentId;
+        _deptController.text = user.department;
+        _batchController.text = user.batch;
+        _phoneController.text = user.phoneNumber;
+        _schoolController.text = user.schoolName;
+        _collegeController.text = user.collegeName;
+        _emailController.text = user.email;
+      }
+    } else if (!_isSaving) {
+      // If any form field was blank but Firestore now streamed user data, auto-fill it
+      if (_nameController.text.isEmpty && user.name.isNotEmpty) {
+        _nameController.text = user.name;
+      }
+      if (_idController.text.isEmpty && user.studentId.isNotEmpty) {
+        _idController.text = user.studentId;
+      }
+      if (_deptController.text.isEmpty && user.department.isNotEmpty) {
+        _deptController.text = user.department;
+      }
+      if (_batchController.text.isEmpty && user.batch.isNotEmpty) {
+        _batchController.text = user.batch;
+      }
+      if (_phoneController.text.isEmpty && user.phoneNumber.isNotEmpty) {
+        _phoneController.text = user.phoneNumber;
+      }
+      if (_schoolController.text.isEmpty && user.schoolName.isNotEmpty) {
+        _schoolController.text = user.schoolName;
+      }
+      if (_collegeController.text.isEmpty && user.collegeName.isNotEmpty) {
+        _collegeController.text = user.collegeName;
+      }
+      if (_emailController.text.isEmpty && user.email.isNotEmpty) {
+        _emailController.text = user.email;
+      }
     }
 
     final double screenWidth = MediaQuery.of(context).size.width;

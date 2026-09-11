@@ -14,6 +14,7 @@ import 'in_app_notification.dart';
 import 'notification_router.dart';
 import 'notification_coordinator.dart';
 import 'shared/notif_thread_store.dart';
+import 'shared/duplicate_guard.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Web Push VAPID Key ──────────────────────────────────────────────────────
@@ -29,6 +30,14 @@ const String _webVapidKey =
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Background FCM message received: ${message.messageId}');
   try {
+    final msgId = (message.data['messageId'] as String?) ??
+        message.messageId ??
+        '';
+    if (msgId.isNotEmpty && DuplicateGuard.checkAndMark('bg_$msgId')) {
+      debugPrint('[BackgroundFCM] Duplicate background message suppressed: $msgId');
+      return;
+    }
+
     // Pull title and body from data-only payload (no notification block).
     final title = (message.data['title'] as String?) ?? 'UniGrid';
     final body = (message.data['body'] as String?) ?? '';
@@ -100,15 +109,17 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         tag: resolvedTag,
       );
 
-      // Persist lines across messages.
-      final stackedLines = await NotifThreadStore.addMessage(
+      // Persist lines across messages (WhatsApp style stacking)
+      final threadResult = await NotifThreadStore.addMessage(
         threadKey: threadKey,
         senderName: conversationTitle,
         messageText: lineText,
       );
+      final stackedLines = threadResult.lines;
+      final countBadge = threadResult.countLabel(singular: 'message', plural: 'messages');
 
-      final finalChatTitle = stackedLines.length > 1
-          ? '$conversationTitle (${stackedLines.length} messages)'
+      final finalChatTitle = threadResult.totalCount > 1
+          ? '$conversationTitle ($countBadge)'
           : conversationTitle;
 
       // Show InboxStyle stacked notification card for this conversation thread.
@@ -130,7 +141,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             styleInformation: InboxStyleInformation(
               stackedLines,
               contentTitle: finalChatTitle,
-              summaryText: '${stackedLines.length} message${stackedLines.length > 1 ? "s" : ""}',
+              summaryText: countBadge,
             ),
           ),
         ),
@@ -144,13 +155,16 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         notifId: 3000,
         tag: 'unigrid_routine',
       );
-      final stackedLines = await NotifThreadStore.addMessage(
+      final threadResult = await NotifThreadStore.addMessage(
         threadKey: 'unigrid_routine',
         senderName: '📅 Routine Reminders',
         messageText: line,
       );
-      final finalTitle = stackedLines.length > 1
-          ? '📅 Routine (${stackedLines.length} updates)'
+      final stackedLines = threadResult.lines;
+      final countBadge = threadResult.countLabel(singular: 'update', plural: 'updates');
+
+      final finalTitle = threadResult.totalCount > 1
+          ? '📅 Routine ($countBadge)'
           : (title.isNotEmpty ? title : '📅 Routine');
 
       await localNotif.show(
@@ -171,7 +185,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             styleInformation: InboxStyleInformation(
               stackedLines,
               contentTitle: finalTitle,
-              summaryText: '${stackedLines.length} reminder${stackedLines.length > 1 ? "s" : ""}',
+              summaryText: countBadge,
             ),
           ),
         ),
@@ -185,13 +199,16 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         notifId: 4000,
         tag: 'unigrid_materials',
       );
-      final stackedLines = await NotifThreadStore.addMessage(
+      final threadResult = await NotifThreadStore.addMessage(
         threadKey: 'unigrid_materials',
         senderName: '📁 Study Materials',
         messageText: line,
       );
-      final finalTitle = stackedLines.length > 1
-          ? '📁 Study Materials (${stackedLines.length} files)'
+      final stackedLines = threadResult.lines;
+      final countBadge = threadResult.countLabel(singular: 'file', plural: 'files');
+
+      final finalTitle = threadResult.totalCount > 1
+          ? '📁 Study Materials ($countBadge)'
           : (title.isNotEmpty ? title : '📁 Study Materials');
 
       await localNotif.show(
@@ -212,7 +229,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             styleInformation: InboxStyleInformation(
               stackedLines,
               contentTitle: finalTitle,
-              summaryText: '${stackedLines.length} file${stackedLines.length > 1 ? "s" : ""}',
+              summaryText: countBadge,
             ),
           ),
         ),
@@ -227,13 +244,16 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         notifId: 2000,
         tag: 'unigrid_alerts',
       );
-      final stackedLines = await NotifThreadStore.addMessage(
+      final threadResult = await NotifThreadStore.addMessage(
         threadKey: 'unigrid_alerts',
         senderName: '📢 Announcements',
         messageText: line,
       );
-      final finalTitle = stackedLines.length > 1
-          ? '📢 Announcements (${stackedLines.length} updates)'
+      final stackedLines = threadResult.lines;
+      final countBadge = threadResult.countLabel(singular: 'update', plural: 'updates');
+
+      final finalTitle = threadResult.totalCount > 1
+          ? '📢 Announcements ($countBadge)'
           : (title.isNotEmpty ? title : '📢 Announcements');
 
       await localNotif.show(
@@ -254,7 +274,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             styleInformation: InboxStyleInformation(
               stackedLines,
               contentTitle: finalTitle,
-              summaryText: '${stackedLines.length} update${stackedLines.length > 1 ? "s" : ""}',
+              summaryText: countBadge,
             ),
           ),
         ),

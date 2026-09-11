@@ -250,21 +250,73 @@ class AuthService {
             }
           }
         } else {
-          // Create a new user document
-          final newUser = AppUser(
-            id: uid,
-            email: email ?? '',
-            isCR: isRoot,
-            isAdmin: isRoot,
-            isApproved: isRoot,
-            department: isRoot ? 'IPE' : '',
-            batch: isRoot ? '51' : '',
-            name: displayName ?? '',
-            photoUrl: photoUrl ?? '',
-            createdAt: DateTime.now(),
-          );
-          _firestore.collection('users').doc(uid).set(newUser.toMap());
-          _userController.add(newUser);
+          // If the snapshot is only from local cache before connecting to server, wait for server sync to avoid wiping real data
+          if (doc.metadata.isFromCache) {
+            debugPrint('[AuthService] User doc not in cache; waiting for authoritative server response...');
+            return;
+          }
+
+          // Before creating a blank document, check if a profile already exists for this email
+          final cleanEmail = (email ?? '').trim().toLowerCase();
+          _firestore
+              .collection('users')
+              .where('email', isEqualTo: cleanEmail)
+              .limit(1)
+              .get()
+              .then((querySnap) async {
+            if (querySnap.docs.isNotEmpty && querySnap.docs.first.id != uid) {
+              // Existing document found under a different ID (e.g. prior UID / Google sign-in)
+              final existingData = Map<String, dynamic>.from(querySnap.docs.first.data());
+              debugPrint('[AuthService] Restoring existing user data for $cleanEmail to current UID $uid');
+              if (isRoot) {
+                existingData['isCR'] = true;
+                existingData['isAdmin'] = true;
+                existingData['isApproved'] = true;
+                if ((existingData['department'] as String?)?.trim().isEmpty ?? true) {
+                  existingData['department'] = 'IPE';
+                }
+                if ((existingData['batch'] as String?)?.trim().isEmpty ?? true) {
+                  existingData['batch'] = '51';
+                }
+              }
+              await _firestore.collection('users').doc(uid).set(existingData, SetOptions(merge: true));
+              return;
+            }
+
+            // Create new user document safely with merge: true — NEVER overwrite with empty strings
+            final Map<String, dynamic> initialData = {
+              'email': cleanEmail,
+              'isCR': isRoot,
+              'isAdmin': isRoot,
+              'isApproved': isRoot,
+              'department': isRoot ? 'IPE' : '',
+              'batch': isRoot ? '51' : '',
+              'createdAt': FieldValue.serverTimestamp(),
+            };
+            if ((displayName ?? '').trim().isNotEmpty) {
+              initialData['name'] = displayName!.trim();
+            }
+            if ((photoUrl ?? '').trim().isNotEmpty) {
+              initialData['photoUrl'] = photoUrl!.trim();
+            }
+
+            await _firestore.collection('users').doc(uid).set(initialData, SetOptions(merge: true));
+            final newUser = AppUser(
+              id: uid,
+              email: cleanEmail,
+              isCR: isRoot,
+              isAdmin: isRoot,
+              isApproved: isRoot,
+              department: isRoot ? 'IPE' : '',
+              batch: isRoot ? '51' : '',
+              name: displayName ?? '',
+              photoUrl: photoUrl ?? '',
+              createdAt: DateTime.now(),
+            );
+            _userController.add(newUser);
+          }).catchError((e) {
+            debugPrint('[AuthService] Error checking existing user document: $e');
+          });
         }
       },
       onError: (e) {
@@ -344,7 +396,11 @@ class AuthService {
           phoneNumber: phoneNumber,
           createdAt: DateTime.now(),
         );
-        await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
+
+        await _firestore.collection('users').doc(user.uid).set(
+          newUser.toMap(),
+          SetOptions(merge: true),
+        );
         
         // Notify CRs & Admins of the new registration request
         if (!isRoot && department.isNotEmpty && batch.isNotEmpty) {

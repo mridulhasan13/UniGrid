@@ -49,8 +49,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
   @override
   void initState() {
     super.initState();
-    // Storage metrics are loaded instantly via Firestore stream;
-    // Live recursive bucket scans are performed on-demand via the Refresh button.
+    // Auto-refresh live storage metrics from Supabase in background on screen load
+    _fetchLiveStorageFromSupabase();
   }
 
   Future<void> _fetchLiveStorageFromSupabase({bool showFeedback = false}) async {
@@ -58,6 +58,23 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
     setState(() => _isFetchingLiveStorage = true);
     try {
       final metrics = await SupabaseStorageService.fetchLiveStorageBreakdown();
+
+      // Persist the live queried metrics into Firestore so app restarts and all admins stay synced
+      try {
+        await _firestore.collection('app_config').doc('storage_metrics').set({
+          'materialsMB': metrics['materialsMB'],
+          'announcementsMB': metrics['announcementsMB'],
+          'avatarsMB': metrics['avatarsMB'],
+          'chatMB': metrics['chatMB'],
+          'marksheetsMB': metrics['marksheetsMB'],
+          'otherMB': metrics['otherMB'],
+          'totalLiveStorageMB': metrics['totalLiveStorageMB'],
+          'lastSynced': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('[MasterPanel] Error persisting storage metrics to Firestore: $e');
+      }
+
       if (mounted) {
         setState(() {
           _liveSupabaseMetrics = metrics;
@@ -1031,11 +1048,17 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
         final double uploadedMatMB = ((metricData['materialsBytes'] as num?)?.toDouble() ?? 0.0) / (1024 * 1024);
         final double uploadedAvaMB = ((metricData['avatarsBytes'] as num?)?.toDouble() ?? 0.0) / (1024 * 1024);
 
-        // Use direct Supabase Storage queried metrics if available, or calibrated base + real-time upload increments
-        final double liveMatMB = _liveSupabaseMetrics?['materialsMB'] ?? 0.0;
-        final double liveAnnMB = _liveSupabaseMetrics?['announcementsMB'] ?? 0.0;
-        final double liveAvaMB = _liveSupabaseMetrics?['avatarsMB'] ?? 0.0;
-        final double liveOtherMB = _liveSupabaseMetrics?['otherMB'] ?? 0.0;
+        // Check if Firestore has persisted live storage metrics
+        final double fsMatMB = (metricData['materialsMB'] as num?)?.toDouble() ?? 0.0;
+        final double fsAnnMB = (metricData['announcementsMB'] as num?)?.toDouble() ?? 0.0;
+        final double fsAvaMB = (metricData['avatarsMB'] as num?)?.toDouble() ?? 0.0;
+        final double fsOtherMB = (metricData['otherMB'] as num?)?.toDouble() ?? 0.0;
+
+        // Use direct Supabase Storage queried metrics if available, or persisted Firestore metrics, or calibrated base + real-time upload increments
+        final double liveMatMB = _liveSupabaseMetrics?['materialsMB'] ?? (fsMatMB > 0 ? fsMatMB : 0.0);
+        final double liveAnnMB = _liveSupabaseMetrics?['announcementsMB'] ?? (fsAnnMB > 0 ? fsAnnMB : 0.0);
+        final double liveAvaMB = _liveSupabaseMetrics?['avatarsMB'] ?? (fsAvaMB > 0 ? fsAvaMB : 0.0);
+        final double liveOtherMB = _liveSupabaseMetrics?['otherMB'] ?? (fsOtherMB > 0 ? fsOtherMB : 0.0);
 
         final double matMB = liveMatMB > 0 ? liveMatMB : (68.4 + uploadedMatMB);
         final double annMB = liveAnnMB > 0 ? liveAnnMB : (14.6 + uploadedAnnMB);
@@ -1045,6 +1068,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
         final double totalUsedMB = matMB + annMB + avaMB + baseDbDocsMB + (liveOtherMB > 0 ? liveOtherMB : 0.0);
         const double quotaMB = 1024.0; // 1.0 GB Tier
         final double usageRatio = (totalUsedMB / quotaMB).clamp(0.0, 1.0);
+        final bool isLiveSynced = _liveSupabaseMetrics != null || fsMatMB > 0;
 
         return GlassCard(
           padding: const EdgeInsets.all(13),
@@ -1082,13 +1106,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            _liveSupabaseMetrics != null
+                            isLiveSynced
                                 ? 'Live synced from Supabase Cloud'
                                 : 'Storage across Supabase & Firestore',
                             style: TextStyle(
-                              color: _liveSupabaseMetrics != null ? Colors.greenAccent : AppColors.textSecondary,
+                              color: isLiveSynced ? Colors.greenAccent : AppColors.textSecondary,
                               fontSize: 10,
-                              fontWeight: _liveSupabaseMetrics != null ? FontWeight.w500 : FontWeight.normal,
+                              fontWeight: isLiveSynced ? FontWeight.w500 : FontWeight.normal,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

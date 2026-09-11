@@ -9,11 +9,31 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Allows stacking multiple incoming messages per sender/conversation (WhatsApp style)
 /// across both foreground and background app executions.
 /// ─────────────────────────────────────────────────────────────────────────────
+/// Result container for a notification thread containing the displayed lines (up to 8)
+/// and the total accumulated notification count.
+class NotifThreadResult {
+  final List<String> lines;
+  final int totalCount;
+
+  const NotifThreadResult({
+    required this.lines,
+    required this.totalCount,
+  });
+
+  /// Formats the notification count badge.
+  /// If totalCount is 10 or more, returns '10+ Notifications'.
+  /// Otherwise returns e.g. '5 messages' or '4 updates'.
+  String countLabel({String singular = 'message', String plural = 'messages'}) {
+    if (totalCount >= 10) return '10+ Notifications';
+    return '$totalCount ${totalCount == 1 ? singular : plural}';
+  }
+}
+
 class NotifThreadStore {
   NotifThreadStore._();
 
   static const String _storageKey = 'unigrid_active_notif_threads_v1';
-  static const int _maxLinesPerThread = 7;
+  static const int _maxLinesPerThread = 8; // Display up to 8 messages/announcements
 
   /// Loads all stored threads from persistent disk.
   static Future<Map<String, Map<String, dynamic>>> _loadRawThreads() async {
@@ -48,29 +68,35 @@ class NotifThreadStore {
   }
 
   /// Appends a new message line to the given [threadKey] (e.g. senderUserId or 'group_chat').
-  /// Returns the updated list of stacked message lines for that thread.
-  static Future<List<String>> addMessage({
+  /// Keeps the latest 8 messages on display while tracking the exact total notification count.
+  /// Returns a [NotifThreadResult] with lines and count.
+  static Future<NotifThreadResult> addMessage({
     required String threadKey,
     required String senderName,
     required String messageText,
   }) async {
-    if (threadKey.isEmpty || messageText.isEmpty) return [];
+    if (threadKey.isEmpty || messageText.isEmpty) {
+      return const NotifThreadResult(lines: [], totalCount: 0);
+    }
 
     final threads = await _loadRawThreads();
     final threadData = threads[threadKey] ??
         {
           'senderName': senderName,
           'lines': <String>[],
+          'count': 0,
           'lastUpdated': DateTime.now().millisecondsSinceEpoch,
         };
 
     final rawLines = (threadData['lines'] as List<dynamic>?) ?? [];
     final List<String> lines = rawLines.map((e) => e.toString()).toList();
+    int count = (threadData['count'] as num?)?.toInt() ?? lines.length;
+    count += 1;
 
     // Append new message line
     lines.add(messageText.trim());
 
-    // Keep only the most recent N lines
+    // Keep only the most recent 8 lines on display
     while (lines.length > _maxLinesPerThread) {
       lines.removeAt(0);
     }
@@ -79,12 +105,13 @@ class NotifThreadStore {
         ? senderName
         : (threadData['senderName'] ?? 'UniGrid');
     threadData['lines'] = lines;
+    threadData['count'] = count;
     threadData['lastUpdated'] = DateTime.now().millisecondsSinceEpoch;
 
     threads[threadKey] = threadData;
     await _saveRawThreads(threads);
 
-    return lines;
+    return NotifThreadResult(lines: lines, totalCount: count);
   }
 
   /// Retrieves the current stacked lines for a thread.
@@ -106,8 +133,13 @@ class NotifThreadStore {
     final threads = await _loadRawThreads();
     int total = 0;
     threads.forEach((_, data) {
-      final lines = (data['lines'] as List<dynamic>?) ?? [];
-      total += lines.length;
+      final count = (data['count'] as num?)?.toInt();
+      if (count != null && count > 0) {
+        total += count;
+      } else {
+        final lines = (data['lines'] as List<dynamic>?) ?? [];
+        total += lines.length;
+      }
     });
     return total;
   }

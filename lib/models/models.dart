@@ -112,14 +112,22 @@ class Announcement {
   });
 
   factory Announcement.fromMap(Map<String, dynamic> data, String id) {
+    DateTime ts = DateTime.now();
+    final rawTs = data['timestamp'];
+    if (rawTs is Timestamp) {
+      ts = rawTs.toDate();
+    } else if (rawTs is int) {
+      ts = DateTime.fromMillisecondsSinceEpoch(rawTs);
+    } else if (rawTs is String) {
+      ts = DateTime.tryParse(rawTs) ?? DateTime.now();
+    }
+
     return Announcement(
       id: id,
       title: data['title'] ?? '',
       content: data['content'] ?? '',
       type: data['type'] ?? 'Notice',
-      timestamp: data['timestamp'] != null
-          ? (data['timestamp'] as Timestamp).toDate()
-          : DateTime.now(),
+      timestamp: ts,
       postedBy: data['postedBy'] ?? '',
       fileUrl: data['fileUrl'],
       fileName: data['fileName'],
