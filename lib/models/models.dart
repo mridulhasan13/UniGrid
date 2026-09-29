@@ -392,3 +392,127 @@ class CourseDetail {
     };
   }
 }
+
+class ExamModel {
+  final String id;
+  final String courseName;
+  final String courseCode;
+  final String examType; // 'Term Final', 'Class Test', 'Midterm', 'Quiz', 'Assignment', 'Lab Final', 'Other'
+  final DateTime examDate; // Date of the exam
+  final String startTime; // e.g. "10:00 AM"
+  final String endTime;   // e.g. "12:00 PM"
+  final String room;      // e.g. "Room 304"
+  final String teacherName;
+  final String syllabus;
+  final String notes;
+  final String createdBy;
+  final DateTime? createdAt;
+
+  ExamModel({
+    required this.id,
+    required this.courseName,
+    required this.courseCode,
+    this.examType = 'Class Test',
+    required this.examDate,
+    this.startTime = '',
+    this.endTime = '',
+    this.room = '',
+    this.teacherName = '',
+    this.syllabus = '',
+    this.notes = '',
+    this.createdBy = '',
+    this.createdAt,
+  });
+
+  /// Parse the exact start DateTime combining examDate and startTime.
+  DateTime get startDateTime {
+    if (startTime.isEmpty) {
+      return DateTime(examDate.year, examDate.month, examDate.day, 9, 0);
+    }
+    return _parseCombinedDateTime(examDate, startTime);
+  }
+
+  /// Parse the exact end DateTime combining examDate and endTime.
+  DateTime get endDateTime {
+    DateTime end;
+    if (endTime.isEmpty) {
+      end = startDateTime.add(const Duration(hours: 2));
+    } else {
+      end = _parseCombinedDateTime(examDate, endTime);
+    }
+    if (!end.isAfter(startDateTime)) {
+      end = startDateTime.add(const Duration(hours: 2));
+    }
+    return end;
+  }
+
+  static DateTime _parseCombinedDateTime(DateTime baseDate, String timeStr) {
+    try {
+      final clean = timeStr.trim().toUpperCase();
+      final isPM = clean.contains('PM');
+      final isAM = clean.contains('AM');
+      final rawTime = clean.replaceAll('AM', '').replaceAll('PM', '').trim();
+      final parts = rawTime.split(':');
+      if (parts.isNotEmpty) {
+        int hour = int.parse(parts[0].trim());
+        int minute = parts.length > 1 ? int.parse(parts[1].trim()) : 0;
+        if (isPM && hour < 12) hour += 12;
+        if (isAM && hour == 12) hour = 0;
+        return DateTime(baseDate.year, baseDate.month, baseDate.day, hour, minute);
+      }
+    } catch (_) {}
+    return DateTime(baseDate.year, baseDate.month, baseDate.day, 9, 0);
+  }
+
+  factory ExamModel.fromMap(Map<String, dynamic> data, String id) {
+    DateTime parsedDate;
+    if (data['examDate'] is Timestamp) {
+      parsedDate = (data['examDate'] as Timestamp).toDate();
+    } else if (data['examDate'] is String) {
+      parsedDate = DateTime.tryParse(data['examDate']) ?? DateTime.now();
+    } else {
+      parsedDate = DateTime.now();
+    }
+
+    DateTime? created;
+    if (data['createdAt'] is Timestamp) {
+      created = (data['createdAt'] as Timestamp).toDate();
+    } else if (data['createdAt'] is String) {
+      created = DateTime.tryParse(data['createdAt']);
+    }
+
+    return ExamModel(
+      id: id,
+      courseName: data['courseName'] ?? '',
+      courseCode: data['courseCode'] ?? '',
+      examType: data['examType'] ?? 'Class Test',
+      examDate: parsedDate,
+      startTime: data['startTime'] ?? '',
+      endTime: data['endTime'] ?? '',
+      room: data['room'] ?? '',
+      teacherName: data['teacherName'] ?? '',
+      syllabus: data['syllabus'] ?? '',
+      notes: data['notes'] ?? '',
+      createdBy: data['createdBy'] ?? '',
+      createdAt: created,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'courseName': courseName,
+      'courseCode': courseCode,
+      'examType': examType,
+      'examDate': Timestamp.fromDate(examDate),
+      'startTime': startTime,
+      'endTime': endTime,
+      'room': room,
+      'teacherName': teacherName,
+      'syllabus': syllabus,
+      'notes': notes,
+      'createdBy': createdBy,
+      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+    };
+  }
+}
+

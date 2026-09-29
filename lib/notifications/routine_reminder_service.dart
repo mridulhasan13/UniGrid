@@ -53,6 +53,7 @@ class RoutineReminderService {
     // Read cached schedule from shared ScheduleService and listen to updates in-memory
     _cachedSchedule = ScheduleService.instance.classes;
     ScheduleService.instance.scheduleNotifier.addListener(_onScheduleUpdated);
+    ScheduleService.instance.dayStatusesNotifier.addListener(_onScheduleUpdated);
 
     // Periodic timer checks local memory ONLY — zero Firestore reads per minute
     _reminderTimer = Timer.periodic(const Duration(seconds: 60), (_) {
@@ -72,12 +73,61 @@ class RoutineReminderService {
     final now = DateTime.now();
     final todayDayName = DateFormat('EEEE').format(now); // e.g. "Monday"
 
+    // 1. Check if the entire selected day is marked as Holiday, Boycott, or Auto Class
+    final todayKey = '${now.year}_${now.month}_${now.day}';
+    final dayStatuses = ScheduleService.instance.dayStatuses;
+    String? todayDayStatus = dayStatuses[todayKey];
+
+    if (todayDayStatus == null || todayDayStatus.isEmpty) {
+      todayDayStatus = dayStatuses['${now.year}_${now.month.toString().padLeft(2, '0')}_${now.day.toString().padLeft(2, '0')}'] ??
+          dayStatuses[DateFormat('yyyy-MM-dd').format(now)] ??
+          dayStatuses[todayDayName.toLowerCase()];
+    }
+
     final todayClasses = _cachedSchedule.where(
       (cls) => cls.dayOfWeek.toLowerCase() == todayDayName.toLowerCase(),
-    );
+    ).toList();
+
+    // Fallback: check if individual class items for today carry a day-wide override status
+    if (todayDayStatus == null || todayDayStatus.isEmpty) {
+      for (final c in todayClasses) {
+        if (c.scheduledDate != null) {
+          final sDate = c.scheduledDate!;
+          if (sDate.year == now.year && sDate.month == now.month && sDate.day == now.day) {
+            final st = c.status.trim().toLowerCase();
+            if (st == 'auto' || st == 'boycott' || st == 'holiday') {
+              todayDayStatus = st;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    final normalizedDayStatus = (todayDayStatus ?? '').trim().toLowerCase();
+    final bool isSpecialDay = normalizedDayStatus == 'holiday' ||
+        normalizedDayStatus == 'boycott' ||
+        normalizedDayStatus == 'auto' ||
+        normalizedDayStatus == 'auto class' ||
+        normalizedDayStatus == 'no class' ||
+        normalizedDayStatus == 'no_class';
+
+    // Strictly close/disable class start reminders on selected holiday / boycott / auto days
+    if (isSpecialDay) {
+      return;
+    }
 
     for (final cls in todayClasses) {
-      if (cls.status == 'cancelled') continue;
+      final clsStatus = cls.status.trim().toLowerCase();
+      if (clsStatus == 'cancelled' ||
+          clsStatus == 'no_class' ||
+          clsStatus == 'no class' ||
+          clsStatus == 'holiday' ||
+          clsStatus == 'boycott' ||
+          clsStatus == 'auto' ||
+          clsStatus == 'auto class') {
+        continue;
+      }
 
       final startTime = _getStartTimeForClass(cls, now);
       if (startTime == null) continue;
@@ -160,5 +210,6 @@ class RoutineReminderService {
     _reminderTimer?.cancel();
     _reminderTimer = null;
     ScheduleService.instance.scheduleNotifier.removeListener(_onScheduleUpdated);
+    ScheduleService.instance.dayStatusesNotifier.removeListener(_onScheduleUpdated);
   }
 }

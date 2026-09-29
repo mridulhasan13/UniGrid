@@ -131,12 +131,62 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
         targetScheduledDate = widget.classToEdit!.scheduledDate;
       }
 
-      String defaultStatus = widget.classToEdit?.status ?? 'upcoming';
-      if (targetScheduledDate != null && widget.classToEdit == null) {
-        final sunday = _getSundayOfWeek(targetScheduledDate);
-        final currentSunday = _getSundayOfWeek(DateTime.now());
-        if (sunday.isBefore(currentSunday)) {
-          defaultStatus = 'completed';
+      final sunday = targetScheduledDate != null
+          ? _getSundayOfWeek(targetScheduledDate)
+          : _getSundayOfWeek(DateTime.now());
+      final calculatedDate = _getDateForDayInWeek(sunday, _selectedDay);
+      final normalized = DateTime(
+        calculatedDate.year,
+        calculatedDate.month,
+        calculatedDate.day,
+      );
+
+      final now = DateTime.now();
+      DateTime classEndDateTime = DateTime(
+        normalized.year,
+        normalized.month,
+        normalized.day,
+        23,
+        59,
+        59,
+      );
+
+      // Parse slot end time from timeString (e.g. "08:00 AM - 09:30 AM")
+      try {
+        final parts = timeString.split('-');
+        if (parts.length > 1) {
+          final endStr = parts[1].trim().toUpperCase();
+          final isPM = endStr.contains('PM');
+          final isAM = endStr.contains('AM');
+          final raw = endStr.replaceAll('AM', '').replaceAll('PM', '').trim();
+          final timeParts = raw.split(':');
+          if (timeParts.isNotEmpty) {
+            int hour = int.parse(timeParts[0].trim());
+            int minute = timeParts.length > 1 ? int.parse(timeParts[1].trim()) : 0;
+            if (isPM && hour < 12) hour += 12;
+            if (isAM && hour == 12) hour = 0;
+            classEndDateTime = DateTime(
+              normalized.year,
+              normalized.month,
+              normalized.day,
+              hour,
+              minute,
+            );
+          }
+        }
+      } catch (_) {}
+
+      // If the scheduled date and time has already passed -> 'completed', otherwise -> 'upcoming'
+      final bool isPassed = now.isAfter(classEndDateTime);
+      String defaultStatus = isPassed ? 'completed' : 'upcoming';
+
+      // If editing an existing class, preserve manual override statuses like 'cancelled' or 'no class'
+      if (widget.classToEdit != null) {
+        final existingStatus = widget.classToEdit!.status.toLowerCase();
+        if (existingStatus == 'cancelled' ||
+            existingStatus == 'no class' ||
+            existingStatus == 'no_class') {
+          defaultStatus = widget.classToEdit!.status;
         }
       }
 
@@ -150,19 +200,9 @@ class _ScheduleBuilderScreenState extends State<ScheduleBuilderScreen> {
         'group': _selectedGroup == 'None' ? '' : _selectedGroup,
         'time': timeString,
         'status': defaultStatus,
+        'scheduledDate': Timestamp.fromDate(normalized),
         'lastUpdatedDate': FieldValue.serverTimestamp(),
       };
-
-      if (targetScheduledDate != null) {
-        final sunday = _getSundayOfWeek(targetScheduledDate);
-        final calculatedDate = _getDateForDayInWeek(sunday, _selectedDay);
-        final normalized = DateTime(
-          calculatedDate.year,
-          calculatedDate.month,
-          calculatedDate.day,
-        );
-        scheduleData['scheduledDate'] = Timestamp.fromDate(normalized);
-      }
 
       final schedulePath = widget.user != null && widget.user!.hasDeptScope
           ? deptBatchCol(

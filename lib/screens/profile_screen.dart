@@ -2423,7 +2423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'socials': [
           {
             'icon': FontAwesomeIcons.facebook,
-            'url': 'https://www.facebook.com/farhanishrakshoron404'
+            'url': 'https://www.facebook.com/profile.php?id=61593391293697'
           },
           {
             'icon': FontAwesomeIcons.linkedin,
@@ -2434,19 +2434,115 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'url': 'mailto:farhanishrak064@gmail.com'
           },
         ]
+      },
+      {
+        'name': 'Abrarul Haque Akib',
+        'designation': 'Marketing Officer',
+        'department': 'IPE',
+        'batch': '51',
+        'photo': 'assets/images/akib_profile.jpg',
+        'socials': [
+          {
+            'icon': FontAwesomeIcons.linkedin,
+            'url': 'https://www.linkedin.com/in/abrarul-haque-a52229352?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app'
+          },
+          {
+            'icon': FontAwesomeIcons.facebook,
+            'url': 'https://www.facebook.com/share/1AmgHB6iFV/?mibextid=wwXIfr'
+          },
+          {
+            'icon': FontAwesomeIcons.instagram,
+            'url': 'https://www.instagram.com/akib_hq?stkn=bXlnZ2FjdDdvdHAw&utm_source=qr'
+          },
+          {
+            'icon': FontAwesomeIcons.envelope,
+            'url': 'mailto:a40151198@gmail.com'
+          },
+        ]
+      },
+      {
+        'name': 'Atique Shahrear Tomal',
+        'designation': 'Marketing Officer',
+        'department': 'TEM',
+        'batch': '51',
+        'photo': 'assets/images/tomal_profile.jpg',
+        'socials': [
+          {
+            'icon': FontAwesomeIcons.linkedin,
+            'url': 'https://www.linkedin.com/in/astomal?utm_source=share_via&utm_content=profile&utm_medium=member_ios'
+          },
+          {
+            'icon': FontAwesomeIcons.facebook,
+            'url': 'https://www.facebook.com/share/17u4fnfXAj/?mibextid=wwXIfr'
+          },
+          {
+            'icon': FontAwesomeIcons.instagram,
+            'url': 'https://www.instagram.com/gottalovetomaal?stkn=Nm1uaWZybWg5NnVx&utm_source=qr'
+          },
+          {
+            'icon': FontAwesomeIcons.envelope,
+            'url': 'mailto:atiqueshahreartomal@gmail.com'
+          },
+        ]
       }
     ];
 
-    Widget socialIconBtn(dynamic icon, String url) {
+    final List<Map<String, dynamic>> batchRepresentatives = [
+      {
+        'name': 'Marzia Hasan',
+        'designation': 'Batch Representative',
+        'department': 'IPE',
+        'batch': '52',
+        'photo': 'assets/images/marzia_profile.jpg',
+        'socials': [
+          {
+            'icon': FontAwesomeIcons.facebook,
+            'url': 'https://www.facebook.com/share/1DUY7Rqm7k/'
+          },
+          {
+            'icon': FontAwesomeIcons.instagram,
+            'url': 'https://www.instagram.com/marzia_hasan_21?stkn=N2s1c3V1cXdqY2s5'
+          },
+        ]
+      },
+      {
+        'name': 'Mijanur Rahman',
+        'designation': 'Batch Representative',
+        'department': 'IPE',
+        'batch': '52',
+        'photo': 'assets/images/mijanur_profile.jpg',
+        'socials': [
+          {
+            'icon': FontAwesomeIcons.linkedin,
+            'url': 'https://www.linkedin.com/in/md-mijanur-rahman-sobuj-058994419?utm_source=share_via&utm_content=profile&utm_medium=member_android'
+          },
+          {
+            'icon': FontAwesomeIcons.facebook,
+            'url': 'https://www.facebook.com/mijanurrohman.sovuj'
+          },
+          {
+            'icon': FontAwesomeIcons.instagram,
+            'url': 'https://www.instagram.com/mijanur_rohma_n?stkn=NHpsZmJoczZ0bWh5'
+          },
+          {
+            'icon': FontAwesomeIcons.envelope,
+            'url': 'mailto:dcmijanur@gmail.com'
+          },
+        ]
+      }
+    ];
+
+    Widget socialIconBtn(dynamic icon, String url,
+        {double size = 40, double iconSize = 16}) {
       return GestureDetector(
         onTap: () =>
             launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
         child: Container(
-          width: 40,
-          height: 40,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
             color: AppColors.textPrimary.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(size * 0.25),
             border: Border.all(
               color: AppColors.textPrimary.withOpacity(0.08),
               width: 1,
@@ -2463,164 +2559,234 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: FaIcon(
               icon,
               color: AppColors.textPrimary.withOpacity(0.65),
-              size: 16,
+              size: iconSize,
             ),
           ),
         ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Officers & Leadership',
-            style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text('The core team managing UniGrid',
-            style:
-                TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 12)),
-        const SizedBox(height: 24),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          alignment: WrapAlignment.center,
-          children: officers.map((officer) {
-            return Container(
-              width: 290,
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.12),
-                    AppColors.primary.withOpacity(0.03),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppColors.primary.withOpacity(0.25),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isPhone = constraints.maxWidth < 600;
+        final double spacing = isPhone ? 10 : 16;
+        final double cardWidth = isPhone
+            ? ((constraints.maxWidth - spacing) / 2).floorToDouble()
+            : 290.0;
+
+        Widget buildPersonCard(Map<String, dynamic> person) {
+          return Container(
+            width: cardWidth,
+            padding: EdgeInsets.symmetric(
+              vertical: isPhone ? 16 : 24,
+              horizontal: isPhone ? 8 : 16,
+            ),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withOpacity(0.12),
+                  AppColors.primary.withOpacity(0.03),
                 ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Avatar Photo
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primary,
-                          AppColors.secondary.withOpacity(0.6),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.35),
-                          blurRadius: 16,
-                          spreadRadius: 2,
-                        ),
+              borderRadius: BorderRadius.circular(isPhone ? 16 : 20),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.25),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Avatar Photo
+                Container(
+                  width: isPhone ? 68 : 90,
+                  height: isPhone ? 68 : 90,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary,
+                        AppColors.secondary.withOpacity(0.6),
                       ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(3),
-                      child: ClipOval(
-                        child: Image.asset(
-                          officer['photo'],
-                          fit: BoxFit.cover,
-                          errorBuilder: (ctx, e, s) => Container(
-                            color: AppColors.glassCardColor,
-                            child: Icon(
-                              Icons.person_rounded,
-                              size: 44,
-                              color: AppColors.textSecondary,
-                            ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.35),
+                        blurRadius: 16,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: ClipOval(
+                      child: Image.asset(
+                        person['photo'],
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, e, s) => Container(
+                          color: AppColors.glassCardColor,
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: isPhone ? 32 : 44,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                ),
+                SizedBox(height: isPhone ? 12 : 16),
 
-                  // Name
-                  Text(
-                    officer['name'],
+                // Name
+                Text(
+                  person['name'],
+                  textAlign: TextAlign.center,
+                  maxLines: isPhone ? 2 : 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: isPhone ? 13 : 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                // Designation Badge
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isPhone ? 8 : 12,
+                    vertical: isPhone ? 3 : 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    person['designation'],
                     textAlign: TextAlign.center,
-                    maxLines: 1,
+                    maxLines: isPhone ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 16,
+                      color: AppColors.primary,
+                      fontSize: isPhone ? 9.5 : 11,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: isPhone ? 0.2 : 0.5,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                ),
+                SizedBox(height: isPhone ? 6 : 10),
+                Text(
+                  '${person['department']} — Batch ${person['batch']}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: isPhone ? 10.5 : 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                SizedBox(height: isPhone ? 12 : 16),
 
-                  // Designation Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppColors.primary.withOpacity(0.3),
-                        width: 1,
+                // Social Links
+                isPhone
+                    ? FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: (person['socials']
+                                  as List<Map<String, dynamic>>)
+                              .map((soc) {
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 2.5),
+                              child: socialIconBtn(
+                                soc['icon'],
+                                soc['url'],
+                                size: 28,
+                                iconSize: 13,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      )
+                    : Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: (person['socials']
+                                as List<Map<String, dynamic>>)
+                            .map((soc) {
+                          return socialIconBtn(
+                            soc['icon'],
+                            soc['url'],
+                            size: 40,
+                            iconSize: 16,
+                          );
+                        }).toList(),
                       ),
-                    ),
-                    child: Text(
-                      officer['designation'],
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '${officer['department']} — Batch ${officer['batch']}',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+              ],
+            ),
+          );
+        }
 
-                  // Social Links
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: (officer['socials'] as List<Map<String, dynamic>>).map((soc) {
-                      return socialIconBtn(soc['icon'], soc['url']);
-                    }).toList(),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
-      ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Officers & Leadership',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: isPhone ? 18 : 20,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('The core team managing UniGrid',
+                style: TextStyle(
+                    color: AppColors.textPrimary.withOpacity(0.5),
+                    fontSize: 12)),
+            SizedBox(height: isPhone ? 16 : 24),
+            Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              alignment: WrapAlignment.center,
+              children: officers.map(buildPersonCard).toList(),
+            ),
+            SizedBox(height: isPhone ? 32 : 40),
+            Text('Batch Representative',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: isPhone ? 18 : 20,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('Batch 52 Student Representatives',
+                style: TextStyle(
+                    color: AppColors.textPrimary.withOpacity(0.5),
+                    fontSize: 12)),
+            SizedBox(height: isPhone ? 16 : 24),
+            Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              alignment: WrapAlignment.center,
+              children: batchRepresentatives.map(buildPersonCard).toList(),
+            ),
+          ],
+        );
+      },
     );
   }
 

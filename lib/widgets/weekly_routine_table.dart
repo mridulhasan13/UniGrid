@@ -11,6 +11,7 @@ import '../utils/schedule_constants.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/unigrid_loader.dart';
 import '../notifications/in_app_notification.dart';
+import '../notifications/fcm_service.dart';
 import '../screens/schedule_builder_screen.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
@@ -95,7 +96,9 @@ Future<void> _checkAndAutoPopulateWeek({
         'startSlot': data['startSlot'] ?? 1,
         'span': data['span'] ?? 1,
         'group': data['group'] ?? '',
-        'status': 'upcoming',
+        'status': DateTime.now().isAfter(dayDate.add(const Duration(days: 1)))
+            ? 'completed'
+            : 'upcoming',
         'scheduledDate': Timestamp.fromDate(dayDate),
         'lastUpdatedDate': FieldValue.serverTimestamp(),
       });
@@ -597,6 +600,7 @@ class WeeklyRoutineTable extends StatelessWidget {
               HeaderBar(
                 university: university,
                 levelTerm: levelTerm,
+                selectedDate: selectedDate,
                 onDateTap: onDateTap,
               ),
               const SizedBox(height: 6),
@@ -1178,6 +1182,23 @@ class WeeklyRoutineTable extends StatelessWidget {
         await batch.commit();
       }
 
+      // Dispatch push broadcast to batch students when a day is marked Holiday, Boycott, or Auto Day
+      if (user.hasDeptScope && newStatus != 'normal') {
+        final String label = newStatus == 'auto'
+            ? 'Auto Day'
+            : (newStatus == 'boycott'
+                ? 'Boycott Day'
+                : (newStatus == 'holiday' ? 'Holiday' : newStatus));
+        FCMService.notifyRoutineUpdated(
+          subject: '$day ($label)',
+          action: 'Set to $label',
+          dayOfWeek: day,
+          senderUserId: user.id,
+          department: user.department,
+          batch: user.batch,
+        ).catchError((e) => debugPrint('[WeeklyRoutine] Day status push notification error: $e'));
+      }
+
       if (context.mounted) {
         final String label = newStatus == 'auto'
             ? 'Auto Day'
@@ -1300,9 +1321,74 @@ class WeeklyRoutineTable extends StatelessWidget {
     return children;
   }
 
+  static bool isClassDateTimePassed(ClassSchedule cls, [DateTime? sundayDate]) {
+    try {
+      final now = DateTime.now();
+      DateTime? classDate = cls.scheduledDate;
+      if (classDate == null && sundayDate != null) {
+        classDate = _getDateTimeForDayHelper(sundayDate, cls.dayOfWeek);
+      }
+      if (classDate == null) return false;
+
+      DateTime classEndDateTime = DateTime(
+        classDate.year,
+        classDate.month,
+        classDate.day,
+        23,
+        59,
+        59,
+      );
+
+      if (cls.time.isNotEmpty) {
+        final parts = cls.time.split('-');
+        if (parts.length > 1) {
+          final endStr = parts[1].trim().toUpperCase();
+          final isPM = endStr.contains('PM');
+          final isAM = endStr.contains('AM');
+          final raw = endStr.replaceAll('AM', '').replaceAll('PM', '').trim();
+          final timeParts = raw.split(':');
+          if (timeParts.isNotEmpty) {
+            int hour = int.parse(timeParts[0].trim());
+            int minute = timeParts.length > 1 ? int.parse(timeParts[1].trim()) : 0;
+            if (isPM && hour < 12) hour += 12;
+            if (isAM && hour == 12) hour = 0;
+            classEndDateTime = DateTime(
+              classDate.year,
+              classDate.month,
+              classDate.day,
+              hour,
+              minute,
+            );
+          }
+        }
+      }
+
+      return now.isAfter(classEndDateTime);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static String getEffectiveClassStatus(ClassSchedule cls, [DateTime? sundayDate]) {
+    final raw = cls.status.trim().toLowerCase();
+    if (raw == 'cancelled' ||
+        raw == 'no class' ||
+        raw == 'no_class' ||
+        raw == 'auto' ||
+        raw == 'boycott' ||
+        raw == 'holiday') {
+      return raw;
+    }
+    // If the scheduled date and time has passed, automatically mark completed
+    if (isClassDateTimePassed(cls, sundayDate)) {
+      return 'completed';
+    }
+    return 'upcoming';
+  }
+
   Widget _buildDynamicClassBox(BuildContext context, ClassSchedule cls,
       {bool isCompact = false, int stackedCount = 1}) {
-    final String status = cls.status.toLowerCase();
+    final String status = getEffectiveClassStatus(cls);
 
     final Color mainThemeColor;
     final List<Color> gradientColors;
@@ -1363,8 +1449,10 @@ class WeeklyRoutineTable extends StatelessWidget {
     final double titleFontSize = stackedCount >= 3 ? 6.2 : (isCompact ? 7.0 : 8.0);
     final double verticalPadding = stackedCount >= 3 ? 0.5 : (isCompact ? 1.0 : 3.0);
 
-    return GestureDetector(
-      onTap: () => _showClassDetailsSheet(context, cls, user),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => _showClassDetailsSheet(context, cls, user),
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -1412,6 +1500,7 @@ class WeeklyRoutineTable extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1608,11 +1697,13 @@ class WeeklyRoutineTable extends StatelessWidget {
                 final String avatarInitial =
                     extractCleanAvatarInitial(teacherShort, resolvedTeacherName);
 
+                final String effectiveStatus = getEffectiveClassStatus(cls);
+
                 Color statusColor;
                 IconData statusIcon;
-                String statusText = cls.status.toUpperCase();
+                String statusText = effectiveStatus.toUpperCase();
 
-                switch (cls.status.toLowerCase()) {
+                switch (effectiveStatus) {
                   case 'completed':
                     statusColor = AppColors.emerald;
                     statusIcon = Icons.check_circle_rounded;
@@ -2121,6 +2212,19 @@ class WeeklyRoutineTable extends StatelessWidget {
         await batch.commit();
       }
 
+      // Dispatch push broadcast when a class is cancelled or marked no class
+      if (effectiveUser != null && effectiveUser.hasDeptScope && (status == 'cancelled' || status == 'no class')) {
+        final actionWord = status == 'cancelled' ? 'Cancelled' : 'Marked No Class';
+        FCMService.notifyRoutineUpdated(
+          subject: cls.subject,
+          action: actionWord,
+          dayOfWeek: cls.dayOfWeek,
+          senderUserId: effectiveUser.id,
+          department: effectiveUser.department,
+          batch: effectiveUser.batch,
+        ).catchError((e) => debugPrint('[WeeklyRoutine] Status push notification error: $e'));
+      }
+
       if (parentContext.mounted) {
         final String statusLabel = status == 'no class'
             ? 'No Class'
@@ -2236,6 +2340,17 @@ class WeeklyRoutineTable extends StatelessWidget {
 
         await batch.commit();
 
+        if (user != null && user.hasDeptScope) {
+          FCMService.notifyRoutineUpdated(
+            subject: cls.subject,
+            action: 'Removed',
+            dayOfWeek: cls.dayOfWeek,
+            senderUserId: user.id,
+            department: user.department,
+            batch: user.batch,
+          ).catchError((e) => debugPrint('[WeeklyRoutine] Delete push notification error: $e'));
+        }
+
         if (parentContext.mounted) {
           InAppNotification.show(
             parentContext,
@@ -2266,19 +2381,22 @@ class HeaderBar extends StatelessWidget {
   final String university;
   final String levelTerm;
   final VoidCallback? onDateTap;
+  final DateTime? selectedDate;
 
   const HeaderBar({
     super.key,
     required this.university,
     required this.levelTerm,
     this.onDateTap,
+    this.selectedDate,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Tuesday-15 Jan 2026 format (using EEEE-d MMM yyyy format)
+    // Selected or current date format (using EEEE-d MMM yyyy format)
+    final dateToDisplay = selectedDate ?? DateTime.now();
     final formattedDate =
-        '(${DateFormat('EEEE-d MMM yyyy').format(DateTime.now())})';
+        '(${DateFormat('EEEE-d MMM yyyy').format(dateToDisplay)})';
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2314,28 +2432,42 @@ class HeaderBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        GestureDetector(
-          onTap: onDateTap,
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: AppColors.primary.withOpacity(0.25),
-                  width: 1),
-            ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                formattedDate,
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.3,
-                ),
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: onDateTap,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppColors.primary.withOpacity(0.25),
+                    width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      formattedDate,
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.calendar_month_rounded,
+                    size: 10,
+                    color: AppColors.primary.withOpacity(0.85),
+                  ),
+                ],
               ),
             ),
           ),

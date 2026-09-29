@@ -8,33 +8,55 @@ service cloud.firestore {
     }
 
     function isRootAdmin(auth) {
-      return auth.token.keys().hasAll(['email']) && (
-        auth.token.email.lower() == 'mridul.owner@unigrid.app' ||
-        auth.token.email.lower() == 'mridulhasan13@gmail.com' ||
-        exists(/databases/$(database)/documents/root_admins/$(auth.token.email.lower()))
-      ) || exists(/databases/$(database)/documents/root_admins/$(auth.uid));
+      return (
+        auth != null && (
+          ('email' in auth.token && (
+            auth.token.email.lower() == 'mridul.owner@unigrid.app' ||
+            auth.token.email.lower() == 'mridulhasan13@gmail.com' ||
+            auth.token.email.lower() == '23.mridulhasan@gmail.com' ||
+            auth.token.email.lower() == 'official.mridulhasan@gmail.com' ||
+            auth.token.email.lower() == 'offical.mridulhasan@gmail.com' ||
+            auth.token.email.lower() == 'hmridul27@gmail.com' ||
+            auth.token.email.lower() == 'sahon.coo@unigrid.app' ||
+            auth.token.email.lower() == 'soron.mo@unigrid.app' ||
+            auth.token.email.lower() == 'shoron.mo@unigrid.app' ||
+            auth.token.email.lower() == 'marzia.52@unigrid.app' ||
+            auth.token.email.lower() == 'mijan.52@unigrid.app' ||
+            exists(/databases/$(database)/documents/root_admins/$(auth.token.email.lower()))
+          )) ||
+          exists(/databases/$(database)/documents/root_admins/$(auth.uid))
+        )
+      );
     }
     
     function isApprovedUser() {
       return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isCR == true ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
-        isRootAdmin(request.auth)
+        isRootAdmin(request.auth) || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isApproved', false) == true ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isCR', false) == true ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAdmin', false) == true
+          )
+        )
       );
     }
     
     function belongsToScope(dept, batch) {
       return isRootAdmin(request.auth) || (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == dept &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.batch == batch
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('department', '') == dept &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('batch', '') == batch
+        )
       );
     }
     
     function isCR(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.isCR == true ||
-             get(/databases/$(database)/documents/users/$(userId)).data.isAdmin == true ||
-             isRootAdmin(request.auth);
+      return isRootAdmin(request.auth) || (
+        exists(/databases/$(database)/documents/users/$(userId)) && (
+          get(/databases/$(database)/documents/users/$(userId)).data.get('isCR', false) == true ||
+          get(/databases/$(database)/documents/users/$(userId)).data.get('isAdmin', false) == true
+        )
+      );
     }
 
     // Root admins list - read-only for clients, updates disabled from client
@@ -54,7 +76,8 @@ service cloud.firestore {
          )
         ) ||
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isCR == true ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+        isRootAdmin(request.auth)
       );
       allow delete: if isAuthenticated() && (
         request.auth.uid == userId || 
@@ -68,10 +91,24 @@ service cloud.firestore {
     match /depts/{dept}/batches/{batch}/{collection}/{docId} {
       allow read: if isApprovedUser() && belongsToScope(dept, batch);
       
-      // For general chat, student uploads (materials), and user read receipts
+      // Explicit create permission
       allow create: if isApprovedUser() && belongsToScope(dept, batch) && (
-        collection == 'chat_messages' || collection == 'materials' || (collection == 'read_receipts' && (request.auth.uid == docId || isRootAdmin(request.auth)))
+        collection == 'chat_messages' || 
+        collection == 'materials' || 
+        (collection == 'read_receipts' && (request.auth.uid == docId || isRootAdmin(request.auth))) ||
+        (isCR(request.auth.uid) && (
+          collection == 'announcements' || 
+          collection == 'schedule' || 
+          collection == 'default_schedule' || 
+          collection == 'schedule_overrides' || 
+          collection == 'routine_metadata' || 
+          collection == 'config' || 
+          collection == 'courses' ||
+          collection == 'exams'
+        ))
       );
+      
+      // Explicit update permission
       allow update: if isApprovedUser() && belongsToScope(dept, batch) && (
         (collection == 'chat_messages' && (
           request.auth.uid == resource.data.authorId || 
@@ -82,8 +119,20 @@ service cloud.firestore {
           request.auth.uid == resource.data.uploadedByUserId ||
           isCR(request.auth.uid)
         )) ||
-        (collection == 'read_receipts' && (request.auth.uid == docId || isRootAdmin(request.auth)))
+        (collection == 'read_receipts' && (request.auth.uid == docId || isRootAdmin(request.auth))) ||
+        (isCR(request.auth.uid) && (
+          collection == 'announcements' || 
+          collection == 'schedule' || 
+          collection == 'default_schedule' || 
+          collection == 'schedule_overrides' || 
+          collection == 'routine_metadata' || 
+          collection == 'config' || 
+          collection == 'courses' ||
+          collection == 'exams'
+        ))
       );
+      
+      // Explicit delete permission
       allow delete: if isApprovedUser() && belongsToScope(dept, batch) && (
         (collection == 'chat_messages' && (
           request.auth.uid == resource.data.authorId || 
@@ -93,10 +142,20 @@ service cloud.firestore {
           request.auth.uid == resource.data.uploadedByUserId ||
           isCR(request.auth.uid)
         )) ||
-        (collection == 'read_receipts' && (request.auth.uid == docId || isRootAdmin(request.auth)))
+        (collection == 'read_receipts' && (request.auth.uid == docId || isRootAdmin(request.auth))) ||
+        (isCR(request.auth.uid) && (
+          collection == 'announcements' || 
+          collection == 'schedule' || 
+          collection == 'default_schedule' || 
+          collection == 'schedule_overrides' || 
+          collection == 'routine_metadata' || 
+          collection == 'config' || 
+          collection == 'courses' ||
+          collection == 'exams'
+        ))
       );
       
-      // For CR-only collections: announcements, schedule, default_schedule, overrides, metadata, config, courses
+      // Blanket write permission for CRs
       allow write: if isApprovedUser() && belongsToScope(dept, batch) && isCR(request.auth.uid) && (
         collection == 'announcements' || 
         collection == 'schedule' || 
@@ -104,7 +163,8 @@ service cloud.firestore {
         collection == 'schedule_overrides' || 
         collection == 'routine_metadata' || 
         collection == 'config' || 
-        collection == 'courses'
+        collection == 'courses' ||
+        collection == 'exams'
       );
     }
     
@@ -163,6 +223,11 @@ service cloud.firestore {
     match /general_announcements/{docId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
+    }
+    
+    // Audit & Admin Activity Log (Root Admins only)
+    match /admin_audit_logs/{logId} {
+      allow read, write: if isAuthenticated() && isRootAdmin(request.auth);
     }
   }
 }

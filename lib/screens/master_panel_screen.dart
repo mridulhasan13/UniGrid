@@ -18,6 +18,12 @@ import '../services/supabase_config.dart';
 import '../services/supabase_storage_service.dart';
 import '../services/theme_service.dart';
 import 'file_viewer_screen.dart';
+import '../services/admin_audit_service.dart';
+import '../widgets/master_admin/admin_audit_log_card.dart';
+import '../widgets/master_admin/resource_telemetry_card.dart';
+import '../widgets/master_admin/user_lifecycle_card.dart';
+import '../widgets/master_admin/sparkline_graph_widget.dart';
+import '../widgets/master_admin/dedicated_analytics_graph_card.dart';
 
 class MasterPanelScreen extends StatefulWidget {
   const MasterPanelScreen({super.key});
@@ -39,6 +45,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
   String _reportsSearchQuery = '';
   final TextEditingController _reportsSearchController = TextEditingController();
   int _usersDisplayLimit = 25;
+  bool _showTrafficGraph = false;
 
   @override
   void dispose() {
@@ -101,6 +108,27 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
       String uid, String field, dynamic value) async {
     try {
       await _firestore.collection('users').doc(uid).update({field: value});
+
+      String category = 'User';
+      String actionDesc = 'Updated $field to "$value" for user $uid';
+      if (field == 'isCR') {
+        category = 'Roles';
+        actionDesc = value == true ? 'Approved CR status for user $uid' : 'Revoked CR status for user $uid';
+      } else if (field == 'isAdmin') {
+        category = 'Roles';
+        actionDesc = value == true ? 'Promoted user $uid to Root Admin' : 'Revoked Admin privileges for user $uid';
+      } else if (field == 'isApproved') {
+        category = 'User';
+        actionDesc = value == true ? 'Approved student account for $uid' : 'Suspended account for $uid';
+      }
+
+      AdminAuditService.logAction(
+        action: actionDesc,
+        category: category,
+        targetId: uid,
+        details: {'field': field, 'newValue': value},
+      );
+
       if (mounted) {
         InAppNotification.show(
           context,
@@ -201,6 +229,14 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
         'minAppVersion': '1.0.0',
       }, SetOptions(merge: true));
 
+      AdminAuditService.logAction(
+        action: nextVal
+            ? 'Activated Emergency Maintenance Mode'
+            : 'Deactivated Maintenance Mode (System Reopened)',
+        category: 'Security',
+        details: {'maintenanceMode': nextVal},
+      );
+
       if (mounted) {
         InAppNotification.show(
           context,
@@ -298,6 +334,22 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
           int monthActive = 0;
           final int lifetimeUsers = allDocs.length;
 
+          // Intraday & historical trend tracking for deltas & sparklines
+          int yesterdayActive = 0;
+          int prevWeekActive = 0;
+          int prevMonthActive = 0;
+
+          // 7-day daily traffic velocity points (index 0 is 6 days ago, index 6 is today)
+          final List<double> daily7Points = List.filled(7, 0.0);
+          final List<String> daily7Labels = List.filled(7, '');
+          for (int i = 0; i < 7; i++) {
+            final d = now.subtract(Duration(days: 6 - i));
+            daily7Labels[i] = i == 6 ? 'Today' : DateFormat('E').format(d);
+          }
+
+          // 30-day grouped velocity (4 weekly buckets)
+          final List<double> monthlyPoints = List.filled(4, 0.0);
+
           for (final doc in allDocs) {
             final data = doc.data() as Map<String, dynamic>? ?? {};
 
@@ -321,18 +373,73 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
               if (isToday || (diff.inSeconds >= 0 && diff.inHours <= 24)) {
                 todayActive++;
               }
+              if (diff.inHours > 24 && diff.inHours <= 48) {
+                yesterdayActive++;
+              }
               if (diff.inSeconds >= 0 && diff.inDays <= 7) {
                 weekActive++;
+              }
+              if (diff.inDays > 7 && diff.inDays <= 14) {
+                prevWeekActive++;
               }
               if (diff.inSeconds >= 0 && diff.inDays <= 30) {
                 monthActive++;
               }
+              if (diff.inDays > 30 && diff.inDays <= 60) {
+                prevMonthActive++;
+              }
+
+              // Bucket into 7-day points
+              if (diff.inSeconds >= 0 && diff.inDays < 7) {
+                final dayIdx = 6 - diff.inDays;
+                if (dayIdx >= 0 && dayIdx < 7) {
+                  daily7Points[dayIdx] += 1.0;
+                }
+              }
+
+              // Bucket into 4-week monthly points
+              if (diff.inSeconds >= 0 && diff.inDays <= 28) {
+                final weekIdx = (diff.inDays / 7).floor().clamp(0, 3);
+                monthlyPoints[3 - weekIdx] += 1.0;
+              }
             }
+          }
+
+          // Calculate real cumulative account creation velocity curve for Lifetime sparkline
+          final List<double> lifetimeGrowthPoints = List.filled(4, 0.0);
+          for (final doc in allDocs) {
+            final data = doc.data() as Map<String, dynamic>? ?? {};
+            DateTime? cDate;
+            if (data['createdAt'] is Timestamp) {
+              cDate = (data['createdAt'] as Timestamp).toDate();
+            } else if (data['createdAt'] is String) {
+              cDate = DateTime.tryParse(data['createdAt']);
+            }
+            cDate ??= (data['lastActive'] is Timestamp)
+                ? (data['lastActive'] as Timestamp).toDate()
+                : now;
+
+            final age = now.difference(cDate);
+            if (age.inDays >= 30) lifetimeGrowthPoints[0] += 1.0;
+            if (age.inDays >= 14) lifetimeGrowthPoints[1] += 1.0;
+            if (age.inDays >= 7) lifetimeGrowthPoints[2] += 1.0;
+            lifetimeGrowthPoints[3] += 1.0;
           }
 
           // Consistent window hierarchies: Today <= 7 Days <= 30 Days <= Lifetime
           if (weekActive < todayActive) weekActive = todayActive;
           if (monthActive < weekActive) monthActive = weekActive;
+
+          // Percentage deltas (Exact mathematical calculation from real data)
+          final double deltaToday = yesterdayActive > 0
+              ? (((todayActive - yesterdayActive) / yesterdayActive) * 100)
+              : (todayActive > 0 ? 100.0 : 0.0);
+          final double deltaWeek = prevWeekActive > 0
+              ? (((weekActive - prevWeekActive) / prevWeekActive) * 100)
+              : (weekActive > 0 ? 100.0 : 0.0);
+          final double deltaMonth = prevMonthActive > 0
+              ? (((monthActive - prevMonthActive) / prevMonthActive) * 100)
+              : (monthActive > 0 ? 100.0 : 0.0);
 
           // ── Filtered Users List ──────────────────────────────────────────
           final filteredUsers = allDocs.where((doc) {
@@ -460,14 +567,45 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                     week: weekActive,
                     month: monthActive,
                     lifetime: lifetimeUsers,
+                    deltaToday: deltaToday,
+                    deltaWeek: deltaWeek,
+                    deltaMonth: deltaMonth,
+                    daily7Points: daily7Points,
+                    daily7Labels: daily7Labels,
+                    monthlyPoints: monthlyPoints,
+                    lifetimeGrowthPoints: lifetimeGrowthPoints,
                   ),
                 ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1, end: 0),
 
-                // ── 2. TOTAL STORAGE SPACE MONITOR CARD ───────────────────────
+                // ── 2. DEDICATED GRAPH ANALYTICS SECTION ──────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                  child: DedicatedAnalyticsGraphCard(allUserDocs: allDocs),
+                ).animate().fadeIn(delay: 115.ms).slideY(begin: 0.1, end: 0),
+
+                // ── 3. USER LIFECYCLE & RETENTION CARD ────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                  child: UserLifecycleCard(allUserDocs: allDocs),
+                ).animate().fadeIn(delay: 130.ms).slideY(begin: 0.1, end: 0),
+
+                // ── 3. ACADEMIC RESOURCE TELEMETRY CARD (NEW) ─────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                  child: ResourceTelemetryCard(allUserDocs: allDocs),
+                ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.1, end: 0),
+
+                // ── 4. AUDIT & ADMIN ACTIVITY LOG (NEW) ───────────────────────
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                  child: AdminAuditLogCard(),
+                ).animate().fadeIn(delay: 175.ms).slideY(begin: 0.1, end: 0),
+
+                // ── 5. TOTAL STORAGE SPACE MONITOR CARD ───────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
                   child: _buildStorageMonitorCard(totalUsers: lifetimeUsers),
-                ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.1, end: 0),
+                ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
 
                 // ── 3. CLOUD SERVICE HEALTH & PING DASHBOARD ──────────────────
                 Padding(
@@ -715,6 +853,13 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
     required int week,
     required int month,
     required int lifetime,
+    required double deltaToday,
+    required double deltaWeek,
+    required double deltaMonth,
+    required List<double> daily7Points,
+    required List<String> daily7Labels,
+    required List<double> monthlyPoints,
+    required List<double> lifetimeGrowthPoints,
   }) {
     return GlassCard(
       padding: const EdgeInsets.all(13),
@@ -730,7 +875,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                     Container(
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: Colors.blueAccent.withOpacity(0.15),
+                        color: Colors.blueAccent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(9),
                       ),
                       child: const Icon(Icons.insights_rounded,
@@ -752,7 +897,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            'Workspace traffic breakdown',
+                            'Workspace traffic breakdown & trends',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 10,
@@ -767,35 +912,78 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.greenAccent.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.greenAccent.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 5,
-                      height: 5,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.greenAccent,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () => setState(() => _showTrafficGraph = !_showTrafficGraph),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _showTrafficGraph
+                            ? const Color(0xFF38BDF8).withValues(alpha: 0.18)
+                            : Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: _showTrafficGraph
+                              ? const Color(0xFF38BDF8).withValues(alpha: 0.4)
+                              : Colors.white.withValues(alpha: 0.1),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.show_chart_rounded,
+                            size: 11,
+                            color: _showTrafficGraph ? const Color(0xFF38BDF8) : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 3.5),
+                          Text(
+                            _showTrafficGraph ? 'Hide Graph' : 'Trend Graph',
+                            style: TextStyle(
+                              color: _showTrafficGraph ? const Color(0xFF38BDF8) : AppColors.textSecondary,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Live',
-                      style: TextStyle(
-                        color: Colors.greenAccent,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.greenAccent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3)),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.greenAccent,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'Live',
+                          style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -817,6 +1005,10 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             color: const Color(0xFF10B981),
                             icon: Icons.flash_on_rounded,
                             isSelected: _selectedActivityFilter == 'Today',
+                            deltaPercent: deltaToday,
+                            sparklineData: daily7Points.length >= 3
+                                ? [daily7Points[4], daily7Points[5], daily7Points[6]]
+                                : null,
                             onTap: () {
                               setState(() {
                                 _selectedActivityFilter =
@@ -834,6 +1026,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             color: const Color(0xFF38BDF8),
                             icon: Icons.date_range_rounded,
                             isSelected: _selectedActivityFilter == '7d',
+                            deltaPercent: deltaWeek,
+                            sparklineData: daily7Points,
                             onTap: () {
                               setState(() {
                                 _selectedActivityFilter =
@@ -855,6 +1049,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             color: const Color(0xFFA855F7),
                             icon: Icons.calendar_month_rounded,
                             isSelected: _selectedActivityFilter == '30d',
+                            deltaPercent: deltaMonth,
+                            sparklineData: monthlyPoints,
                             onTap: () {
                               setState(() {
                                 _selectedActivityFilter =
@@ -872,6 +1068,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                             color: const Color(0xFFF59E0B),
                             icon: Icons.people_alt_rounded,
                             isSelected: _selectedActivityFilter == 'All',
+                            sparklineData: lifetimeGrowthPoints,
                             onTap: () {
                               setState(() {
                                 _selectedActivityFilter = 'All';
@@ -895,6 +1092,10 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       color: const Color(0xFF10B981),
                       icon: Icons.flash_on_rounded,
                       isSelected: _selectedActivityFilter == 'Today',
+                      deltaPercent: deltaToday,
+                      sparklineData: daily7Points.length >= 3
+                          ? [daily7Points[4], daily7Points[5], daily7Points[6]]
+                          : null,
                       onTap: () {
                         setState(() {
                           _selectedActivityFilter =
@@ -912,6 +1113,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       color: const Color(0xFF38BDF8),
                       icon: Icons.date_range_rounded,
                       isSelected: _selectedActivityFilter == '7d',
+                      deltaPercent: deltaWeek,
+                      sparklineData: daily7Points,
                       onTap: () {
                         setState(() {
                           _selectedActivityFilter =
@@ -929,6 +1132,8 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       color: const Color(0xFFA855F7),
                       icon: Icons.calendar_month_rounded,
                       isSelected: _selectedActivityFilter == '30d',
+                      deltaPercent: deltaMonth,
+                      sparklineData: monthlyPoints,
                       onTap: () {
                         setState(() {
                           _selectedActivityFilter =
@@ -946,6 +1151,7 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                       color: const Color(0xFFF59E0B),
                       icon: Icons.people_alt_rounded,
                       isSelected: _selectedActivityFilter == 'All',
+                      sparklineData: lifetimeGrowthPoints,
                       onTap: () {
                         setState(() {
                           _selectedActivityFilter = 'All';
@@ -957,6 +1163,16 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
               );
             },
           ),
+          if (_showTrafficGraph) ...[
+            const SizedBox(height: 12),
+            InteractiveTrafficGraph(
+              dailyValues: daily7Points,
+              labels: daily7Labels,
+              primaryColor: const Color(0xFF38BDF8),
+              title: '7-Day Traffic Velocity Curve',
+              subtitle: 'Daily active workspace members over time',
+            ),
+          ],
         ],
       ),
     );
@@ -970,24 +1186,26 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
     required IconData icon,
     bool isSelected = false,
     VoidCallback? onTap,
+    double? deltaPercent,
+    List<double>? sparklineData,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7.5),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.22) : color.withOpacity(0.08),
+          color: isSelected ? color.withValues(alpha: 0.22) : color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.2),
+            color: isSelected ? color : color.withValues(alpha: 0.2),
             width: isSelected ? 1.5 : 1.0,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.3),
+                    color: color.withValues(alpha: 0.3),
                     blurRadius: 8,
                     spreadRadius: 1,
                   )
@@ -1008,29 +1226,58 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
                     fontSize: 11,
                   ),
                 ),
-                Icon(icon, color: color.withOpacity(0.8), size: 13),
+                if (deltaPercent != null)
+                  TrendDeltaBadge(deltaPercent: deltaPercent, compact: true)
+                else
+                  Icon(icon, color: color.withValues(alpha: 0.8), size: 13),
               ],
             ),
             const SizedBox(height: 3),
-            Text(
-              value,
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-                fontSize: 9.5,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        value,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                          fontSize: 9.5,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (sparklineData != null && sparklineData.isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: 36,
+                    height: 20,
+                    child: MiniSparkline(
+                      data: sparklineData,
+                      color: color,
+                      height: 20,
+                      strokeWidth: 1.5,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),

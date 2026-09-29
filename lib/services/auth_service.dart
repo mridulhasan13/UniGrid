@@ -74,8 +74,12 @@ class AuthService {
 
   Future<void> waitForSessionInit() async {
     if (_sessionInitCompleter.isCompleted) return;
+    final hasStored = await hasActiveStoredSession();
+    final timeoutDuration = hasStored
+        ? const Duration(milliseconds: 3500)
+        : const Duration(milliseconds: 800);
     await _sessionInitCompleter.future.timeout(
-      const Duration(milliseconds: 1000),
+      timeoutDuration,
       onTimeout: () {},
     );
   }

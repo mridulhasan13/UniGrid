@@ -161,6 +161,7 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _isRestoringSession = true;
+  bool _hasStoredSession = false;
 
   @override
   void initState() {
@@ -178,6 +179,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
         precacheImage(const AssetImage('assets/images/mridul_profile.png'), context);
       } catch (_) {}
     });
+
+    final hasStored = await authService.hasActiveStoredSession();
+    if (mounted) {
+      setState(() {
+        _hasStoredSession = hasStored;
+      });
+    }
+
     await authService.waitForSessionInit();
     if (mounted) {
       setState(() {
@@ -196,8 +205,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
       return const Scaffold(
         body: Center(
           child: UniGridLoader(
-            title: 'Loading UniGrid...',
-            subtitle: 'Restoring your session...',
+            title: '',
+            subtitle: '',
             showBackground: false,
           ),
         ),
@@ -209,6 +218,17 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     // 1. Truly logged out (no Firebase Auth session and no AppUser profile)
     if (firebaseUser == null && user == null) {
+      if (_hasStoredSession && _isRestoringSession) {
+        return const Scaffold(
+          body: Center(
+            child: UniGridLoader(
+              title: '',
+              subtitle: '',
+              showBackground: false,
+            ),
+          ),
+        );
+      }
       return const LoginScreen();
     }
 
@@ -217,8 +237,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
       return const Scaffold(
         body: Center(
           child: UniGridLoader(
-            title: 'Loading workspace...',
-            subtitle: 'Syncing your profile...',
+            title: '',
+            subtitle: '',
             showBackground: false,
           ),
         ),

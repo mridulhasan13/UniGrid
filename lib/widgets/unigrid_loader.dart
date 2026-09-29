@@ -79,7 +79,7 @@ class UniGridLoader extends StatelessWidget {
           .fadeIn(duration: 500.ms)
           .scale(begin: const Offset(0.85, 0.85), end: const Offset(1.0, 1.0), curve: Curves.easeOutBack, duration: 500.ms),
 
-          const SizedBox(height: 24),
+          if (title.isNotEmpty || subtitle.isNotEmpty) const SizedBox(height: 24),
 
           if (title.isNotEmpty)
             Text(

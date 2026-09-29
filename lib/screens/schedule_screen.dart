@@ -12,9 +12,11 @@ import '../widgets/weekly_routine_table.dart';
 import 'schedule_builder_screen.dart';
 import 'course_registry_screen.dart';
 import '../widgets/floating_app_bar.dart';
+import '../widgets/exam_button.dart';
 import '../services/auth_service.dart';
 import '../notifications/in_app_notification.dart';
 import '../notifications/web_to_app/wa_receiver.dart';
+import '../notifications/fcm_service.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -122,7 +124,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 'startSlot': data['startSlot'] ?? 1,
                 'span': data['span'] ?? 1,
                 'group': data['group'] ?? '',
-                'status': 'upcoming',
+                'status': DateTime.now().isAfter(dayDate.add(const Duration(days: 1)))
+                    ? 'completed'
+                    : 'upcoming',
                 'scheduledDate': Timestamp.fromDate(dayDate),
                 'lastUpdatedDate': FieldValue.serverTimestamp(),
               });
@@ -1329,7 +1333,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               'startSlot': data['startSlot'] ?? 1,
               'span': data['span'] ?? 1,
               'group': data['group'] ?? '',
-              'status': 'upcoming',
+              'status': DateTime.now().isAfter(targetDate.add(const Duration(days: 1)))
+                  ? 'completed'
+                  : 'upcoming',
               'scheduledDate': Timestamp.fromDate(targetDate),
               'lastUpdatedDate': FieldValue.serverTimestamp(),
             });
@@ -1384,7 +1390,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             'startSlot': data['startSlot'] ?? 1,
             'span': data['span'] ?? 1,
             'group': data['group'] ?? '',
-            'status': 'upcoming',
+            'status': DateTime.now().isAfter(dayDate.add(const Duration(days: 1)))
+                ? 'completed'
+                : 'upcoming',
             'scheduledDate': Timestamp.fromDate(dayDate),
             'lastUpdatedDate': FieldValue.serverTimestamp(),
           });
@@ -1592,6 +1600,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       FloatingAppBar(
                         title: 'Weekly Routine',
                         actions: [
+                          ExamButton(user: user),
                           IconButton(
                             icon: Icon(Icons.menu_book, color: AppColors.textSecondary),
                             tooltip: 'Course & Teacher Registry',
@@ -1899,8 +1908,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           data['scheduledDate'] = Timestamp.fromDate(newDate);
         }
 
-        // Set status to upcoming for the new week
-        data['status'] = 'upcoming';
+        // Auto-calculate status: if target date has passed -> completed, else upcoming
+        DateTime? targetClassDate;
+        if (data['scheduledDate'] is Timestamp) {
+          targetClassDate = (data['scheduledDate'] as Timestamp).toDate();
+        }
+        final bool isAlreadyPassed = targetClassDate != null &&
+            DateTime.now().isAfter(targetClassDate.add(const Duration(days: 1)));
+        data['status'] = isAlreadyPassed ? 'completed' : 'upcoming';
         data['lastUpdatedDate'] = FieldValue.serverTimestamp();
 
         // Add to batch (generate a new document ID)
@@ -2611,22 +2626,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             ),
             const SizedBox(height: 20),
             _buildDialogStatusOption(ctx, schedulePath, classId,
-                'Upcoming', 'upcoming', Colors.blueAccent),
+                'Upcoming', 'upcoming', Colors.blueAccent, user, subject),
             const SizedBox(height: 10),
             _buildDialogStatusOption(ctx, schedulePath, classId,
-                'Completed', 'completed', Colors.greenAccent),
+                'Completed', 'completed', Colors.greenAccent, user, subject),
             const SizedBox(height: 10),
             _buildDialogStatusOption(ctx, schedulePath, classId,
-                'No Class / Cancelled', 'cancelled', Colors.amberAccent),
+                'No Class / Cancelled', 'cancelled', Colors.amberAccent, user, subject),
             const SizedBox(height: 10),
             _buildDialogStatusOption(ctx, schedulePath, classId,
-                'Auto Class (Uncounted)', 'auto', Colors.cyanAccent),
+                'Auto Class (Uncounted)', 'auto', Colors.cyanAccent, user, subject),
             const SizedBox(height: 10),
             _buildDialogStatusOption(ctx, schedulePath, classId,
-                'Boycott Class (Uncounted)', 'boycott', Colors.redAccent),
+                'Boycott Class (Uncounted)', 'boycott', Colors.redAccent, user, subject),
             const SizedBox(height: 10),
             _buildDialogStatusOption(ctx, schedulePath, classId,
-                'Holiday (Uncounted)', 'holiday', Colors.orangeAccent),
+                'Holiday (Uncounted)', 'holiday', Colors.orangeAccent, user, subject),
           ],
         ),
       ),
@@ -2634,8 +2649,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   // Directly updates the class status in the schedule collection.
-  Widget _buildDialogStatusOption(BuildContext dialogCtx, String schedulePath,
-      String classId, String label, String value, Color color) {
+  Widget _buildDialogStatusOption(
+      BuildContext dialogCtx,
+      String schedulePath,
+      String classId,
+      String label,
+      String value,
+      Color color,
+      AppUser? user,
+      String subject) {
     return ElevatedButton(
       onPressed: () async {
         try {
@@ -2646,23 +2668,41 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             'status': value,
             'lastUpdatedDate': FieldValue.serverTimestamp(),
           });
+
+          // Dispatch real-time push broadcast if marked Cancelled or No Class
+          if (user != null && user.hasDeptScope && (value == 'cancelled' || value == 'no class' || value == 'no_class')) {
+            final actionWord = value == 'cancelled' ? 'Cancelled' : 'Marked No Class';
+            FCMService.notifyRoutineUpdated(
+              subject: subject,
+              action: actionWord,
+              dayOfWeek: _getDayOfWeekName(_selectedDate),
+              senderUserId: user.id,
+              department: user.department,
+              batch: user.batch,
+            ).catchError((e) => debugPrint('[ScheduleScreen] Status push notification error: $e'));
+          }
+
           if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-          InAppNotification.show(
-            context,
-            title: 'Status Updated',
-            message: 'Class set to "$label".',
-            accentColor: AppColors.primary,
-            icon: Icons.edit_calendar_rounded,
-          );
+          if (mounted) {
+            InAppNotification.show(
+              context,
+              title: 'Status Updated',
+              message: 'Class set to "$label".',
+              accentColor: AppColors.primary,
+              icon: Icons.edit_calendar_rounded,
+            );
+          }
         } catch (e) {
           if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-          InAppNotification.show(
-            context,
-            title: 'Update Failed',
-            message: 'Failed to update status: $e',
-            accentColor: Colors.redAccent,
-            icon: Icons.error_outline_rounded,
-          );
+          if (mounted) {
+            InAppNotification.show(
+              context,
+              title: 'Update Failed',
+              message: 'Failed to update status: $e',
+              accentColor: Colors.redAccent,
+              icon: Icons.error_outline_rounded,
+            );
+          }
         }
       },
       style: ElevatedButton.styleFrom(

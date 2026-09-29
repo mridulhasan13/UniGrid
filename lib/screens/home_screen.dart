@@ -14,6 +14,7 @@ import '../widgets/floating_app_bar.dart';
 import 'file_viewer_screen.dart';
 import '../notifications/in_app_notification.dart';
 import '../widgets/general_announcements_manager.dart';
+import '../widgets/exam_button.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -37,6 +38,7 @@ class HomeScreen extends StatelessWidget {
                   ? '${deptFullName(user.department)} — Batch ${user.batch}'
                   : null,
               actions: [
+                ExamButton(user: user),
                 GeneralNotificationBell(user: user),
               ],
             ),
