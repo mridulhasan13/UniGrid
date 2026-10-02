@@ -11,6 +11,7 @@ import '../notifications/fcm_service.dart';
 import 'theme_service.dart';
 import 'supabase_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'email_notification_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -25,6 +26,7 @@ class AuthService {
   // restart it when the user's scope actually changes (Bug #3 guard).
   String? _lastThemeDept;
   String? _lastThemeBatch;
+  bool? _wasPreviouslyApproved;
 
   final _sessionInitCompleter = Completer<void>();
 
@@ -154,10 +156,13 @@ class AuthService {
     if (uid == null) {
       _lastThemeDept = null;
       _lastThemeBatch = null;
+      _wasPreviouslyApproved = null;
       ThemeService.instance.stopListener();
       _userController.add(null);
       return;
     }
+
+    _wasPreviouslyApproved = null;
 
     // Always use the real Firebase UID for the document — no more unified ID
     _userSubscription =
@@ -234,6 +239,38 @@ class AuthService {
 
           final appUser = AppUser.fromMap(data, doc.id);
           _userController.add(appUser);
+
+          // Real-time automatic approval email dispatcher:
+          // Triggers when a student actively waiting for approval is approved by CR, Admin, or console.
+          final bool isApproved = data['isApproved'] == true;
+          if (!isRoot &&
+              _wasPreviouslyApproved != null &&
+              _wasPreviouslyApproved == false &&
+              isApproved) {
+            final bool alreadyNotified = data['approvalEmailSent'] == true;
+            if (!alreadyNotified) {
+              _firestore.collection('users').doc(uid).set({
+                'approvalEmailSent': true,
+              }, SetOptions(merge: true));
+              data['approvalEmailSent'] = true;
+
+              final recipientEmail = (storedEmail.isNotEmpty ? storedEmail : (email ?? '')).trim();
+              final recipientName = (data['name'] as String?)?.trim() ?? displayName ?? '';
+              final recipientDept = (data['department'] as String?)?.trim() ?? '';
+              final recipientBatch = (data['batch'] as String?)?.trim() ?? '';
+
+              if (recipientEmail.isNotEmpty) {
+                EmailNotificationService.sendApprovedEmail(
+                  email: recipientEmail,
+                  name: recipientName,
+                  department: recipientDept,
+                  batch: recipientBatch,
+                );
+              }
+            }
+          }
+          _wasPreviouslyApproved = isApproved;
+
           SharedPreferences.getInstance().then((prefs) {
             prefs.setString('auth_session_department', appUser.department);
             prefs.setString('auth_session_batch', appUser.batch);
@@ -305,6 +342,14 @@ class AuthService {
             }
 
             await _firestore.collection('users').doc(uid).set(initialData, SetOptions(merge: true));
+            if (!isRoot) {
+              EmailNotificationService.sendPendingEmail(
+                email: cleanEmail,
+                name: displayName ?? '',
+                department: '',
+                batch: '',
+              ).catchError((_) {});
+            }
             final newUser = AppUser(
               id: uid,
               email: cleanEmail,
@@ -405,6 +450,18 @@ class AuthService {
           newUser.toMap(),
           SetOptions(merge: true),
         );
+
+        // Send Pending Registration Email to Student
+        if (!isRoot) {
+          EmailNotificationService.sendPendingEmail(
+            email: cleanEmail,
+            name: name,
+            department: department,
+            batch: batch,
+          ).catchError((e) {
+            debugPrint('[AuthService] Pending email dispatch error: $e');
+          });
+        }
         
         // Notify CRs & Admins of the new registration request
         if (!isRoot && department.isNotEmpty && batch.isNotEmpty) {

@@ -4,6 +4,7 @@ import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../utils/constants.dart';
 import '../utils/dept_scope.dart';
+import '../services/email_notification_service.dart';
 import 'glass_card.dart';
 
 class DeptSetupGuard extends StatefulWidget {
@@ -279,11 +280,23 @@ class _DeptSetupGuardState extends State<DeptSetupGuard> {
     });
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUser = Provider.of<AppUser?>(context, listen: false);
       await authService.updateUserProfile(
         department: _selectedDept,
         batch: _selectedBatch,
         phoneNumber: _phoneController.text.trim(),
       );
+
+      if (currentUser != null &&
+          !currentUser.isApproved &&
+          !authService.isRootAdmin(currentUser.email)) {
+        EmailNotificationService.sendPendingEmail(
+          email: currentUser.email,
+          name: currentUser.name,
+          department: _selectedDept ?? '',
+          batch: _selectedBatch ?? '',
+        ).catchError((_) {});
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to update profile: ${e.toString()}';

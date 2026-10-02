@@ -23,6 +23,7 @@ import '../widgets/master_admin/admin_audit_log_card.dart';
 import '../widgets/master_admin/resource_telemetry_card.dart';
 import '../widgets/master_admin/user_lifecycle_card.dart';
 import '../widgets/master_admin/sparkline_graph_widget.dart';
+import '../services/email_notification_service.dart';
 import '../widgets/master_admin/dedicated_analytics_graph_card.dart';
 
 class MasterPanelScreen extends StatefulWidget {
@@ -120,6 +121,19 @@ class _MasterPanelScreenState extends State<MasterPanelScreen> {
       } else if (field == 'isApproved') {
         category = 'User';
         actionDesc = value == true ? 'Approved student account for $uid' : 'Suspended account for $uid';
+        if (value == true) {
+          _firestore.collection('users').doc(uid).get().then((snap) {
+            if (snap.exists) {
+              final d = snap.data() ?? {};
+              EmailNotificationService.sendApprovedEmail(
+                email: (d['email'] ?? '').toString(),
+                name: (d['name'] ?? '').toString(),
+                department: (d['department'] ?? '').toString(),
+                batch: (d['batch'] ?? '').toString(),
+              ).catchError((_) {});
+            }
+          }).catchError((_) {});
+        }
       }
 
       AdminAuditService.logAction(

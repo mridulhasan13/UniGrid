@@ -19,6 +19,7 @@ import '../notifications/fcm_service.dart';
 import 'course_registry_screen.dart';
 import '../widgets/custom_snack_bar.dart';
 import '../notifications/in_app_notification.dart';
+import '../services/email_notification_service.dart';
 
 class CRPanelScreen extends StatefulWidget {
   const CRPanelScreen({super.key});
@@ -1032,17 +1033,31 @@ class _CRPanelScreenState extends State<CRPanelScreen> {
                                   icon: const Icon(Icons.check_circle,
                                       color: Colors.greenAccent),
                                   onPressed: () async {
+                                    final crUser = Provider.of<AppUser?>(context, listen: false);
+                                    final studentDept = (data['department'] ?? (crUser?.department ?? '')).toString();
+                                    final studentBatch = batch.isNotEmpty ? batch : (crUser?.batch ?? '');
+
                                     await FirebaseFirestore.instance
                                         .collection('users')
                                         .doc(docId)
-                                        .update({'isApproved': true});
+                                        .update({
+                                          'isApproved': true,
+                                          'approvalEmailSent': true,
+                                        });
 
-                                    final crUser = Provider.of<AppUser?>(context, listen: false);
+
+                                    EmailNotificationService.sendApprovedEmail(
+                                      email: email,
+                                      name: name,
+                                      department: studentDept,
+                                      batch: studentBatch,
+                                    ).catchError((_) {});
+
                                     if (crUser != null) {
                                       FCMService.notifyAccountApproved(
                                         recipientUserId: docId,
-                                        department: (data['department'] ?? crUser.department).toString(),
-                                        batch: batch.isNotEmpty ? batch : crUser.batch,
+                                        department: studentDept,
+                                        batch: studentBatch,
                                         senderUserId: crUser.id,
                                       ).catchError((_) {});
                                     }
